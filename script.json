@@ -1,0 +1,128 @@
+{
+  "meta": {
+    "repo": "BigBodyCobain/Shadowbroker",
+    "voice": "fr-CA-AntoineNeural",
+    "rate": "+8%",
+    "fps": 30,
+    "width": 1920,
+    "height": 1080
+  },
+  "scenes": [
+    {
+      "id": "intro",
+      "type": "title",
+      "narration": "Aujourd'hui on décortique ShadowBroker : une plateforme open source de renseignement géospatial qui agrège plus de soixante sources de données publiques en temps réel sur une seule carte. Neuf mille deux cents étoiles sur GitHub. C'est parti.",
+      "props": {
+        "title": "SHADOWBROKER",
+        "subtitle": "Renseignement géospatial temps réel — open source",
+        "badge": "★ 9.2k  ·  Python · TypeScript · Rust"
+      }
+    },
+    {
+      "id": "what",
+      "type": "bullets",
+      "narration": "Concrètement, ShadowBroker affiche en direct des avions, des navires, des satellites, des séismes, des caméras de surveillance, et même des feux de scanners de police. Tout converge sur une seule interface façon salle d'opérations.",
+      "props": {
+        "heading": "C'est quoi, au juste ?",
+        "bullets": [
+          "Aviation — vols commerciaux, militaires, jets privés (ADS-B)",
+          "Maritime — 25 000+ navires via AIS",
+          "Spatial — 2 000+ satellites avec propagation orbitale",
+          "Surveillance — 11 000+ caméras CCTV publiques",
+          "Aléas — séismes, incendies, météo, qualité de l'air"
+        ]
+      }
+    },
+    {
+      "id": "why",
+      "type": "bullets",
+      "narration": "L'idée centrale : une quantité énorme de télémétrie mondiale est déjà publique, mais éparpillée entre des dizaines d'outils. ShadowBroker ne crée aucune nouvelle capacité de surveillance — il rassemble et visualise des données existantes. Et comme c'est open source, on peut auditer exactement ce qui est consulté.",
+      "props": {
+        "heading": "Pourquoi ça existe",
+        "bullets": [
+          "Les signaux publics sont éparpillés sur des dizaines d'outils",
+          "ShadowBroker les réunit sur une carte unique",
+          "Aucune nouvelle surveillance — agrégation de données publiques",
+          "100% auditable : pas de comptes, pas de télémétrie produit"
+        ]
+      }
+    },
+    {
+      "id": "arch",
+      "type": "architecture",
+      "narration": "Côté architecture, c'est propre. Un backend FastAPI en Python fait les requêtes vers les fournisseurs publics, avec des garde-fous anti-SSRF. Un frontend Next.js avec MapLibre dessine la carte. Un crate Rust gère les primitives de chiffrement. Et tout se déploie via Docker Compose.",
+      "props": {
+        "nodes": [
+          { "label": "Frontend\nNext.js + MapLibre GL", "x": 0 },
+          { "label": "Backend\nFastAPI (Python)", "x": 1 },
+          { "label": "60+ sources OSINT\nADS-B · AIS · satellites…", "x": 2 }
+        ],
+        "side": "privacy-core (Rust) — chiffrement · Docker Compose — déploiement"
+      }
+    },
+    {
+      "id": "tree",
+      "type": "filetree",
+      "narration": "Voici comment le repo est organisé. Le dossier backend contient les routers FastAPI et les services qui vont chercher chaque flux. Le frontend tient la carte et l'interface. openclaw-skills expose le tout à un agent IA, et privacy-core, c'est le Rust.",
+      "props": {
+        "root": "Shadowbroker/",
+        "tree": [
+          { "name": "backend/", "depth": 0, "dir": true },
+          { "name": "routers/  — osint, cctv, radio, mesh…", "depth": 1, "dir": true },
+          { "name": "services/ — 60+ fetchers de données", "depth": 1, "dir": true },
+          { "name": "main.py", "depth": 1, "dir": false },
+          { "name": "frontend/  — Next.js + MapLibre", "depth": 0, "dir": true },
+          { "name": "openclaw-skills/  — canal agent IA", "depth": 0, "dir": true },
+          { "name": "privacy-core/  — crate Rust (crypto)", "depth": 0, "dir": true },
+          { "name": "docker-compose.yml", "depth": 0, "dir": false }
+        ]
+      }
+    },
+    {
+      "id": "code_osint",
+      "type": "code",
+      "narration": "Regardons un vrai bout de code : le router OSINT. Point important sur la sécurité — toutes les routes dépendent de require_local_operator. Les requêtes de recon ne partent jamais du navigateur : elles sont proxifiées par le backend, après validation anti-SSRF.",
+      "props": {
+        "filename": "backend/routers/osint.py",
+        "lang": "python",
+        "code": "\"\"\"Operator OSINT recon routes (server-side proxies, SSRF guarded).\"\"\"\nfrom __future__ import annotations\n\nfrom fastapi import APIRouter, Depends, HTTPException, Query, Request\nfrom pydantic import BaseModel, Field\n\nfrom auth import require_local_operator\nfrom limiter import limiter\nfrom services.osint import lookups\n\nrouter = APIRouter(dependencies=[Depends(require_local_operator)])\n\nclass SweepScanRequest(BaseModel):\n    ip: str = Field(min_length=7, max_length=45)\n    cidr: int = Field(default=24, ge=24, le=32)",
+        "highlight": [9]
+      }
+    },
+    {
+      "id": "code_skill",
+      "type": "code",
+      "narration": "Et la pièce la plus intéressante : le canal agent. ShadowBroker expose une skill OpenClaw avec un heartbeat qui tourne toutes les soixante secondes pour la surveillance autonome, et une surface d'outils minimale exposée au sélecteur de l'IA. Un agent — Claude, GPT, peu importe — devient un co-analyste sur la carte.",
+      "props": {
+        "filename": "openclaw-skills/shadowbroker/skill.yaml",
+        "lang": "yaml",
+        "code": "name: shadowbroker\ndescription: >-\n  ShadowBroker OSINT intelligence co-pilot.\n\n# Heartbeat — how often the autonomous monitor runs\nheartbeat:\n  enabled: true\n  interval_seconds: 60\n  handler: sb_monitor.heartbeat\n\n# Thin agent surface — expose only these to the LLM\nagent_surface:\n  primary_reads:\n    - sb_query.ShadowBrokerClient.ask\n    - sb_query.ShadowBrokerClient.run_playbook\n  writes:\n    - sb_query.ShadowBrokerClient.place_pin",
+        "highlight": [6, 7, 8]
+      }
+    },
+    {
+      "id": "terminal",
+      "type": "terminal",
+      "narration": "Pour le lancer, c'est du Docker Compose classique. On clone le repo, on copie le fichier d'environnement pour mettre ses propres clés, et on monte la stack. Le backend et le frontend démarrent ensemble.",
+      "props": {
+        "commands": [
+          "git clone https://github.com/BigBodyCobain/Shadowbroker.git",
+          "cd Shadowbroker",
+          "cp .env.example .env   # ajoute tes clés API ici",
+          "docker compose up -d",
+          "# ✓ backend + frontend en ligne sur localhost:3000"
+        ]
+      }
+    },
+    {
+      "id": "outro",
+      "type": "title",
+      "narration": "Voilà ShadowBroker : agrégation OSINT massive, architecture propre, et un vrai canal pour brancher une IA comme co-analyste. Le lien du repo est en description. Abonne-toi pour le prochain décorticage.",
+      "props": {
+        "title": "Teste-le toi-même",
+        "subtitle": "github.com/BigBodyCobain/Shadowbroker",
+        "badge": "★ Laisse une étoile si t'as aimé"
+      }
+    }
+  ]
+}

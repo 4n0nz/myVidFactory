@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+.venv/
+whisper.cpp/
+
+# generated artifacts
+out/
+public/audio/
+render-manifest.json
+captions.json
+
+# cloned repos under analysis
+work/
+
+# misc
+*.log
+.DS_Store

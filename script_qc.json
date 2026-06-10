@@ -1,0 +1,319 @@
+{
+  "meta": {
+    "repo": "BigBodyCobain/Shadowbroker",
+    "voice": "fr-CA-ThierryNeural",
+    "rate": "+15%",
+    "pitch": "-16Hz",
+    "fps": 30,
+    "width": 1920,
+    "height": 1080
+  },
+  "scenes": [
+    {
+      "id": "intro",
+      "type": "title",
+      "narration": "ShadowBroker. Imagine une seule carte du monde où tu vois, en temps réel, tous les avions, tous les bateaux, tous les satellites, des milliers de caméras de surveillance pis les tremblements de terre de la planète. Open source, neuf mille deux cents étoiles sur GitHub. Aujourd'hui on décortique ça comme du monde : l'architecture, le code, pis la feature qui le rend vraiment unique. Envoye, on part ça.",
+      "props": {
+        "title": "SHADOWBROKER",
+        "subtitle": "Le décorticage complet — architecture, code, et la feature qui tue",
+        "badge": "★ 9.2k  ·  Python · TypeScript · Rust"
+      }
+    },
+    {
+      "id": "agenda",
+      "type": "bullets",
+      "narration": "Voici le plan de match. On commence par comprendre c'est quoi pis pourquoi ça existe. Après ça, l'architecture globale. Ensuite on plonge dans le backend pis sa sécurité, dans les soixante sources de données, dans le canal agent IA, pis pour finir le frontend, le chiffrement, pis comment le déployer.",
+      "props": {
+        "heading": "Au programme",
+        "bullets": [
+          "Ce que c'est, et pourquoi",
+          "L'architecture globale",
+          "Le backend & sa sécurité",
+          "Les 60+ sources de données",
+          "Le canal agent IA — la feature signature",
+          "Frontend, chiffrement & déploiement"
+        ]
+      }
+    },
+    {
+      "id": "ch1",
+      "type": "chapter",
+      "narration": "Chapitre un. C'est quoi, ShadowBroker.",
+      "props": {"num": "01", "title": "C'est quoi ShadowBroker"}
+    },
+    {
+      "id": "what",
+      "type": "bullets",
+      "narration": "ShadowBroker, c'est une plateforme de renseignement géospatial décentralisée. A va chercher la télémétrie de plus de soixante sources publiques en direct, pis a met ça sur une seule interface, façon salle d'opérations. Aviation, maritime, spatial, surveillance, pis les aléas naturels — toute à la même place.",
+      "props": {
+        "heading": "Une carte, tous les signaux",
+        "bullets": [
+          "Aviation — vols commerciaux, militaires, jets privés (ADS-B)",
+          "Maritime — 25 000+ navires via AIS",
+          "Spatial — 2 000+ satellites, propagation orbitale",
+          "Surveillance — 11 000+ caméras CCTV publiques",
+          "Aléas — séismes, incendies, météo, qualité de l'air"
+        ]
+      }
+    },
+    {
+      "id": "why",
+      "type": "bullets",
+      "narration": "Pourquoi ça existe ? Parce qu'une quantité écœurante de télémétrie mondiale est déjà publique — mais éparpillée dans des dizaines d'outils différents. ShadowBroker invente aucune nouvelle capacité de surveillance. Y rassemble pis y visualise des données qui existent déjà. Pis comme toute est open source, tu peux vérifier exactement ce qui est consulté. Pas de comptes, pas de tracking.",
+      "props": {
+        "heading": "Pourquoi ça existe",
+        "bullets": [
+          "Les signaux publics sont dispersés sur des dizaines d'outils",
+          "ShadowBroker les réunit sur une carte unique",
+          "Aucune nouvelle surveillance — agrégation de données publiques",
+          "100% auditable : pas de comptes, pas d'analytics"
+        ]
+      }
+    },
+    {
+      "id": "stat1",
+      "type": "stat",
+      "narration": "Pis les chiffres, c'est pas mal impressionnant. Plus de soixante sources de renseignement. Vingt-cinq mille bateaux suivis. Onze mille caméras à travers six pays.",
+      "props": {
+        "items": [
+          {"value": "60+", "label": "sources OSINT en direct"},
+          {"value": "25000+", "label": "navires AIS suivis"},
+          {"value": "11000+", "label": "caméras CCTV publiques"}
+        ]
+      }
+    },
+    {
+      "id": "ch2",
+      "type": "chapter",
+      "narration": "Chapitre deux. L'architecture.",
+      "props": {"num": "02", "title": "L'architecture"}
+    },
+    {
+      "id": "arch",
+      "type": "architecture",
+      "narration": "L'architecture est clean. Un frontend Next.js avec MapLibre qui dessine la carte. Un backend FastAPI en Python qui va questionner les fournisseurs publics, avec des garde-fous anti-SSRF. Un crate Rust qui s'occupe du chiffrement. Pis toute se déploie avec Docker Compose.",
+      "props": {
+        "nodes": [
+          {"label": "Frontend\nNext.js + MapLibre GL", "x": 0},
+          {"label": "Backend\nFastAPI (Python)", "x": 1},
+          {"label": "60+ sources OSINT\nADS-B · AIS · satellites…", "x": 2}
+        ],
+        "side": "privacy-core (Rust) — chiffrement MLS  ·  Docker Compose — déploiement"
+      }
+    },
+    {
+      "id": "tree",
+      "type": "filetree",
+      "narration": "Côté organisation du dépôt : le dossier backend contient les routers FastAPI pis les services qui vont chercher chaque flux. Le frontend tient la carte pis l'interface. openclaw-skills expose toute ça à un agent IA, pis privacy-core, c'est le Rust pour le chiffrement.",
+      "props": {
+        "root": "Shadowbroker/",
+        "tree": [
+          {"name": "backend/", "depth": 0, "dir": true},
+          {"name": "routers/  — osint, cctv, radio, mesh…", "depth": 1, "dir": true},
+          {"name": "services/fetchers/ — 36 sources", "depth": 1, "dir": true},
+          {"name": "main.py", "depth": 1, "dir": false},
+          {"name": "frontend/  — Next.js + MapLibre (287 fichiers)", "depth": 0, "dir": true},
+          {"name": "openclaw-skills/  — canal agent IA", "depth": 0, "dir": true},
+          {"name": "privacy-core/  — crate Rust (MLS)", "depth": 0, "dir": true},
+          {"name": "docker-compose.yml", "depth": 0, "dir": false}
+        ]
+      }
+    },
+    {
+      "id": "ch3",
+      "type": "chapter",
+      "narration": "Chapitre trois. Le backend pis sa sécurité.",
+      "props": {"num": "03", "title": "Le backend & la sécurité"}
+    },
+    {
+      "id": "code_osint",
+      "type": "code",
+      "narration": "Checke un vrai bout de code : le router OSINT. Le point important — toutes les routes dépendent de require_local_operator. Les requêtes de reconnaissance partent jamais du navigateur. A sont proxifiées par le backend, après une validation anti-SSRF. Le navigateur touche jamais directement aux APIs sensibles.",
+      "props": {
+        "filename": "backend/routers/osint.py",
+        "lang": "python",
+        "code": "\"\"\"Operator OSINT recon routes (server-side proxies, SSRF guarded).\"\"\"\nfrom __future__ import annotations\n\nfrom fastapi import APIRouter, Depends, HTTPException, Query, Request\nfrom pydantic import BaseModel, Field\n\nfrom auth import require_local_operator\nfrom limiter import limiter\nfrom services.osint import lookups\n\nrouter = APIRouter(dependencies=[Depends(require_local_operator)])\n\nclass SweepScanRequest(BaseModel):\n    ip: str = Field(min_length=7, max_length=45)\n    cidr: int = Field(default=24, ge=24, le=32)",
+        "highlight": [9]
+      }
+    },
+    {
+      "id": "security",
+      "type": "bullets",
+      "narration": "Le modèle de sécurité est sérieux en titi. Toute passe par le serveur, jamais par le client. Validation anti-SSRF sur chaque requête qui sort. L'accès est réservé à l'opérateur local. Pis les clés API que tu fournis restent dans ton déploiement — a fuient nulle part.",
+      "props": {
+        "heading": "Sécurité d'abord",
+        "bullets": [
+          "Tout proxifié côté serveur — le navigateur ne touche aucune API tierce",
+          "Validation anti-SSRF sur chaque requête sortante",
+          "Accès recon réservé au local-operator",
+          "Tes clés API restent dans ton déploiement"
+        ]
+      }
+    },
+    {
+      "id": "ch4",
+      "type": "chapter",
+      "narration": "Chapitre quatre. Les soixante sources de données.",
+      "props": {"num": "04", "title": "Les 60+ sources de données"}
+    },
+    {
+      "id": "fetchers",
+      "type": "bullets",
+      "narration": "Le cœur du projet, c'est ses fetchers : trente-six modules Python qui vont chercher chaque type de flux. Les vols pis les avions militaires, les bateaux pis l'activité de pêche, les satellites pis les stations au sol, les infrastructures, les cybermenaces, pis même du renseignement open source via Telegram.",
+      "props": {
+        "heading": "36 fetchers, un par domaine",
+        "bullets": [
+          "flights · military · satellites · trains",
+          "AIS vessels · fishing · yacht & carrier tracking",
+          "infrastructure · emissions · wastewater",
+          "malware · cyber_status · crowdthreat · SIGINT",
+          "telegram_osint · prediction_markets · financial"
+        ]
+      }
+    },
+    {
+      "id": "code_flights",
+      "type": "code",
+      "narration": "Pis c'est pas juste de la collecte bête là. Checke le module des vols : en plus de l'ADS-B pis d'OpenSky, y fait de l'accumulation de trajectoires, de la détection de zones de brouillage GPS, pis même la détection de circuits d'attente. C'est de l'analyse, pas juste de l'affichage.",
+      "props": {
+        "filename": "backend/services/fetchers/flights.py",
+        "lang": "python",
+        "code": "\"\"\"Commercial flight fetching — ADS-B, OpenSky, supplemental\nsources, routes, trail accumulation, GPS jamming detection,\nand holding pattern detection.\"\"\"\n\nfrom services.fetchers.plane_alert import enrich_with_tracked_names\nfrom services.fetchers.emissions import get_emissions_info\nfrom services.fetchers.route_database import lookup_route\nfrom services.constants import (\n    GPS_JAMMING_NACP_THRESHOLD,\n    GPS_JAMMING_MIN_RATIO,\n    GPS_JAMMING_MIN_AIRCRAFT,\n)",
+        "highlight": [1, 2, 3]
+      }
+    },
+    {
+      "id": "stat2",
+      "type": "stat",
+      "narration": "Concrètement, ça donne : trente-six fetchers, deux mille satellites suivis avec leur orbite, pis trente-cinq mille centrales électriques sur la carte.",
+      "props": {
+        "items": [
+          {"value": "36", "label": "modules fetchers"},
+          {"value": "2000+", "label": "satellites suivis"},
+          {"value": "35000+", "label": "centrales électriques"}
+        ]
+      }
+    },
+    {
+      "id": "ch5",
+      "type": "chapter",
+      "narration": "Chapitre cinq. Le canal agent IA. La feature signature.",
+      "props": {"num": "05", "title": "Le canal agent IA"}
+    },
+    {
+      "id": "agent_intro",
+      "type": "bullets",
+      "narration": "Là c'est ça qui distingue vraiment ShadowBroker. Y expose un canal agentique signé en HMAC : tu branches une IA — Claude, GPT, n'importe quel agent qui parle le protocole — pis a devient une co-analyste. A voit toute ce que l'opérateur voit, pis a peut agir sur la carte en temps réel. C'est malade.",
+      "props": {
+        "heading": "Une IA comme co-analyste",
+        "bullets": [
+          "Canal de commande signé HMAC — Claude, GPT, LangChain…",
+          "Accès lecture/écriture aux 40+ couches de données",
+          "Recherche transversale : search_telemetry, search_news",
+          "Toolkit recon complet : osint_lookup (IP, DNS, sanctions, CVE)",
+          "Place des pins, contrôle la carte, livre des alertes"
+        ]
+      }
+    },
+    {
+      "id": "code_skill",
+      "type": "code",
+      "narration": "Techniquement, c'est une skill OpenClaw. Un heartbeat roule à toutes les soixante secondes pour la surveillance autonome. Pis checke le concept clé : une surface d'outils minimale. On expose à l'IA juste quelques fonctions choisies — les lectures sûres, pis les écritures contrôlées. Ça, c'est de la conception d'agent faite comme du monde.",
+      "props": {
+        "filename": "openclaw-skills/shadowbroker/skill.yaml",
+        "lang": "yaml",
+        "code": "name: shadowbroker\ndescription: ShadowBroker OSINT intelligence co-pilot.\n\n# Heartbeat — le moniteur autonome tourne toutes les 60s\nheartbeat:\n  enabled: true\n  interval_seconds: 60\n  handler: sb_monitor.heartbeat\n\n# Surface fine — on n'expose que ça au sélecteur de l'IA\nagent_surface:\n  primary_reads:\n    - sb_query.ShadowBrokerClient.ask\n    - sb_query.ShadowBrokerClient.run_playbook\n  writes:\n    - sb_query.ShadowBrokerClient.place_pin",
+        "highlight": [4, 5, 6, 7]
+      }
+    },
+    {
+      "id": "code_client",
+      "type": "code",
+      "narration": "Pis côté client, c'est pensé sécurité dès le départ. En local, t'as pas besoin d'authentification. En distant, toute est signé en HMAC. Le code te prévient même clairement : envoye jamais le secret comme un simple bearer token. C'est ces détails-là qui font un projet sérieux.",
+      "props": {
+        "filename": "openclaw-skills/shadowbroker/sb_query.py",
+        "lang": "python",
+        "code": "\"\"\"ShadowBroker query functions - core API for OpenClaw.\n\nFor local access (same machine), no authentication is needed.\nFor remote access, set SHADOWBROKER_HMAC_SECRET to enable\nHMAC-signed requests. Never send the value as a raw bearer\ntoken, X-Admin-Key, query parameter, or unsigned header.\n\"\"\"\n\nimport asyncio\nimport hashlib\nimport hmac\nimport os\nimport secrets",
+        "highlight": [3, 4, 5]
+      }
+    },
+    {
+      "id": "ch6",
+      "type": "chapter",
+      "narration": "Chapitre six. Le frontend pis le chiffrement.",
+      "props": {"num": "06", "title": "Frontend & chiffrement"}
+    },
+    {
+      "id": "frontend",
+      "type": "bullets",
+      "narration": "Le frontend, c'est du Next.js avec MapLibre GL — proche de trois cents fichiers TypeScript. Quarante couches que t'actives une par une, comme tu veux. Pis cinq modes visuels : défaut, satellite, thermique, vision de nuit, pis même un mode CRT rétro pour le style salle d'ops.",
+      "props": {
+        "heading": "Frontend — Next.js + MapLibre",
+        "bullets": [
+          "287 fichiers TypeScript",
+          "40+ couches de données activables une par une",
+          "5 modes visuels : DEFAULT · SATELLITE · FLIR · NVG · CRT",
+          "Clic droit n'importe où → dossier pays + photo Sentinel-2"
+        ]
+      }
+    },
+    {
+      "id": "rust",
+      "type": "bullets",
+      "narration": "Pis la partie la plus pointue : privacy-core, un crate Rust. Y s'appuie sur MLS — Messaging Layer Security, la librairie d'AWS — pour les primitives de messagerie privée du réseau mesh. L'état du protocole reste du bord Rust, opaque à Python, exposé juste via une FFI à base de handles. Du solide.",
+      "props": {
+        "heading": "privacy-core — le Rust",
+        "bullets": [
+          "Chiffrement basé sur MLS (mls-rs, la lib d'AWS)",
+          "Primitives de messagerie privée pour le mesh InfoNet",
+          "L'état du protocole reste opaque à Python (FFI par handles)",
+          "Compilable en WASM (wasm-bindgen)"
+        ]
+      }
+    },
+    {
+      "id": "ch7",
+      "type": "chapter",
+      "narration": "Chapitre sept. Le déploiement.",
+      "props": {"num": "07", "title": "Le déploiement"}
+    },
+    {
+      "id": "terminal",
+      "type": "terminal",
+      "narration": "Pour partir ShadowBroker, c'est du Docker Compose ben classique. Tu clones le repo, tu copies le fichier d'environnement pour mettre tes propres clés API, pis tu montes la stack. Le backend pis le frontend démarrent ensemble, en local par défaut.",
+      "props": {
+        "commands": [
+          "git clone https://github.com/BigBodyCobain/Shadowbroker.git",
+          "cd Shadowbroker",
+          "cp .env.example .env   # ajoute tes clés API ici",
+          "docker compose up -d",
+          "# ✓ backend :8000 + frontend en ligne"
+        ]
+      }
+    },
+    {
+      "id": "config",
+      "type": "bullets",
+      "narration": "Côté configuration, toute passe par des variables d'environnement. Les clés sont optionnelles — sans clé, t'as déjà en masse de sources gratuites. Pis le réseau mesh peut même router à travers Tor, sur des adresses point-oignon, pour de la synchronisation privée.",
+      "props": {
+        "heading": "Config par variables d'env",
+        "bullets": [
+          "Clés API optionnelles (OpenSky, AIS, Windy, Finnhub…)",
+          "Sans clé : déjà des dizaines de sources gratuites",
+          "Mesh InfoNet routable via Tor (.onion)",
+          "Bind sur 127.0.0.1 par défaut — privé par défaut"
+        ]
+      }
+    },
+    {
+      "id": "outro",
+      "type": "title",
+      "narration": "Faque voilà ShadowBroker au grand complet : agrégation OSINT massive, architecture clean pis sécurisée, pis un vrai canal pour brancher une IA comme co-analyste. C'est un des projets open source les plus impressionnants en ce moment, mettons. Le lien est dans la description — va le tester toi-même. Pis si t'as aimé le décorticage, abonne-toi pour le prochain. Salut !",
+      "props": {
+        "title": "Teste-le toi-même",
+        "subtitle": "github.com/BigBodyCobain/Shadowbroker",
+        "badge": "★ Abonne-toi pour le prochain décorticage"
+      }
+    }
+  ]
+}
