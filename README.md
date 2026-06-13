@@ -133,7 +133,7 @@ Usage privé. Les dépôts analysés gardent leur propre licence.
 
 ## v6 — host avatar, B-roll, voix XTTS, cerveau agent
 
-- **Host avatar** () : un présentateur masqué (vidéo  via OffthreadVideo) + le terminal de sous-titres, en un bloc qui passe de **plein écran (hero)** aux **chapitres** à **PiP** pendant le contenu. Piloté par le champ `host` (hero/pip/off) de chaque scène. Plus d'overlay alpha séparé.
+- **Host avatar** (`src/HostModule.tsx`) : un présentateur masqué (vidéo `public/avatar.mp4` via OffthreadVideo) + le terminal de sous-titres, en un bloc qui passe de **plein écran (hero)** aux **chapitres** à **PiP** pendant le contenu. Piloté par le champ `host` (hero/pip/off) de chaque scène. Plus d'overlay alpha séparé.
 - **B-roll** (`src/scenes/Broll.tsx` + `add_broll.py`) : clips d'habillage insérés entre les sections avec un effet **glitch / coupure de signal**. Clips préparés via `prep_broll.ps1`.
 - **Scènes UI** : `BrowserSearch` (recherche simulée), `Action` (curseur synchronisé sur la voix via whisper + `gen_cues.py`/`build_cues.py`), `Install` (terminal d'install), `MatrixRain`, `Stat`, `Chapter`.
 - **Voix** : `build_audio_xtts.py` (XTTS local sur GPU, voix clonables) en alternative à edge-tts. Driver : `render_master_xtts.sh`.
