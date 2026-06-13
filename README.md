@@ -37,22 +37,21 @@ claude -p "Lis SPEC.md et suis-le. Clone <URL> dans work/repo, analyse, écris s
 
 | Étape | Script | Rôle |
 |---|---|---|
-| 1. Voix off | `build_audio_xtts.py` *(défaut)* ou `build_audio.py` | TTS par scène → `public/audio/*.mp3` + `render-manifest.json` (durées synchro, tags host) |
+| 1. Voix off | `build_audio_xtts.py` | TTS XTTS par scène → `public/audio/*.mp3` + `render-manifest.json` (durées synchro, tags host) |
 | 2. Cues | `build_cues.py` | whisper word-timing → pilote le curseur des scènes `action` |
 | 3. Sous-titres | `gen_captions.py` | texte EXACT du script → captions propres pour le terminal |
 | 4. Rendu | `npx remotion render … Tutorial` | visuels + avatar host + terminal, **un seul rendu** |
 | 5. B-roll | `add_broll.py` + `prep_broll.ps1` | insère des clips d'habillage glitch entre les chapitres |
 
-**Tout-en-un** : `render_master_xtts.sh` (voix XTTS) ou `render_master.sh` (edge-tts).
+**Tout-en-un** : `render_master_xtts.sh`.
 
 ---
 
-## Les voix (au choix, l'étape est agnostique)
+## La voix : XTTS (local GPU)
 
-- **XTTS** (`build_audio_xtts.py`) — **local sur GPU**, 58 voix intégrées + clonage de voix depuis un clip de référence (et émotion). Qualité chaude. ⚠️ Modèle XTTS v2 sous **license non-commerciale**.
-- **edge-tts** (`build_audio.py`) — gratuit, en ligne (voix neurales Microsoft, dont fr-CA), sans clé. Non-officiel (peut être coupé), pas de clonage.
+`build_audio_xtts.py` utilise **XTTS** en local sur le GPU : 58 voix intégrées + clonage de voix depuis un clip de référence (et émotion). Voix par défaut actuelle : `Zacharie Aimilios`. ⚠️ Le modèle XTTS v2 est sous **license non-commerciale** (pour une chaîne monétisée, prévoir une voix à license commerciale).
 
-Le pipeline lit juste des `.mp3` par scène — on branche la source qu'on veut (Azure, ElevenLabs… s'ajoutent pareil).
+L'étape voix est **agnostique** : le pipeline lit juste des `.mp3` par scène, donc n'importe quelle source se branche pareil. Le repo contient aussi un chemin **edge-tts** (gratuit, en ligne, `build_audio.py` / `render_master.sh`) comme alternative.
 
 ---
 
@@ -112,8 +111,8 @@ cd myVidFactory
 # 1. L'agent écrit le script depuis un repo
 claude -p "Lis SPEC.md et suis-le. Clone <URL>, écris script.json." --dangerously-skip-permissions
 
-# 2. Rendu complet
-bash render_master_xtts.sh        # (ou render_master.sh pour edge-tts)
+# 2. Rendu complet (voix XTTS + avatar host + sous-titres + B-roll)
+bash render_master_xtts.sh
 # → out/master.mp4
 ```
 
