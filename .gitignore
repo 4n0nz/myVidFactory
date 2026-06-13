@@ -15,3 +15,14 @@ work/
 # misc
 *.log
 .DS_Store
+
+public/
+agent_test/
+agent_dec/
+.venv-xtts/
+whisper.cpp/
+script_qc*.json
+render-manifest.json
+captions.json
+cues.json
+*.wav

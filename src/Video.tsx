@@ -9,6 +9,11 @@ import {Code} from "./scenes/Code";
 import {Terminal} from "./scenes/Terminal";
 import {Chapter} from "./scenes/Chapter";
 import {Stat} from "./scenes/Stat";
+import {Action} from "./scenes/Action";
+import {Install} from "./scenes/Install";
+import {Broll} from "./scenes/Broll";
+import {BrowserSearch} from "./BrowserSearch";
+import {HostModule} from "./HostModule";
 
 const MAP: Record<string, React.FC<any>> = {
   title: Title,
@@ -19,6 +24,10 @@ const MAP: Record<string, React.FC<any>> = {
   terminal: Terminal,
   chapter: Chapter,
   stat: Stat,
+  action: Action,
+  install: Install,
+  broll: Broll,
+  browser: BrowserSearch,
 };
 
 export const Video: React.FC = () => {
@@ -41,6 +50,7 @@ export const Video: React.FC = () => {
           );
         })}
       </Series>
+      <HostModule />
     </AbsoluteFill>
   );
 };

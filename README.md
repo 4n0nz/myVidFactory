@@ -128,3 +128,15 @@ Master 1080p de ~6 min : ~35 min de rendu (base) + ~30 min (terminal-PiP alpha) 
 ## Licence
 
 Usage privé. Les dépôts analysés gardent leur propre licence.
+
+---
+
+## v6 — host avatar, B-roll, voix XTTS, cerveau agent
+
+- **Host avatar** () : un présentateur masqué (vidéo  via OffthreadVideo) + le terminal de sous-titres, en un bloc qui passe de **plein écran (hero)** aux **chapitres** à **PiP** pendant le contenu. Piloté par le champ `host` (hero/pip/off) de chaque scène. Plus d'overlay alpha séparé.
+- **B-roll** (`src/scenes/Broll.tsx` + `add_broll.py`) : clips d'habillage insérés entre les sections avec un effet **glitch / coupure de signal**. Clips préparés via `prep_broll.ps1`.
+- **Scènes UI** : `BrowserSearch` (recherche simulée), `Action` (curseur synchronisé sur la voix via whisper + `gen_cues.py`/`build_cues.py`), `Install` (terminal d'install), `MatrixRain`, `Stat`, `Chapter`.
+- **Voix** : `build_audio_xtts.py` (XTTS local sur GPU, voix clonables) en alternative à edge-tts. Driver : `render_master_xtts.sh`.
+- **Cerveau agent** : `SPEC.md` = les consignes complètes données à un agent Claude Code headless pour transformer un repo en `script.json` (structure narrative en 5 temps, types de scènes, tags host). C'est ce qui rend la génération 100% autonome depuis une URL.
+
+> Note : `public/` (avatar, B-roll, audio générés) n'est pas versionné — fournis tes propres assets.

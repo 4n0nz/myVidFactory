@@ -42,6 +42,7 @@ for sc in data["scenes"]:
     out_scenes.append({
         "id": sid,
         "type": sc["type"],
+        "host": sc.get("host", sc.get("props", {}).get("host", "pip")),
         "props": sc["props"],
         "audioFile": f"audio/{sid}.mp3",
         "durationInFrames": frames,
