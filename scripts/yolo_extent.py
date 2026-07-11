@@ -11,7 +11,10 @@ from ultralytics import YOLO
 hmap_path = sys.argv[1]
 source = sys.argv[2]
 CONF = float(sys.argv[3]) if len(sys.argv) > 3 else 0.35
-WEIGHTS = os.environ.get("YOLO_WEIGHTS", os.path.expanduser("~/yolo/runs/facecam/weights/best.pt"))
+# Defaut = facecam5 epoch8 (= best_real.pt) : le checkpoint qui bat v3 sur les VRAIES frames
+# (24/24, 6gtf/1x32/vkmx/masortie natifs). PAS best.pt de facecam5 (= overfit sur val SYNTHETIQUE).
+# Rollback vers v3 : YOLO_WEIGHTS=~/yolo/runs/facecam/weights/best.pt
+WEIGHTS = os.environ.get("YOLO_WEIGHTS", os.path.expanduser("~/yolo/runs/facecam5/weights/best_real.pt"))
 
 m = YOLO(WEIGHTS)
 cap = cv2.VideoCapture(source)
