@@ -94,67 +94,125 @@ def _strip_moves(mm, x0, y0, x1, y1):
     return float(mm[y0:y1, x0:x1].mean())
 
 med = lambda L: statistics.median(L)
-fixed = 0; yunet_hit = 0; missed = 0
-for s in segs:
-    if s["host"] != "pip":
-        continue
-    a, b = s["start"], s["end"]
-    ts = [a + (b - a) * f for f in (0.2, 0.35, 0.5, 0.65, 0.8)]
+
+def raw_box(wa, wb, fallback_bbox):
+    """Box brute pour la fenetre [wa,wb] : YOLO (mediane 5 samples) -> YuNet -> box heuristique.
+    Retourne (bx,by,bw,bh, method) ou None. method in yolo|yunet|heur. Chaine INCHANGEE vs avant."""
+    ts = [wa + (wb - wa) * f for f in (0.2, 0.35, 0.5, 0.65, 0.8)]
     boxes = [bb for bb in (best_box(t) for t in ts) if bb]
     if len(boxes) >= 2:
-        bx = med([b_[0] for b_ in boxes]); by = med([b_[1] for b_ in boxes])
-        bw = med([b_[2] for b_ in boxes]); bh = med([b_[3] for b_ in boxes])
-        fixed += 1
-    else:
-        # YOLO muet -> FALLBACK #1 : YuNet (2e detecteur, trouve les webcams que YOLO rate).
-        yb = [bb for bb in (yunet_box(t) for t in ts) if bb]
-        if len(yb) >= 2:
-            bx = med([b_[0] for b_ in yb]); by = med([b_[1] for b_ in yb])
-            bw = med([b_[2] for b_ in yb]); bh = med([b_[3] for b_ in yb])
-            yunet_hit += 1
-        elif s.get("bbox"):
-            # ni YOLO ni YuNet -> FALLBACK #2 : ancienne box heuristique (la garde
-            # anti-sur-couverture plus bas la rabote a un coin prudent si elle est enorme).
-            bx, by, bw, bh = s["bbox"]
+        return (med([q[0] for q in boxes]), med([q[1] for q in boxes]),
+                med([q[2] for q in boxes]), med([q[3] for q in boxes]), "yolo")
+    # YOLO muet -> FALLBACK #1 : YuNet (2e detecteur, trouve les webcams que YOLO rate).
+    yb = [bb for bb in (yunet_box(t) for t in ts) if bb]
+    if len(yb) >= 2:
+        return (med([q[0] for q in yb]), med([q[1] for q in yb]),
+                med([q[2] for q in yb]), med([q[3] for q in yb]), "yunet")
+    # ni YOLO ni YuNet -> FALLBACK #2 : ancienne box heuristique (la garde anti-sur-couverture
+    # dans finalize() la rabote a un coin prudent si elle est enorme).
+    if fallback_bbox:
+        bx, by, bw, bh = fallback_bbox
+        return (bx, by, bw, bh, "heur")
+    return None
+
+def finalize(bx, by, bw, bh, wa, wb):
+    """Extension bord motion-gated + garde anti-sur-couverture. Retourne [x,y,w,h]. INCHANGE vs avant.
+    Voir commentaires historiques : snap motion-gated (1DOLq/1x32/Jjwv) + rabot anti-ecrasement (6GtF/Ethx)."""
+    PAD = 0.015; EDGE_ZONE = 0.10; MOT_FILL = 0.05
+    rx1, ry1 = bx + bw, by + bh
+    mm = _motion_map((wa + wb) / 2)
+    bxp, byp, rxp, ryp = bx * W, by * H, rx1 * W, ry1 * H
+    def _ext(near, moves):
+        return near and (mm is not None) and moves > MOT_FILL
+    x0 = 0.0 if _ext(bx < EDGE_ZONE, mm is not None and _strip_moves(mm, 0, byp, bxp, ryp)) else max(0.0, bx - bw * PAD)
+    y0 = 0.0 if _ext(by < EDGE_ZONE, mm is not None and _strip_moves(mm, bxp, 0, rxp, byp)) else max(0.0, by - bh * PAD)
+    x1 = 1.0 if _ext(rx1 > 1 - EDGE_ZONE, mm is not None and _strip_moves(mm, rxp, byp, W, ryp)) else min(1.0, rx1 + bw * PAD)
+    y1 = 1.0 if _ext(ry1 > 1 - EDGE_ZONE, mm is not None and _strip_moves(mm, bxp, ryp, rxp, H)) else min(1.0, ry1 + bh * PAD)
+    fx0, fy0, fw, fh = x0, y0, x1 - x0, y1 - y0
+    if fh > 0.72 or fw > 0.55 or fw * fh > 0.38:
+        hcx, hcy = fx0 + fw / 2, fy0 + fh / 2
+        fw, fh = 0.26, 0.42
+        fx0 = 0.0 if hcx < 0.5 else 1.0 - fw
+        fy0 = 1.0 - fh if hcy > 0.35 else 0.0
+    return [round(fx0, 4), round(fy0, 4), round(fw, 4), round(fh, 4)]
+
+def intro_split_time(a, b):
+    """CHANTIER #2 : webcam d'INTRO plus grosse qui retrecit en cours de segment (cf Ethx grosse->petite).
+    Une seule box mediane par segment ecrase ce cas. CHIRURGICAL (bulk-safe) : on ne split QUE si le
+    debut du segment est NETTEMENT plus grand (>=1.6x l'aire) que le regime stable de la 2e moitie.
+    Pas de saut = None -> comportement IDENTIQUE a avant (vKMx/1x32/... intouches, aucune sous-seg aveugle).
+    Retourne l'instant de bascule (absolu) ou None."""
+    if a > 90.0:                            # un INTRO est par definition au DEBUT de la video ;
+        return None                         # un segment qui commence tard (ex. vKMx 440s) n'en est pas un
+    if (b - a) < 6.0:                       # trop court pour un vrai intro qui retrecit
+        return None
+    fracs = [0.03, 0.08, 0.14, 0.22, 0.32, 0.45, 0.60, 0.75, 0.90]
+    samp = []
+    for f in fracs:
+        bb = best_box(a + (b - a) * f)      # YOLO seul = signal propre (box complete)
+        if bb:
+            samp.append((f, bb))
+    late = [bx for f, bx in samp if f >= 0.35]
+    early = [(f, bx) for f, bx in samp if f < 0.20]
+    if len(late) < 2 or not early:
+        return None
+    ar = lambda bx: bx[2] * bx[3]
+    steady = [med([bx[i] for bx in late]) for i in range(4)]   # box mediane du regime stable
+    s_area = ar(steady)
+    # coin ancre du regime stable (webcam collee a un coin d'ecran) : un VRAI resize garde ce
+    # coin fixe, seule la taille change. Un saut de coin/position = autre chose (decoy, changement
+    # de plan) -> PAS un resize -> on ne split pas. C'est ce qui distingue Ethx (meme coin bas-gauche,
+    # accepte) de vKMx (la partie "grosse" saute en (0.20,0.64), autre position -> rejete).
+    scx, scy = steady[0] + steady[2] / 2, steady[1] + steady[3] / 2
+    sx = 0 if scx < 0.5 else 1; sy = 0 if scy < 0.5 else 1
+    corner = lambda bx: (bx[0] if sx == 0 else bx[0] + bx[2], bx[1] if sy == 0 else bx[1] + bx[3])
+    scn = corner(steady)
+    big = []
+    for f, bx in early:
+        if ar(bx) >= 1.6 * s_area:                        # intro nettement plus grosse
+            cn = corner(bx)
+            if abs(cn[0] - scn[0]) <= 0.10 and abs(cn[1] - scn[1]) <= 0.10:  # meme coin = meme webcam
+                big.append(f)
+    if not big:
+        return None
+    f_big = max(big)
+    after = [f for f, bx in samp if f > f_big and ar(bx) <= 1.3 * s_area]  # retour au stable
+    f_small = min(after) if after else min(f_big + 0.1, 0.99)
+    return a + (b - a) * (f_big + f_small) / 2
+
+fixed = 0; yunet_hit = 0; missed = 0
+out_segs = []
+for s in segs:
+    if s["host"] != "pip":
+        out_segs.append(s)
+        continue
+    a, b = s["start"], s["end"]
+    # split intro chirurgical : 2 fenetres seulement si un vrai resize est detecte ET que
+    # CHAQUE sous-fenetre detecte quelque chose (sinon on retombe sur le segment entier = zero trou).
+    tsplit = intro_split_time(a, b)
+    parts = None
+    if tsplit is not None:
+        rb1 = raw_box(a, tsplit, s.get("bbox"))
+        rb2 = raw_box(tsplit, b, s.get("bbox"))
+        if rb1 and rb2:
+            parts = [(a, tsplit, rb1), (tsplit, b, rb2)]
+    if parts is None:
+        rb = raw_box(a, b, s.get("bbox"))
+        if rb is None:
             missed += 1
-        else:
-            missed += 1
+            out_segs.append(s)              # aucune detection -> segment inchange (bbox d'origine)
             continue
-    if True:
-        # extension PAR-BORD, conditionnee a la proximite de la box BRUTE au bord.
-        # Un bord de box qui TOUCHE deja le bord ecran (<NEAR) = webcam de coin collee ->
-        # on snap au bord (sinon le vrai narrateur fuit, cf 1DOLq). Un bord EN RETRAIT
-        # (webcam flottante avec marge, cf 1x32) = on NE pousse PAS vers le bord, juste un
-        # overscan doux (PAD) pour couvrir le cadre/coins arrondis. Evite le debord dans la
-        # marge sombre des webcams inset tout en gardant la couverture des webcams au bord.
-        # SNAP MOTION-GATED (content-aware, bulk) : au bord d'une box proche du bord ecran,
-        # on regarde la BANDE entre la box et le bord. Bande qui BOUGE = la webcam continue
-        # (le narrateur fuit) -> on etend jusqu'au bord. Bande STATIQUE = marge/wallpaper ->
-        # on garde le retrait (juste micro-overscan). Un seuil de position seul ne distingue
-        # pas "vraie marge 2.5%" (1x32) de "webcam au bord sous-estimee" (Jjwv) ; le mouvement si.
-        PAD = 0.015; EDGE_ZONE = 0.10; MOT_FILL = 0.05
-        rx1, ry1 = bx + bw, by + bh
-        mm = _motion_map((a + b) / 2)
-        bxp, byp, rxp, ryp = bx * W, by * H, rx1 * W, ry1 * H
-        def _ext(near, moves):
-            return near and (mm is not None) and moves > MOT_FILL
-        x0 = 0.0 if _ext(bx < EDGE_ZONE, mm is not None and _strip_moves(mm, 0, byp, bxp, ryp)) else max(0.0, bx - bw * PAD)
-        y0 = 0.0 if _ext(by < EDGE_ZONE, mm is not None and _strip_moves(mm, bxp, 0, rxp, byp)) else max(0.0, by - bh * PAD)
-        x1 = 1.0 if _ext(rx1 > 1 - EDGE_ZONE, mm is not None and _strip_moves(mm, rxp, byp, W, ryp)) else min(1.0, rx1 + bw * PAD)
-        y1 = 1.0 if _ext(ry1 > 1 - EDGE_ZONE, mm is not None and _strip_moves(mm, bxp, ryp, rxp, H)) else min(1.0, ry1 + bh * PAD)
-        fx0, fy0, fw, fh = x0, y0, x1 - x0, y1 - y0
-        # GARDE anti-sur-couverture (fallback prudent), sur la box FINALE : une box pip
-        # implausiblement GRANDE (h>0.72 / large / aire>0.38) = YOLO muet (box heuristique
-        # full-height) OU detection foireuse sur createur inconnu (cf 6GtF h=0.85). Un tel
-        # avatar ECRASE tout le contenu. On la rabote a une webcam de COIN prudente, ancree
-        # au coin qu'elle vise. Mieux un avatar un peu petit dans le bon coin que plein ecran.
-        # Seuil haut (0.72) pour epargner une vraie grosse webcam d'intro (ex. Ethx ~0.70).
-        if fh > 0.72 or fw > 0.55 or fw * fh > 0.38:
-            hcx, hcy = fx0 + fw / 2, fy0 + fh / 2
-            fw, fh = 0.26, 0.42   # taille webcam de coin plausible (assez haute pour couvrir tete+epaules)
-            fx0 = 0.0 if hcx < 0.5 else 1.0 - fw
-            fy0 = 1.0 - fh if hcy > 0.35 else 0.0
-        s["bbox"] = [round(fx0, 4), round(fy0, 4), round(fw, 4), round(fh, 4)]
+        parts = [(a, b, rb)]
+    for wa, wb, rb in parts:
+        bx, by, bw, bh, method = rb
+        if method == "yolo": fixed += 1
+        elif method == "yunet": yunet_hit += 1
+        else: missed += 1
+        bbox = finalize(bx, by, bw, bh, wa, wb)
+        ns = s if len(parts) == 1 else dict(s)
+        ns["start"], ns["end"], ns["bbox"] = wa, wb, bbox
+        out_segs.append(ns)
+segs = out_segs
 
 cap.release()
 
