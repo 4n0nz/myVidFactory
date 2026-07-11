@@ -247,6 +247,53 @@ for s in segs:
         out_segs.append(ns)
 segs = out_segs
 
+# --- raffinement de frontiere : aligner les bornes sur le VRAI hard-cut (scene change) ---
+# analyze_host2 echantillonne tous les 0.5s -> une frontiere de segment peut etre en RETARD jusqu'a
+# 0.5s sur la vraie transition. Pendant ce retard, l'avatar reste a l'ancienne position pendant que
+# la webcam a deja saute -> le vrai visage FUIT (cf ofr : webcam 2 positions, cut a 38.72 mais borne
+# a 39.0 = 0.28s de fuite). Fix bulk : a chaque frontiere ou l'apparence de l'avatar change (pip<->
+# autre, ou pip qui se DEPLACE), on cherche un hard-cut (pic de diff globale) dans +/-0.5s et on snap
+# la borne au frame du cut. Ne touche QUE les frontieres a vrai scene-cut -> videos mono-position et
+# sans cut net = intactes. Un slide sans cut (pas de pic) = borne inchangee (fallback sur).
+_SC_WIN = 0.5; _SC_STEP = 0.05; _SC_TH = 25.0
+def _scene_cut(t0, t1):
+    prev = None; best_t = None; best_d = 0.0; tt = max(0.0, t0)
+    while tt <= t1:
+        f = _frame(tt)
+        if f is not None:
+            g = cv2.cvtColor(cv2.resize(f, (320, 180)), cv2.COLOR_BGR2GRAY)
+            if prev is not None:
+                d = float(cv2.absdiff(g, prev).mean())
+                if d > best_d: best_d, best_t = d, tt
+            prev = g
+        tt += _SC_STEP
+    return best_t if best_d > _SC_TH else None
+
+def _pcen(s):
+    b = s.get("bbox"); return (b[0] + b[2] / 2, b[1] + b[3] / 2) if b else None
+
+refined = 0
+for i in range(len(segs) - 1):
+    s1, s2 = segs[i], segs[i + 1]
+    if abs(s1["end"] - s2["start"]) > 1e-6:
+        continue                                        # segments non adjacents (trou) -> on saute
+    # CIBLE = le saut de POSITION de webcam (cf ofr, pos A<->B) : 2 pip adjacents dont le centre
+    # bouge nettement. C'est le seul cas ou l'avatar reste visiblement au mauvais endroit pendant
+    # que le vrai visage a saute. On NE touche PAS les frontieres pip<->hero/off (=> videos
+    # mono-position et deja validees restent byte-identique).
+    c1, c2 = _pcen(s1), _pcen(s2)
+    moved = (s1["host"] == "pip" and s2["host"] == "pip" and c1 and c2
+             and (abs(c1[0] - c2[0]) > 0.12 or abs(c1[1] - c2[1]) > 0.12))
+    if not moved:
+        continue
+    bnd = s1["end"]
+    cut = _scene_cut(bnd - _SC_WIN, bnd + _SC_WIN)
+    if cut is not None and abs(cut - bnd) > 0.06:
+        s1["end"] = round(cut, 2); s2["start"] = round(cut, 2)
+        refined += 1
+if refined:
+    print("raffinement frontiere : %d borne(s) snappee(s) sur hard-cut" % refined)
+
 cap.release()
 
 # --- cleanup anti-decoy : pip bref qui saute loin de la webcam stable ---
