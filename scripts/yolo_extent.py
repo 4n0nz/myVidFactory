@@ -79,6 +79,20 @@ def yunet_box(t):
         return [ax / W, ay / H, aw / W, ah / H]
     return None
 
+def _motion_map(t):
+    """Carte binaire du mouvement a l'instant t (diff avec +0.15s). None si illisible."""
+    f0 = _frame(t)
+    if f0 is None: return None
+    f1 = _frame(t + _MOT_DT); f1 = f1 if f1 is not None else f0
+    g0 = cv2.cvtColor(f0, cv2.COLOR_BGR2GRAY); g1 = cv2.cvtColor(f1, cv2.COLOR_BGR2GRAY)
+    return (cv2.absdiff(g0, g1) > _MOT_TH).astype(np.uint8)
+
+def _strip_moves(mm, x0, y0, x1, y1):
+    """Fraction de pixels en mouvement dans la bande (coords PIXEL)."""
+    x0, x1 = max(0, int(x0)), min(W, int(x1)); y0, y1 = max(0, int(y0)), min(H, int(y1))
+    if x1 - x0 < 2 or y1 - y0 < 2: return 0.0
+    return float(mm[y0:y1, x0:x1].mean())
+
 med = lambda L: statistics.median(L)
 fixed = 0; yunet_hit = 0; missed = 0
 for s in segs:
@@ -113,15 +127,21 @@ for s in segs:
         # (webcam flottante avec marge, cf 1x32) = on NE pousse PAS vers le bord, juste un
         # overscan doux (PAD) pour couvrir le cadre/coins arrondis. Evite le debord dans la
         # marge sombre des webcams inset tout en gardant la couverture des webcams au bord.
-        # touche le bord (<NEAR) -> snap au bord (webcam collee, sinon le narrateur fuit).
-        # sinon -> on garde la coordonnee BRUTE (la box YOLO = deja la webcam, marge reelle),
-        # juste un micro-overscan PAD pour couvrir le cadre/coins arrondis sans manger la marge.
-        PAD = 0.015; NEAR = 0.02
+        # SNAP MOTION-GATED (content-aware, bulk) : au bord d'une box proche du bord ecran,
+        # on regarde la BANDE entre la box et le bord. Bande qui BOUGE = la webcam continue
+        # (le narrateur fuit) -> on etend jusqu'au bord. Bande STATIQUE = marge/wallpaper ->
+        # on garde le retrait (juste micro-overscan). Un seuil de position seul ne distingue
+        # pas "vraie marge 2.5%" (1x32) de "webcam au bord sous-estimee" (Jjwv) ; le mouvement si.
+        PAD = 0.015; EDGE_ZONE = 0.10; MOT_FILL = 0.05
         rx1, ry1 = bx + bw, by + bh
-        x0 = 0.0 if bx < NEAR else max(0.0, bx - bw * PAD)
-        y0 = 0.0 if by < NEAR else max(0.0, by - bh * PAD)
-        x1 = 1.0 if rx1 > 1.0 - NEAR else min(1.0, rx1 + bw * PAD)
-        y1 = 1.0 if ry1 > 1.0 - NEAR else min(1.0, ry1 + bh * PAD)
+        mm = _motion_map((a + b) / 2)
+        bxp, byp, rxp, ryp = bx * W, by * H, rx1 * W, ry1 * H
+        def _ext(near, moves):
+            return near and (mm is not None) and moves > MOT_FILL
+        x0 = 0.0 if _ext(bx < EDGE_ZONE, mm is not None and _strip_moves(mm, 0, byp, bxp, ryp)) else max(0.0, bx - bw * PAD)
+        y0 = 0.0 if _ext(by < EDGE_ZONE, mm is not None and _strip_moves(mm, bxp, 0, rxp, byp)) else max(0.0, by - bh * PAD)
+        x1 = 1.0 if _ext(rx1 > 1 - EDGE_ZONE, mm is not None and _strip_moves(mm, rxp, byp, W, ryp)) else min(1.0, rx1 + bw * PAD)
+        y1 = 1.0 if _ext(ry1 > 1 - EDGE_ZONE, mm is not None and _strip_moves(mm, bxp, ryp, rxp, H)) else min(1.0, ry1 + bh * PAD)
         fx0, fy0, fw, fh = x0, y0, x1 - x0, y1 - y0
         # GARDE anti-sur-couverture (fallback prudent), sur la box FINALE : une box pip
         # implausiblement GRANDE (h>0.72 / large / aire>0.38) = YOLO muet (box heuristique
