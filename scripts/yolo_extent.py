@@ -22,14 +22,44 @@ segs = json.load(open(hmap_path))
 def _frame(t):
     cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps)); ok, f = cap.read(); return f if ok else None
 
+_BB_DT = 0.15; _BB_MTH = 12   # filtre fantome : diff de frames pour la densite de mouvement
+
+def _box_motion(f0, f1, bx):
+    """Fraction de pixels en mouvement dans la box bx (normalisee). 1.0 si pas de 2e frame (=ne filtre pas)."""
+    if f1 is None: return 1.0
+    g0 = cv2.cvtColor(f0, cv2.COLOR_BGR2GRAY); g1 = cv2.cvtColor(f1, cv2.COLOR_BGR2GRAY)
+    d = cv2.absdiff(g0, g1) > _BB_MTH
+    x1, y1 = max(0, int(bx[0] * W)), max(0, int(bx[1] * H))
+    x2, y2 = min(W, int((bx[0] + bx[2]) * W)), min(H, int((bx[1] + bx[3]) * H))
+    if x2 - x1 < 2 or y2 - y1 < 2: return 0.0
+    return float(d[y1:y2, x1:x2].mean())
+
 def best_box(t):
     f = _frame(t)
     if f is None: return None
     r = m.predict(f, imgsz=960, conf=CONF, verbose=False)[0]
     if len(r.boxes) == 0: return None
-    b = max(r.boxes, key=lambda b: float(b.conf[0]))  # la plus confiante
-    x1, y1, x2, y2 = [float(v) for v in b.xyxy[0]]
-    return [x1 / W, y1 / H, (x2 - x1) / W, (y2 - y1) / H]
+    cands = []
+    for b in r.boxes:
+        x1, y1, x2, y2 = [float(v) for v in b.xyxy[0]]
+        cands.append((float(b.conf[0]), [x1 / W, y1 / H, (x2 - x1) / W, (y2 - y1) / H]))
+    if len(cands) == 1:                         # 1 seule detection = pas d'ambiguite (INCHANGE vs avant)
+        return cands[0][1]
+    # >1 detection : YOLO donne parfois une box conf-haute TROP GRANDE qui englobe la vraie webcam
+    # vivante + du vide immobile au-dessus (cf Ethx 560-606s epoch8 : box h=0.91 conf 0.84 vs vraie
+    # webcam h=0.57 conf 0.71). Prendre la max-conf = box gonflee. Discriminant bulk = DENSITE de
+    # mouvement : une webcam serree = personne vivante = mouvement DENSE ; une box gonflee = mouvement
+    # dilue par le vide. On choisit la box la mieux remplie de mouvement (parmi celles conf plausible).
+    f1 = _frame(t + _BB_DT)
+    if f1 is None:
+        return max(cands, key=lambda c: c[0])[1]   # pas de 2e frame -> ancien comportement (max conf)
+    # densite = signal RELATIF (comparer les box entre elles), pas un seuil absolu : sur un segment
+    # peu anime la densite est faible partout (0.006 vs 0.009) mais la box la mieux remplie reste
+    # la vraie webcam. On prend donc la densite MAX parmi les conf-plausibles, sans plancher absolu
+    # (un plancher reprendrait la max-conf = la box gonflee, cf bug Ethx).
+    scored = [(_box_motion(f, f1, bx), cf, bx) for cf, bx in cands]
+    ok = [s for s in scored if s[1] >= 0.40] or scored   # garde-fou conf (ecarte une box junk faible conf)
+    return max(ok, key=lambda s: s[0])[2]
 
 # --- YuNet = detecteur de SECOURS quand YOLO rate un facecam (createur inconnu).
 # YuNet multi-echelle + live-motion trouve souvent la vraie webcam (c'est lui qui
