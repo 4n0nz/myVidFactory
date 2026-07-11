@@ -14,4 +14,13 @@ en gardant le contenu écran et l'audio source.
     split intro, filtre densité anti-box-gonflée, raffinement de frontière sur hard-cut
   - `scripts/` — dataset synthétique, train, validation (score sur vraies frames)
 
-Modèles, venvs et médias sont hors repo (voir `.gitignore` de chaque sous-dossier).
+## Assets inclus
+
+Modèles YOLO (`yolo/runs/.../*.pt`), YuNet (`videogen/*.onnx`) et avatar (`videogen/public/avatar.mp4`)
+sont dans le repo. Deps Python : `requirements.txt` dans chaque sous-dossier (recréer un venv + `pip install -r`).
+Seuls les venvs et les workdirs `wk_*` (temp par vidéo) restent hors repo.
+
+## Modèle par défaut
+
+`yolo/scripts/yolo_extent.py` utilise `runs/facecam5/weights/best_real.pt` (epoch8).
+Rollback v3 : `YOLO_WEIGHTS=.../runs/facecam/weights/best.pt`.
