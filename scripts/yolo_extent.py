@@ -11,7 +11,7 @@ from ultralytics import YOLO
 hmap_path = sys.argv[1]
 source = sys.argv[2]
 CONF = float(sys.argv[3]) if len(sys.argv) > 3 else 0.35
-WEIGHTS = os.path.expanduser("~/yolo/runs/facecam/weights/best.pt")
+WEIGHTS = os.environ.get("YOLO_WEIGHTS", os.path.expanduser("~/yolo/runs/facecam/weights/best.pt"))
 
 m = YOLO(WEIGHTS)
 cap = cv2.VideoCapture(source)
