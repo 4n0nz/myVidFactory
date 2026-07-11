@@ -1,0 +1,16 @@
+.venv*/
+wk_*/
+out/
+backups/
+*.mp4
+*.mkv
+*.webm
+*.tflite
+*.onnx
+*.pt
+*.png
+*.jpg
+*.log
+__pycache__/
+*.pyc
+public/*.mp4

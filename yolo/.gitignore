@@ -1,0 +1,8 @@
+.venv/
+runs/
+data/
+*.pt
+*.onnx
+__pycache__/
+*.pyc
+val_*/
