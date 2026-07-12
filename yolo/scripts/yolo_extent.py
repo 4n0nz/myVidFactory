@@ -128,14 +128,19 @@ def _strip_moves(mm, x0, y0, x1, y1):
 
 med = lambda L: statistics.median(L)
 
-def raw_box(wa, wb, fallback_bbox):
+def raw_box(wa, wb, fallback_bbox, from_split=False):
     """Box brute pour la fenetre [wa,wb] : YOLO (mediane 5 samples) -> YuNet -> box heuristique.
     Retourne (bx,by,bw,bh, method) ou None. method in yolo|yunet|heur. Chaine INCHANGEE vs avant."""
     ts = [wa + (wb - wa) * f for f in (0.2, 0.35, 0.5, 0.65, 0.8)]
     boxes = [bb for bb in (best_box(t) for t in ts) if bb]
     if len(boxes) >= 2:
-        return (med([q[0] for q in boxes]), med([q[1] for q in boxes]),
-                med([q[2] for q in boxes]), med([q[3] for q in boxes]), "yolo")
+        yb = (med([q[0] for q in boxes]), med([q[1] for q in boxes]),
+              med([q[2] for q in boxes]), med([q[3] for q in boxes]))
+        if not from_split and fallback_bbox:
+            ratio = _contained_ratio(yb, fallback_bbox)
+            if 0 < ratio < 0.65 and fallback_bbox[3] > 0.40 and fallback_bbox[2] * fallback_bbox[3] < 0.60:
+                return (*fallback_bbox, "host2")
+        return (*yb, "yolo")
     # YOLO muet -> FALLBACK #1 : YuNet (2e detecteur, trouve les webcams que YOLO rate).
     yb = [bb for bb in (yunet_box(t) for t in ts) if bb]
     if len(yb) >= 2:
@@ -148,7 +153,7 @@ def raw_box(wa, wb, fallback_bbox):
         return (bx, by, bw, bh, "heur")
     return None
 
-def finalize(bx, by, bw, bh, wa, wb):
+def finalize(bx, by, bw, bh, wa, wb, skip_overcover=False):
     """Extension bord motion-gated + garde anti-sur-couverture. Retourne [x,y,w,h]. INCHANGE vs avant.
     Voir commentaires historiques : snap motion-gated (1DOLq/1x32/Jjwv) + rabot anti-ecrasement (6GtF/Ethx)."""
     PAD = 0.015; EDGE_ZONE = 0.10; MOT_FILL = 0.05
@@ -162,12 +167,36 @@ def finalize(bx, by, bw, bh, wa, wb):
     x1 = 1.0 if _ext(rx1 > 1 - EDGE_ZONE, mm is not None and _strip_moves(mm, rxp, byp, W, ryp)) else min(1.0, rx1 + bw * PAD)
     y1 = 1.0 if _ext(ry1 > 1 - EDGE_ZONE, mm is not None and _strip_moves(mm, bxp, ryp, rxp, H)) else min(1.0, ry1 + bh * PAD)
     fx0, fy0, fw, fh = x0, y0, x1 - x0, y1 - y0
-    if fh > 0.72 or fw > 0.55 or fw * fh > 0.38:
+    if not skip_overcover and (fh > 0.72 or fw > 0.55 or fw * fh > 0.38):
         hcx, hcy = fx0 + fw / 2, fy0 + fh / 2
         fw, fh = 0.26, 0.42
         fx0 = 0.0 if hcx < 0.5 else 1.0 - fw
         fy0 = 1.0 - fh if hcy > 0.35 else 0.0
+    # CHANTIER #4 (hack pragmatique, valide Boss) : une box collee a un bord VERTICAL (gauche/droite)
+    # et qui FLOTTE verticalement (ni collee en haut ni en bas) = detection PARTIELLE d'une webcam
+    # COLONNE laterale pleine hauteur (cf ofr : box milieu-droite qui rate tete+epaules). -> pleine
+    # hauteur. Une box collee en BAS (webcam de COIN : vKMx/Ethx/1x32/masortie...) n'est PAS etendue,
+    # ni une box collee en haut -> corpus mono-position intact (aucune box laterale flottante dedans).
+    M4 = 0.04
+    side_flush = fx0 <= M4 or fx0 + fw >= 1 - M4
+    floating_v = fy0 > M4 and fy0 + fh < 1 - M4
+    if side_flush and floating_v and fh > 0.4 and fw < 0.5:
+        fy0, fh = 0.0, 1.0
     return [round(fx0, 4), round(fy0, 4), round(fw, 4), round(fh, 4)]
+
+def _contained_ratio(yolo_bx, h2_bx):
+    """CHANTIER #4 : yolo_area/h2_area si yolo_bx est a 80%+ dans h2_bx, sinon -1.
+    Detecte webcam borderless : YOLO voit visage serre contenu dans vraie webcam h2."""
+    yx, yy, yw, yh = yolo_bx
+    hx, hy, hw, hh = h2_bx
+    ix0, iy0 = max(yx, hx), max(yy, hy)
+    ix1, iy1 = min(yx + yw, hx + hw), min(yy + yh, hy + hh)
+    if ix1 <= ix0 or iy1 <= iy0: return -1.0
+    inter = (ix1 - ix0) * (iy1 - iy0)
+    ya, ha = yw * yh, hw * hh
+    if ya < 1e-6 or ha < 1e-6: return -1.0
+    if inter / ya < 0.80: return -1.0
+    return ya / ha
 
 def intro_split_time(a, b):
     """CHANTIER #2 : webcam d'INTRO plus grosse qui retrecit en cours de segment (cf Ethx grosse->petite).
@@ -213,7 +242,7 @@ def intro_split_time(a, b):
     f_small = min(after) if after else min(f_big + 0.1, 0.99)
     return a + (b - a) * (f_big + f_small) / 2
 
-fixed = 0; yunet_hit = 0; missed = 0
+fixed = 0; yunet_hit = 0; host2_hit = 0; missed = 0
 out_segs = []
 for s in segs:
     if s["host"] != "pip":
@@ -225,8 +254,8 @@ for s in segs:
     tsplit = intro_split_time(a, b)
     parts = None
     if tsplit is not None:
-        rb1 = raw_box(a, tsplit, s.get("bbox"))
-        rb2 = raw_box(tsplit, b, s.get("bbox"))
+        rb1 = raw_box(a, tsplit, s.get("bbox"), from_split=True)
+        rb2 = raw_box(tsplit, b, s.get("bbox"), from_split=True)
         if rb1 and rb2:
             parts = [(a, tsplit, rb1), (tsplit, b, rb2)]
     if parts is None:
@@ -240,10 +269,12 @@ for s in segs:
         bx, by, bw, bh, method = rb
         if method == "yolo": fixed += 1
         elif method == "yunet": yunet_hit += 1
+        elif method == "host2": host2_hit += 1
         else: missed += 1
-        bbox = finalize(bx, by, bw, bh, wa, wb)
+        bbox = finalize(bx, by, bw, bh, wa, wb, skip_overcover=(method == "host2"))
         ns = s if len(parts) == 1 else dict(s)
         ns["start"], ns["end"], ns["bbox"] = wa, wb, bbox
+        ns["_ext_method"] = method
         out_segs.append(ns)
 segs = out_segs
 
@@ -314,7 +345,8 @@ if anchors:
         same_corner = abs(cx - acx) <= 0.15 and abs(cy - acy) <= 0.15
         area = s["bbox"][2] * s["bbox"][3]
         mis_size = same_corner and (area > darea * 1.6 or area < darea * 0.6)
-        if (brief and far) or mis_size:
+        is_host2 = s.get("_ext_method") == "host2"
+        if (brief and far) or (mis_size and not is_host2):
             s["bbox"] = list(dom["bbox"])  # colle a la vraie webcam (position + taille)
             snapped += 1
 else:
@@ -327,8 +359,9 @@ else:
 if snapped:
     print("cleanup anti-decoy : %d pip bref(s) recale(s)" % snapped)
 
+for s in segs: s.pop("_ext_method", None)
 json.dump(segs, open(hmap_path, "w"), indent=2)
-print("YOLO extent: %d par YOLO, %d par YuNet (fallback), %d sans detection (box heuristique)" % (fixed, yunet_hit, missed))
+print("YOLO extent: %d par YOLO, %d par YuNet (fallback), %d par host2 (borderless), %d sans detection (box heuristique)" % (fixed, yunet_hit, host2_hit, missed))
 for s in segs:
     if s["host"] == "pip":
         print("  PIP %.1f-%.1f bbox=%s" % (s["start"], s["end"], s["bbox"]))
