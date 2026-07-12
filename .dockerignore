@@ -1,0 +1,8 @@
+.git
+**/.venv
+**/wk_*
+**/out
+**/__pycache__
+**/*.pyc
+cmp_out
+ofr_diag

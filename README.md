@@ -40,25 +40,43 @@ workdirs temporaires `wk_*` (source + rendus par vidéo) sont hors repo.
 
 ## Installation
 
+Trois façons, du plus simple au plus manuel.
+
+### A. Docker (recommandé — machine neuve, zéro install manuelle)
+
+Prérequis hôte : **Docker** + **nvidia-container-toolkit** (pour passer le GPU au container).
+Rien d'autre à installer (CUDA/ffmpeg/python sont dans l'image).
+
 ```bash
-# 1. cloner en 2 dossiers attendus par le code (chemins ~/yolo et ~/videogen)
-git clone https://github.com/4n0nz/myVidFactory.git vf
-ln -s "$PWD/vf/yolo"     ~/yolo
-ln -s "$PWD/vf/videogen" ~/videogen
-
-# 2. venv YOLO (détection)
-python3.10 -m venv ~/yolo/.venv
-~/yolo/.venv/bin/pip install -r ~/yolo/requirements.txt
-
-# 3. venv videogen (compositor)
-python3.10 -m venv ~/videogen/.venv
-~/videogen/.venv/bin/pip install -r ~/videogen/requirements.txt
+git clone https://github.com/4n0nz/myVidFactory.git && cd myVidFactory
+docker build -t videofactory .
+docker run --gpus all -v "$PWD/out:/root/videogen/out" videofactory wk_demo "<url_youtube>" demo.mp4
+# résultat -> ./out/demo.mp4
 ```
 
-> ⚠️ **Chemins en dur** : le code référence `~/yolo`, `~/videogen` et quelques
-> `/home/boss/videogen/...`. Layout attendu = un user dont `$HOME` contient `yolo/` et `videogen/`.
-> Pour un autre user, adapter les `/home/boss/` (grep `/home/boss` dans `build_seg.py` et
-> `yolo/scripts/yolo_extent.py`).
+`--gpus all` expose le GPU **et NVENC** de l'hôte au container (via `NVIDIA_DRIVER_CAPABILITIES`).
+
+### B. setup.sh (bare-metal — la machine a déjà GPU NVIDIA + drivers CUDA)
+
+```bash
+git clone https://github.com/4n0nz/myVidFactory.git && cd myVidFactory
+bash setup.sh          # apt: ffmpeg/python + venvs + pip install + symlinks + adapte les chemins
+cd ~/videogen && bash run_one.sh wk_demo "<url_youtube>" demo.mp4
+```
+
+`setup.sh` **n'installe PAS** les drivers NVIDIA/CUDA (trop variable selon la distro) — il vérifie
+juste que `nvidia-smi` répond. Installe CUDA avant si besoin.
+
+### C. Manuel
+
+```bash
+git clone https://github.com/4n0nz/myVidFactory.git vf
+ln -s "$PWD/vf/yolo" ~/yolo ; ln -s "$PWD/vf/videogen" ~/videogen
+# adapter les chemins en dur si le user n'est pas 'boss' :
+sed -i "s|/home/boss|$HOME|g" ~/videogen/build_seg.py ~/videogen/run_one.sh ~/yolo/scripts/yolo_extent.py
+python3.10 -m venv ~/yolo/.venv     && ~/yolo/.venv/bin/pip     install --extra-index-url https://download.pytorch.org/whl/cu128 -r ~/yolo/requirements.txt
+python3.10 -m venv ~/videogen/.venv && ~/videogen/.venv/bin/pip install --extra-index-url https://download.pytorch.org/whl/cu128 -r ~/videogen/requirements.txt
+```
 
 ## Lancer le pipeline
 
