@@ -189,7 +189,11 @@ def finalize(bx, by, bw, bh, wa, wb, skip_overcover=False):
     # COLONNE laterale pleine hauteur (cf ofr : box milieu-droite qui rate tete+epaules). -> pleine
     # hauteur. Une box collee en BAS (webcam de COIN : vKMx/Ethx/1x32/masortie...) n'est PAS etendue,
     # ni une box collee en haut -> corpus mono-position intact (aucune box laterale flottante dedans).
-    if _side_column(fx0, fy0, fw, fh):
+    # extension pleine hauteur QUE pour une box host2 (skip_overcover=True) : le host2-fallback a
+    # confirme une colonne laterale via analyze_host2. Sur une box YOLO ordinaire (ex. 1DOLq webcam
+    # de coin dont le median a flotte) NE PAS etendre -> evite de gonfler a plein ecran une webcam
+    # qui n'est pas une colonne (regression 1DOLq).
+    if skip_overcover and _side_column(fx0, fy0, fw, fh):
         fy0, fh = 0.0, 1.0
     return [round(fx0, 4), round(fy0, 4), round(fw, 4), round(fh, 4)]
 
