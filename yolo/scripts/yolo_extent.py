@@ -128,6 +128,16 @@ def _strip_moves(mm, x0, y0, x1, y1):
 
 med = lambda L: statistics.median(L)
 
+def _side_column(x, y, w, h):
+    """CHANTIER #4 : box collee a un bord VERTICAL (gauche/droite) et qui FLOTTE verticalement (ni
+    collee en haut NI en bas) = colonne laterale (webcam borderless pleine hauteur, detectee partielle).
+    Une webcam de COIN est collee en BAS (y+h~=1) -> False. Sert de gate au host2-fallback ET a
+    l'extension pleine hauteur (meme signal -> coherent : on ne prend/n'etend que les vraies colonnes)."""
+    M = 0.04
+    side = x <= M or x + w >= 1 - M
+    floating = y > M and y + h < 1 - M
+    return side and floating and h > 0.4 and w < 0.5
+
 def raw_box(wa, wb, fallback_bbox, from_split=False):
     """Box brute pour la fenetre [wa,wb] : YOLO (mediane 5 samples) -> YuNet -> box heuristique.
     Retourne (bx,by,bw,bh, method) ou None. method in yolo|yunet|heur. Chaine INCHANGEE vs avant."""
@@ -138,7 +148,9 @@ def raw_box(wa, wb, fallback_bbox, from_split=False):
               med([q[2] for q in boxes]), med([q[3] for q in boxes]))
         if not from_split and fallback_bbox:
             ratio = _contained_ratio(yb, fallback_bbox)
-            if 0 < ratio < 0.65 and fallback_bbox[3] > 0.40 and fallback_bbox[2] * fallback_bbox[3] < 0.60:
+            # host2 QUE si la box host2 est une vraie COLONNE laterale (flottante, bord vertical) : evite
+            # de gonfler une petite webcam de COIN (cf vKMx : host2 box collee en bas -> on garde YOLO serre).
+            if 0 < ratio < 0.65 and fallback_bbox[2] * fallback_bbox[3] < 0.60 and _side_column(*fallback_bbox):
                 return (*fallback_bbox, "host2")
         return (*yb, "yolo")
     # YOLO muet -> FALLBACK #1 : YuNet (2e detecteur, trouve les webcams que YOLO rate).
@@ -177,10 +189,7 @@ def finalize(bx, by, bw, bh, wa, wb, skip_overcover=False):
     # COLONNE laterale pleine hauteur (cf ofr : box milieu-droite qui rate tete+epaules). -> pleine
     # hauteur. Une box collee en BAS (webcam de COIN : vKMx/Ethx/1x32/masortie...) n'est PAS etendue,
     # ni une box collee en haut -> corpus mono-position intact (aucune box laterale flottante dedans).
-    M4 = 0.04
-    side_flush = fx0 <= M4 or fx0 + fw >= 1 - M4
-    floating_v = fy0 > M4 and fy0 + fh < 1 - M4
-    if side_flush and floating_v and fh > 0.4 and fw < 0.5:
+    if _side_column(fx0, fy0, fw, fh):
         fy0, fh = 0.0, 1.0
     return [round(fx0, 4), round(fy0, 4), round(fw, 4), round(fh, 4)]
 
