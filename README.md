@@ -1,102 +1,109 @@
 # VideoFactory
 
-Pipeline qui **remplace le narrateur** d'une vidéo (screen-record + webcam) par un **avatar**,
-en gardant le contenu écran et l'audio source. Détecte la webcam par segment (YOLO facecam +
-fallbacks), remplace le visage par l'avatar avec coins arrondis, rend en NVENC.
+A pipeline that **replaces the narrator** of a video (screen recording + webcam) with an
+**avatar**, while keeping the on-screen content and the source audio. It detects the webcam
+per segment (YOLO facecam + fallbacks), swaps the face for the avatar with rounded corners,
+and renders with NVENC.
 
-## Structure (monorepo, 2 sous-projets)
+## Structure (monorepo, 2 sub-projects)
 
-Le pipeline = 2 briques qui tournent ensemble :
+The pipeline = 2 parts that run together:
 
 ```
 videogen/          # orchestration + compositor
-  run_one.sh         # ENTRÉE : download → détection → extent YOLO → build → render
-  build_seg.py       # compositor segmenté (overlay avatar dans la webcam pip)
-  agent_yt/          # analyze_host2.py (classification hero/pip/off) + scripts pipeline
-  agent_yt3/         # variantes/utilitaires pipeline
-  vf_qc.py           # QC couverture
-  public/avatar.mp4  # ← l'avatar de remplacement (inclus)
-  face_detection_yunet_2023mar.onnx  # ← détecteur YuNet (inclus)
+  run_one.sh         # ENTRY POINT: download -> detection -> YOLO extent -> build -> render
+  build_seg.py       # segmented compositor (overlays the avatar into the pip webcam)
+  agent_yt/          # analyze_host2.py (hero/pip/off classification) + pipeline scripts
+  agent_yt3/         # pipeline variants / helpers
+  vf_qc.py           # coverage QC
+  public/avatar.mp4  # <- the replacement avatar (included)
+  face_detection_yunet_2023mar.onnx  # <- YuNet detector (included)
   requirements.txt
 
-yolo/              # détection facecam
-  scripts/yolo_extent.py   # box webcam précise/segment (YOLO → YuNet → coin)
-                           # + split intro, filtre densité, raffinement frontière
-  scripts/                 # dataset synthétique, train, validation, score_real.py
-  runs/facecam5/weights/best_real.pt  # ← MODÈLE PROD epoch8 (inclus)
-  runs/facecam/weights/best.pt        # ← modèle v3 rollback (inclus)
+yolo/              # facecam detection
+  scripts/yolo_extent.py   # precise webcam box per segment (YOLO -> YuNet -> corner)
+                           # + intro split, motion-density filter, boundary refinement
+  scripts/                 # synthetic dataset, training, validation, score_real.py
+  runs/facecam5/weights/best_real.pt  # <- PROD MODEL epoch8 (included)
+  runs/facecam/weights/best.pt        # <- v3 rollback model (included)
   requirements.txt
 ```
 
-Modèles, avatar et onnx sont **dans le repo** (pas de download externe). Seuls les venvs et les
-workdirs temporaires `wk_*` (source + rendus par vidéo) sont hors repo.
+Models, avatar and onnx are **in the repo** (no external download). Only the venvs and the
+temporary `wk_*` workdirs (per-video source + renders) live outside the repo.
 
-## Prérequis système
+## System requirements
 
-- **Linux** + **GPU NVIDIA** (testé RTX 5060 Ti 16 Go) avec drivers CUDA
-- **ffmpeg** compilé avec **NVENC** (`h264_nvenc`) — le render l'utilise
+- **Linux** + **NVIDIA GPU** (tested on RTX 5060 Ti 16 GB) with CUDA drivers
+- **ffmpeg** built with **NVENC** (`h264_nvenc`) — the render uses it
 - **Python 3.10**
-- Le modèle YOLO tourne sur CUDA (torch cu12x)
+- The YOLO model runs on CUDA (torch cu12x)
 
 ## Installation
 
-Trois façons, du plus simple au plus manuel.
+Three ways, from easiest to most manual.
 
-### A. Docker (recommandé — machine neuve, zéro install manuelle)
+### A. Docker (recommended — fresh machine, zero manual install)
 
-Prérequis hôte : **Docker** + **nvidia-container-toolkit** (pour passer le GPU au container).
-Rien d'autre à installer (CUDA/ffmpeg/python sont dans l'image).
+Host requirements: **Docker** + **nvidia-container-toolkit** (to pass the GPU into the container).
+Nothing else to install (CUDA/ffmpeg/python are inside the image).
 
 ```bash
 git clone https://github.com/4n0nz/myVidFactory.git && cd myVidFactory
 docker build -t videofactory .
-docker run --gpus all -v "$PWD/out:/root/videogen/out" videofactory wk_demo "<url_youtube>" demo.mp4
-# résultat -> ./out/demo.mp4
+docker run --gpus all -v "$PWD/out:/root/videogen/out" videofactory wk_demo "<youtube_url>" demo.mp4
+# result -> ./out/demo.mp4
 ```
 
-`--gpus all` expose le GPU **et NVENC** de l'hôte au container (via `NVIDIA_DRIVER_CAPABILITIES`).
+`--gpus all` exposes the host GPU **and NVENC** to the container (via `NVIDIA_DRIVER_CAPABILITIES`).
 
-### B. setup.sh (bare-metal — la machine a déjà GPU NVIDIA + drivers CUDA)
+### B. setup.sh (bare-metal — the machine already has an NVIDIA GPU + CUDA drivers)
 
 ```bash
 git clone https://github.com/4n0nz/myVidFactory.git && cd myVidFactory
-bash setup.sh          # apt: ffmpeg/python + venvs + pip install + symlinks + adapte les chemins
-cd ~/videogen && bash run_one.sh wk_demo "<url_youtube>" demo.mp4
+bash setup.sh          # apt: ffmpeg/python + venvs + pip install + symlinks + path fixups
+cd ~/videogen && bash run_one.sh wk_demo "<youtube_url>" demo.mp4
 ```
 
-`setup.sh` **n'installe PAS** les drivers NVIDIA/CUDA (trop variable selon la distro) — il vérifie
-juste que `nvidia-smi` répond. Installe CUDA avant si besoin.
+`setup.sh` does **not** install the NVIDIA/CUDA drivers (too distro-dependent) — it only checks
+that `nvidia-smi` responds. Install CUDA first if needed.
 
-### C. Manuel
+### C. Manual
 
 ```bash
 git clone https://github.com/4n0nz/myVidFactory.git vf
 ln -s "$PWD/vf/yolo" ~/yolo ; ln -s "$PWD/vf/videogen" ~/videogen
-# adapter les chemins en dur si le user n'est pas 'boss' :
+# fix the hardcoded paths if the user is not 'boss':
 sed -i "s|/home/boss|$HOME|g" ~/videogen/build_seg.py ~/videogen/run_one.sh ~/yolo/scripts/yolo_extent.py
 python3.10 -m venv ~/yolo/.venv     && ~/yolo/.venv/bin/pip     install --extra-index-url https://download.pytorch.org/whl/cu128 -r ~/yolo/requirements.txt
 python3.10 -m venv ~/videogen/.venv && ~/videogen/.venv/bin/pip install --extra-index-url https://download.pytorch.org/whl/cu128 -r ~/videogen/requirements.txt
 ```
 
-## Lancer le pipeline
+> **Hardcoded paths**: the code references `~/yolo`, `~/videogen` and a few `/home/boss/videogen/...`.
+> Expected layout = a user whose `$HOME` contains `yolo/` and `videogen/`. For another user, adjust
+> the `/home/boss/` paths (grep `/home/boss` in `build_seg.py` and `yolo/scripts/yolo_extent.py`).
+
+## Running the pipeline
 
 ```bash
 cd ~/videogen
-bash run_one.sh <workdir> <url_youtube> <sortie.mp4>
+bash run_one.sh <workdir> <youtube_url> <output.mp4>
 
-# exemple
+# example
 bash run_one.sh wk_demo "https://www.youtube.com/watch?v=XXXX" demo.mp4
 ```
 
-- `<sortie.mp4>` : **l'extension `.mp4` est obligatoire** (sinon le muxer ffmpeg plante à la fin).
-- Étapes : download (yt-dlp) → `analyze_host2.py` (hero/pip/off) → `yolo_extent.py` (box webcam
-  précise, modèle epoch8 par défaut) → `build_seg.py` (overlay avatar) → render NVENC.
-- Résultat dans `~/videogen/out/<sortie.mp4>`.
+- `<output.mp4>`: the **`.mp4` extension is mandatory** (otherwise the ffmpeg muxer fails at the end).
+- Steps: download (yt-dlp) -> `analyze_host2.py` (hero/pip/off) -> `yolo_extent.py` (precise webcam
+  box, epoch8 model by default) -> `build_seg.py` (avatar overlay) -> NVENC render.
+- Output lands in `~/videogen/out/<output.mp4>`.
+- Optional 4th arg `PIP_RECT="x,y,w,h"` to force a fixed webcam position (otherwise auto by detection).
+- The avatar is fixed = `public/avatar.mp4`. To change the narrator, replace that file.
 
-## Modèle
+## Model
 
-`yolo_extent.py` utilise **`runs/facecam5/weights/best_real.pt`** (epoch8) par défaut.
-Rollback vers v3 :
+`yolo_extent.py` uses **`runs/facecam5/weights/best_real.pt`** (epoch8) by default.
+Rollback to v3:
 
 ```bash
 YOLO_WEIGHTS=~/yolo/runs/facecam/weights/best.pt bash run_one.sh ...
@@ -104,6 +111,6 @@ YOLO_WEIGHTS=~/yolo/runs/facecam/weights/best.pt bash run_one.sh ...
 
 ## Notes
 
-- Webcam mobile / multi-position : gérée par segment (détection + raffinement de frontière sur hard-cut).
-- Chantier ouvert : webcam **grande sans bordure** (plein côté d'écran) encore sous-couverte (box = visage).
-- Audio : piste source copiée telle quelle (tag `und`).
+- Mobile / multi-position webcam: handled per segment (detection + boundary refinement on hard cut).
+- Open issue: a **large borderless webcam** (full screen side) is still under-covered (box = face only).
+- Audio: the source track is copied as-is (tag `und`).
