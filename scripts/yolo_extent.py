@@ -172,6 +172,16 @@ def finalize(bx, by, bw, bh, wa, wb, skip_overcover=False):
         fw, fh = 0.26, 0.42
         fx0 = 0.0 if hcx < 0.5 else 1.0 - fw
         fy0 = 1.0 - fh if hcy > 0.35 else 0.0
+    # CHANTIER #4 (hack pragmatique, valide Boss) : une box collee a un bord VERTICAL (gauche/droite)
+    # et qui FLOTTE verticalement (ni collee en haut ni en bas) = detection PARTIELLE d'une webcam
+    # COLONNE laterale pleine hauteur (cf ofr : box milieu-droite qui rate tete+epaules). -> pleine
+    # hauteur. Une box collee en BAS (webcam de COIN : vKMx/Ethx/1x32/masortie...) n'est PAS etendue,
+    # ni une box collee en haut -> corpus mono-position intact (aucune box laterale flottante dedans).
+    M4 = 0.04
+    side_flush = fx0 <= M4 or fx0 + fw >= 1 - M4
+    floating_v = fy0 > M4 and fy0 + fh < 1 - M4
+    if side_flush and floating_v and fh > 0.4 and fw < 0.5:
+        fy0, fh = 0.0, 1.0
     return [round(fx0, 4), round(fy0, 4), round(fw, 4), round(fh, 4)]
 
 def _contained_ratio(yolo_bx, h2_bx):
