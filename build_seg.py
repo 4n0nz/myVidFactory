@@ -162,6 +162,9 @@ lines.append('ffmpeg -y -f concat -safe 0 -i %s -c copy %s/videoonly.mp4' % (lis
 lines.append("echo '=== MUX AUDIO ==='")
 lines.append('ffmpeg -y -i %s/videoonly.mp4 -i %s -map 0:v -map 1:a -c:v copy -c:a copy -metadata:s:a:0 language=und -shortest "%s"'
              % (segdir, source, outp))
+lines.append("echo '=== EXTRACT WAV ==='")
+lines.append('ffmpeg -y -i "%s" -vn -acodec pcm_s16le -ar 48000 -ac 2 "%s"'
+             % (outp, outp.rsplit('.', 1)[0] + '.wav'))
 lines.append('T1=$(date +%s); echo "=== DONE in $((T1-T0))s ==="')
 lines.append('ls -lh "%s"' % outp)
 
