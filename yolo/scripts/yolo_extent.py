@@ -164,9 +164,32 @@ def finalize(bx, by, bw, bh, wa, wb):
     fx0, fy0, fw, fh = x0, y0, x1 - x0, y1 - y0
     if fh > 0.72 or fw > 0.55 or fw * fh > 0.38:
         hcx, hcy = fx0 + fw / 2, fy0 + fh / 2
+        big = (fx0, fy0, fw, fh)
         fw, fh = 0.26, 0.42
-        fx0 = 0.0 if hcx < 0.5 else 1.0 - fw
-        fy0 = 1.0 - fh if hcy > 0.35 else 0.0
+        # rabot ancre-VISAGE : si YuNet trouve un visage DANS la grande box, la box prudente
+        # se centre dessus (visage au tiers haut) au lieu du coin geometrique — sinon un
+        # narrateur en panneau lateral pleine hauteur recoit l'avatar sur le TORSE (coin bas).
+        fpos = None
+        for _t in (wa + (wb - wa) * _f for _f in (0.3, 0.5, 0.7)):
+            _fr = _frame(_t)
+            if _fr is None: continue
+            _, _fcs = _yfd.detect(_fr)
+            if _fcs is None: continue
+            cand = []
+            for _fc in _fcs:
+                _fx, _fy, _fw2, _fh2 = _fc[0] / W, _fc[1] / H, _fc[2] / W, _fc[3] / H
+                _cx, _cy = _fx + _fw2 / 2, _fy + _fh2 / 2
+                if big[0] <= _cx <= big[0] + big[2] and big[1] <= _cy <= big[1] + big[3]:
+                    cand.append((_fw2 * _fh2, _cx, _cy))
+            if cand:
+                cand.sort(reverse=True)
+                fpos = (float(cand[0][1]), float(cand[0][2])); break
+        if fpos:
+            fx0 = min(1.0 - fw, max(0.0, fpos[0] - fw / 2))
+            fy0 = min(1.0 - fh, max(0.0, fpos[1] - fh * 0.33))
+        else:
+            fx0 = 0.0 if hcx < 0.5 else 1.0 - fw
+            fy0 = 1.0 - fh if hcy > 0.35 else 0.0
     return [round(fx0, 4), round(fy0, 4), round(fw, 4), round(fh, 4)]
 
 def intro_split_time(a, b):
