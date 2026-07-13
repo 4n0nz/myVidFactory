@@ -60,7 +60,7 @@ def detect(t):
         aw = ax2 - ax; ah = ay2 - ay
         if aw < 16 or ah < 16: continue
         live.append((ax, ay, aw, ah, fx + fw / 2, fw, fh))
-    if not live: return ('off', None, None, 0.0)
+    if not live: return ('off', None, None)
     # dominant = le plus GROS VISAGE (le narrateur plein ecran gagne sur un pip de coin)
     ax, ay, aw, ah, fcx, fw, fh = max(live, key=lambda r: r[5] * r[6])
     frac = aw * ah / (W * H); ccx = (ax + aw / 2) / W
@@ -70,8 +70,8 @@ def detect(t):
     face_big = (fh / H) > 0.18 and (box_w > 0.55 or 0.25 <= ccx <= 0.75)
     bbox = [round(ax / W, 4), round(ay / H, 4), round(aw / W, 4), round(ah / H, 4)]
     if frac >= 0.30 or (0.30 <= ccx <= 0.70 and frac >= 0.12) or face_big:
-        return ('hero', bbox, round(fcx / W, 4), round(fh / H, 4))
-    return ('pip', bbox, round(fcx / W, 4), round(fh / H, 4))
+        return ('hero', bbox, round(fcx / W, 4))
+    return ('pip', bbox, round(fcx / W, 4))
 
 # ---------- PASS B : etendue exacte (edge-scan) ----------
 def strongest(prof, a, b):
@@ -123,8 +123,8 @@ raw = []; t = 0.0
 while t < dur:
     r = detect(t)
     if r is None: t += SAMPLE; continue
-    host, bbox, cx, fhH = r
-    raw.append({'t': round(t, 2), 'host': host, 'bbox': bbox, 'cx': cx, 'fhH': fhH})
+    host, bbox, cx = r
+    raw.append({'t': round(t, 2), 'host': host, 'bbox': bbox, 'cx': cx})
     t += SAMPLE
 pip_n = sum(1 for r in raw if r['host'] == 'pip'); hero_n = sum(1 for r in raw if r['host'] == 'hero')
 print("raw: %d samples (pip=%d hero=%d)" % (len(raw), pip_n, hero_n))
@@ -132,36 +132,11 @@ print("raw: %d samples (pip=%d hero=%d)" % (len(raw), pip_n, hero_n))
 def med(L): return statistics.median(L)
 
 hosts = [r['host'] for r in raw]; sm = list(hosts)
-# un vrai plan plein-ecran = gros visage centre : on le VERROUILLE hero. Le lissage median
-# effacait les cutaways hero courts noyes dans un long regime pip (narrateur decouvert,
-# ex. ofr 1:54). Cle sur le VISAGE (fhH/fcx), pas la box mouvement. NO_HEROLOCK=1 = ancien.
-HEROLOCK = os.environ.get('NO_HEROLOCK') != '1'
-STRONG_H = float(os.environ.get('STRONG_HERO', '0.30'))
-MINRUN = int(os.environ.get('HEROLOCK_MINRUN', '3'))
-def _strong_hero(r): return r['host'] == 'hero' and r.get('fhH', 0) > STRONG_H and 0.28 <= (r['cx'] or 0) <= 0.72
-# min-run : un sample strong ISOLE (decoy, frame de cross-dissolve) reste lisse ;
-# seuls les runs de >=MINRUN samples consecutifs (>=1.5s) sont verrouilles
-# (vrai cutaway plein ecran >=1.5s ; faux positifs YuNet vus jusqu a 2 samples consecutifs, cf Ethx trou noir 431s).
-_strong = [_strong_hero(r) for r in raw]
-_lockmask = [False] * len(raw)
-_i = 0
-while _i < len(raw):
-    if _strong[_i]:
-        _j = _i
-        while _j < len(raw) and _strong[_j]: _j += 1
-        if _j - _i >= MINRUN:
-            for _k in range(_i, _j): _lockmask[_k] = True
-        _i = _j
-    else: _i += 1
-locked = 0
 for i in range(len(hosts)):
-    if HEROLOCK and _lockmask[i]:
-        sm[i] = 'hero'; locked += 1; continue
     if hosts[i] in ('hero', 'pip'):
         win = [hosts[j] for j in range(max(0, i-4), min(len(hosts), i+5)) if hosts[j] in ('hero', 'pip')]
         if win: sm[i] = 'hero' if win.count('hero') >= win.count('pip') else 'pip'
 for i, r in enumerate(raw): r['host'] = sm[i]
-print('smoothing: %d strong-hero verrouilles (gros visage centre)' % locked)
 
 pip_idx = [(i, r) for i, r in enumerate(raw) if r['host'] == 'pip' and r['bbox']]
 cells = {}
