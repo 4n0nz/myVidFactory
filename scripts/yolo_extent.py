@@ -148,6 +148,35 @@ def raw_box(wa, wb, fallback_bbox):
         return (bx, by, bw, bh, "heur")
     return None
 
+def _detect_split(big, wa, wb):
+    """SPLIT : panneau lateral pleine hauteur = une camera entiere (layout ecran divise),
+    pas un pip flottant. Criteres stricts (anti faux-positif type ofr, panneau flottant) :
+    colle a un bord lateral + touche haut ET bas + frontiere verticale STATIQUE nette.
+    Retourne [x,y,w,h] du panneau entier, ou None."""
+    bx0, by0, bw0, bh0 = big
+    left = bx0 < 0.03
+    right = bx0 + bw0 > 0.97
+    if not (left or right): return None
+    if by0 > 0.05 or by0 + bh0 < 0.95: return None
+    guess = (bx0 + bw0) if left else bx0
+    lo, hi = max(0.10, guess - 0.10), min(0.90, guess + 0.10)
+    acc = None; n = 0
+    for f_ in (0.2, 0.35, 0.5, 0.65, 0.8):
+        fr = _frame(wa + (wb - wa) * f_)
+        if fr is None: continue
+        g = cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY)
+        sx = np.abs(cv2.Sobel(g, cv2.CV_32F, 1, 0, ksize=3)).mean(axis=0)
+        acc = sx if acc is None else acc + sx; n += 1
+    if n < 3: return None
+    acc = acc / n
+    x_lo, x_hi = int(lo * W), int(hi * W)
+    if x_hi - x_lo < 4: return None
+    col = int(np.argmax(acc[x_lo:x_hi])) + x_lo
+    if float(acc[col]) < 3.0 * float(np.median(acc)): return None   # pas de frontiere nette
+    b = col / W
+    if left:  return [0.0, 0.0, round(b, 4), 1.0]
+    else:     return [round(b, 4), 0.0, round(1.0 - b, 4), 1.0]
+
 def finalize(bx, by, bw, bh, wa, wb):
     """Extension bord motion-gated + garde anti-sur-couverture. Retourne [x,y,w,h]. INCHANGE vs avant.
     Voir commentaires historiques : snap motion-gated (1DOLq/1x32/Jjwv) + rabot anti-ecrasement (6GtF/Ethx)."""
@@ -183,10 +212,21 @@ def finalize(bx, by, bw, bh, wa, wb):
                     cand.append((_fw2 * _fh2, _cx, _cy))
             if cand:
                 cand.sort(reverse=True)
-                fpos = (float(cand[0][1]), float(cand[0][2])); break
-        if fpos:
-            fx0 = min(1.0 - fw, max(0.0, fpos[0] - fw / 2))
-            fy0 = min(1.0 - fh, max(0.0, fpos[1] - fh * 0.33))
+                import math as _m
+                fpos = (float(cand[0][1]), float(cand[0][2]), float(_m.sqrt(cand[0][0])))
+                break
+        _sp = _detect_split(big, wa, wb)
+        if _sp and fpos and _sp[0] - 0.02 <= fpos[0] <= _sp[0] + _sp[2] + 0.02:
+            # vrai SPLIT : le panneau entier est la camera -> l'avatar couvre tout le panneau
+            fx0, fy0, fw, fh = _sp
+        elif fpos:
+            # box dimensionnee sur la taille du visage (grand narrateur = grande box),
+            # ancree pour couvrir cheveux/front (visage au ~42% de la hauteur de box).
+            _fcx, _fcy, _fs = fpos
+            fh = min(0.62, max(0.42, 3.2 * _fs))
+            fw = min(0.50, max(0.26, fh * 0.62))
+            fx0 = min(1.0 - fw, max(0.0, _fcx - fw / 2))
+            fy0 = min(1.0 - fh, max(0.0, _fcy - 1.35 * _fs))
         else:
             fx0 = 0.0 if hcx < 0.5 else 1.0 - fw
             fy0 = 1.0 - fh if hcy > 0.35 else 0.0
