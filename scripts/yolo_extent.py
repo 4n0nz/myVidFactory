@@ -431,16 +431,26 @@ if anchors:
     dom = max(anchors, key=lambda s: s["end"] - s["start"])  # webcam la plus persistante
     acx, acy = _ctr(dom["bbox"])
     darea = dom["bbox"][2] * dom["bbox"][3]
+    # decoy CENTRAL longue duree (batch20 XzEg 40s / Iup 3.5s / N1rA 16s) : un "pip" dont le
+    # centre est en pleine zone centrale n'est pas une webcam (les webcams vivent aux coins/bords,
+    # un talking-head central = hero). Si une webcam dominante NON-centrale existe -> snap dessus,
+    # PEU IMPORTE la duree. Les colonnes/splits (w>=0.5 ou h>=0.72) ne passent pas par ici.
+    dcx, dcy = acx, acy
+    dom_central = 0.25 <= dcx <= 0.75 and 0.2 <= dcy <= 0.8
     for s in pips:
         if s is dom:
             continue
-        cx, cy = _ctr(s["bbox"])
+        b = s["bbox"]
+        if b[2] >= 0.5 or b[3] >= 0.72:
+            continue  # colonne/split legitime
+        cx, cy = _ctr(b)
         brief = (s["end"] - s["start"]) < 3.0
         far = abs(cx - acx) > 0.2 or abs(cy - acy) > 0.2
+        central = 0.25 <= cx <= 0.75 and 0.2 <= cy <= 0.8
         same_corner = abs(cx - acx) <= 0.15 and abs(cy - acy) <= 0.15
-        area = s["bbox"][2] * s["bbox"][3]
+        area = b[2] * b[3]
         mis_size = same_corner and (area > darea * 1.6 or area < darea * 0.6)
-        if (brief and far) or mis_size:
+        if (brief and far) or mis_size or (central and far and not dom_central):
             s["bbox"] = list(dom["bbox"])  # colle a la vraie webcam (position + taille)
             snapped += 1
 else:
