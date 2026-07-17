@@ -136,7 +136,9 @@ def cover_col(w, h):
             % (w, h, w, h, w, fgh, fy))
 
 def cover_auto(w, h):
-    if PIP_COL != '0' and h > 0 and (w / float(h)) < COL_RATIO:
+    # colonne = etroit ET quasi pleine hauteur ecran. Une petite box verticale (ex 0.11x0.29)
+    # n'est PAS une colonne -> crop-to-fill normal (bug vu sur XzEg t=322, box decoy 219x314).
+    if PIP_COL != '0' and h > 0 and (w / float(h)) < COL_RATIO and h >= 0.6 * H:
         return cover_col(w, h)
     return cover(w, h)
 
