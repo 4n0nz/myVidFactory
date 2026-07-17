@@ -561,7 +561,7 @@ if os.environ.get("VLM_ARBITER", "1") != "0":
                 else:
                     s["host"] = "off"; s["bbox"] = None; vherooff += 1
         acap.release()
-        if vfixed or voff or vhero or vherooff:
+        if True:  # toujours afficher (0 = OK, silence = indistinguable erreur)
             print("arbitre VLM : %d box pip corrigee(s), %d pip -> off, %d faux hero -> pip, %d faux hero -> off"
                   % (vfixed, voff, vhero, vherooff))
     except Exception as e:
