@@ -357,6 +357,69 @@ for i in range(len(segs) - 1):
 if refined:
     print("raffinement frontiere : %d borne(s) snappee(s) sur hard-cut" % refined)
 
+# --- border-snap : couvre le CADRE complet de la webcam, pas juste son contenu ---
+# Symptome (batch20 : pLos/0sqC/KKni) : la box borne le visage/contenu, le cadre arrondi de la
+# carte webcam (halo blanc, liseres) reste visible autour de l'avatar. Fix : chaque bord de box
+# pip est etendu VERS L'EXTERIEUR jusqu'a la bordure nette du cadre (profil Sobel median sur
+# 3 frames, meme methode que analyze_host2 Pass B). Garde-fous : un bord ne bouge que si une
+# bordure franche existe a >=1% dehors (box deja bonne = INCHANGEE), extension max 6% du cote,
+# aire finale max 1.35x sinon revert. Jamais de retrecissement.
+def _border_snap(b, wa, wb):
+    bx, by, bw, bh = b
+    if bw >= 0.5 or bh >= 0.72:  # colonnes / splits : geres par leur propre chemin, pas touche
+        return b
+    profs = []
+    for f in (0.3, 0.5, 0.7):
+        fr = _frame(wa + (wb - wa) * f)
+        if fr is None: continue
+        g = cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY)
+        profs.append((np.abs(cv2.Sobel(g, cv2.CV_32F, 1, 0, ksize=3)),
+                      np.abs(cv2.Sobel(g, cv2.CV_32F, 0, 1, ksize=3))))
+    if not profs: return b
+    x0p, y0p = int(bx * W), int(by * H)
+    x1p, y1p = int((bx + bw) * W), int((by + bh) * H)
+    profx = np.median(np.stack([p[0][y0p:y1p, :].mean(axis=0) for p in profs]), axis=0)
+    profy = np.median(np.stack([p[1][:, x0p:x1p].mean(axis=1) for p in profs]), axis=0)
+    LIMX, LIMY = int(0.06 * W), int(0.06 * H)
+    MOFX, MOFY = max(3, int(0.01 * W)), max(3, int(0.01 * H))
+    _TH = 18.0
+    def _peak(prof, a, bnd):
+        a = max(0, a); bnd = min(len(prof), bnd)
+        if bnd <= a: return None
+        seg = prof[a:bnd]; i = int(np.argmax(seg))
+        return (a + i) if float(seg[i]) > _TH else None
+    nx0, ny0, nx1, ny1 = x0p, y0p, x1p, y1p
+    if x0p > 2:
+        p = _peak(profx, x0p - LIMX, x0p - MOFX)
+        if p is not None: nx0 = max(0, p - 2)
+    if x1p < W - 2:
+        p = _peak(profx, x1p + MOFX, x1p + LIMX)
+        if p is not None: nx1 = min(W, p + 2)
+    if y0p > 2:
+        p = _peak(profy, y0p - LIMY, y0p - MOFY)
+        if p is not None: ny0 = max(0, p - 2)
+    if y1p < H - 2:
+        p = _peak(profy, y1p + MOFY, y1p + LIMY)
+        if p is not None: ny1 = min(H, p + 2)
+    if (nx0, ny0, nx1, ny1) == (x0p, y0p, x1p, y1p):
+        return b
+    if (nx1 - nx0) * (ny1 - ny0) > 1.35 * max(1, (x1p - x0p) * (y1p - y0p)):
+        return b  # extension aberrante -> on garde la box d'origine
+    return [round(nx0 / W, 4), round(ny0 / H, 4),
+            round((nx1 - nx0) / W, 4), round((ny1 - ny0) / H, 4)]
+
+_bs_cache = {}; _bs_moved = 0
+for s in segs:
+    if s["host"] == "pip" and s.get("bbox"):
+        key = tuple(s["bbox"])
+        if key not in _bs_cache:
+            _bs_cache[key] = _border_snap(s["bbox"], s["start"], s["end"])
+        nb = _bs_cache[key]
+        if nb != s["bbox"]:
+            s["bbox"] = list(nb); _bs_moved += 1
+if _bs_moved:
+    print("border-snap cadre : %d seg(s) etendus a la bordure du cadre webcam" % _bs_moved)
+
 cap.release()
 
 # --- cleanup anti-decoy : pip bref qui saute loin de la webcam stable ---
