@@ -483,60 +483,87 @@ if os.environ.get("VLM_ARBITER", "1") != "0":
         QUAD = {"top-left": (0.0, 0.0, 0.55, 0.55), "top-right": (0.45, 0.0, 0.55, 0.55),
                 "bottom-left": (0.0, 0.45, 0.55, 0.55), "bottom-right": (0.45, 0.45, 0.55, 0.55),
                 "center": (0.25, 0.2, 0.5, 0.6)}
-        vfixed = voff = 0
-        for s in segs:
-            if s["host"] != "pip" or not s.get("bbox"):
-                continue
-            b = s["bbox"]; dur = s["end"] - s["start"]
-            if dur < 2.0 or b[2] >= 0.5 or b[3] >= 0.72:
-                continue
-            f1 = _afr(s["start"] + dur / 2)
-            if f1 is None: continue
-            if vlm_probe.webcam_crop(f1, b) is not False:
-                continue  # verdict: box ok (ou inexploitable) -> pas touche
-            f2 = _afr(s["start"] + dur * 0.25)
-            if f2 is None or vlm_probe.webcam_crop(f2, b) is not False:
-                continue  # pas de confirmation -> pas touche
-            reg = vlm_probe.region(f1) or vlm_probe.region(f2)
-            nb = None
-            if reg in QUAD:
-                qx, qy, qw, qh = QUAD[reg]
-                dets = []
-                for tt in (s["start"] + dur * f for f in (0.25, 0.5, 0.75)):
-                    fr = _afr(tt)
-                    if fr is None: continue
-                    _, fcs = _yfd.detect(fr)
-                    if fcs is None: continue
-                    for fc in fcs:
-                        fx, fy, fw2, fh2 = fc[0] / W, fc[1] / H, fc[2] / W, fc[3] / H
-                        ccx, ccy = fx + fw2 / 2, fy + fh2 / 2
-                        if qx <= ccx <= qx + qw and qy <= ccy <= qy + qh:
-                            dets.append((fx, fy, fw2, fh2))
-                if dets:
-                    # float() : YuNet sort du numpy float32, pas serialisable JSON
-                    fx = float(statistics.median([d[0] for d in dets])); fy = float(statistics.median([d[1] for d in dets]))
-                    fw2 = float(statistics.median([d[2] for d in dets])); fh2 = float(statistics.median([d[3] for d in dets]))
-                    bh2 = min(0.62, max(0.30, 3.0 * fh2)); bw2 = min(0.50, max(0.20, bh2 * 0.75))
-                    bx2 = min(1 - bw2, max(0.0, fx + fw2 / 2 - bw2 / 2))
-                    by2 = min(1 - bh2, max(0.0, fy - 0.8 * fh2))
-                    nb = [round(bx2, 4), round(by2, 4), round(bw2, 4), round(bh2, 4)]
-                else:
-                    # YuNet muet (cam trop petite/sombre) -> box prudente ancree au coin du quadrant
-                    bw2, bh2 = 0.26, 0.42
-                    bx2 = 0.0 if qx == 0.0 else 1.0 - bw2
-                    by2 = 0.0 if qy == 0.0 else 1.0 - bh2
-                    if reg == "center": bx2, by2 = 0.5 - bw2 / 2, 0.5 - bh2 / 2
-                    nb = [bx2, by2, bw2, bh2]
-                # verdict croise : la NOUVELLE box doit contenir une webcam selon le crop-test
-                if nb is not None and vlm_probe.webcam_crop(f1, nb) is not True:
-                    nb = None
-            if nb is not None:
-                s["bbox"] = nb; vfixed += 1
+        def _quad_box(s, reg, f1):
+            """Box webcam dans le quadrant VLM : YuNet contraint (medianes) sinon box prudente
+            ancree au coin. La box doit etre APPROUVEE par le crop-verdict, sinon None."""
+            if reg not in QUAD:
+                return None
+            dur = s["end"] - s["start"]
+            qx, qy, qw, qh = QUAD[reg]
+            dets = []
+            for tt in (s["start"] + dur * f for f in (0.25, 0.5, 0.75)):
+                fr = _afr(tt)
+                if fr is None: continue
+                _, fcs = _yfd.detect(fr)
+                if fcs is None: continue
+                for fc in fcs:
+                    fx, fy, fw2, fh2 = fc[0] / W, fc[1] / H, fc[2] / W, fc[3] / H
+                    ccx, ccy = fx + fw2 / 2, fy + fh2 / 2
+                    if qx <= ccx <= qx + qw and qy <= ccy <= qy + qh:
+                        dets.append((fx, fy, fw2, fh2))
+            if dets:
+                # float() : YuNet sort du numpy float32, pas serialisable JSON
+                fx = float(statistics.median([d[0] for d in dets])); fy = float(statistics.median([d[1] for d in dets]))
+                fw2 = float(statistics.median([d[2] for d in dets])); fh2 = float(statistics.median([d[3] for d in dets]))
+                bh2 = min(0.62, max(0.30, 3.0 * fh2)); bw2 = min(0.50, max(0.20, bh2 * 0.75))
+                bx2 = min(1 - bw2, max(0.0, fx + fw2 / 2 - bw2 / 2))
+                by2 = min(1 - bh2, max(0.0, fy - 0.8 * fh2))
+                nb = [round(bx2, 4), round(by2, 4), round(bw2, 4), round(bh2, 4)]
             else:
-                s["host"] = "off"; s["bbox"] = None; voff += 1
+                # YuNet muet (cam trop petite/sombre) -> box prudente ancree au coin du quadrant
+                bw2, bh2 = 0.26, 0.42
+                bx2 = 0.0 if qx == 0.0 else 1.0 - bw2
+                by2 = 0.0 if qy == 0.0 else 1.0 - bh2
+                if reg == "center": bx2, by2 = 0.5 - bw2 / 2, 0.5 - bh2 / 2
+                nb = [bx2, by2, bw2, bh2]
+            if vlm_probe.webcam_crop(f1, nb) is not True:
+                return None
+            return nb
+
+        vfixed = voff = vhero = vherooff = 0
+        for s in segs:
+            dur = s["end"] - s["start"]
+            if dur < 2.0:
+                continue
+            if s["host"] == "pip" and s.get("bbox"):
+                b = s["bbox"]
+                if b[2] >= 0.5 or b[3] >= 0.72:
+                    continue
+                f1 = _afr(s["start"] + dur / 2)
+                if f1 is None: continue
+                if vlm_probe.webcam_crop(f1, b) is not False:
+                    continue  # verdict: box ok (ou inexploitable) -> pas touche
+                f2 = _afr(s["start"] + dur * 0.25)
+                if f2 is None or vlm_probe.webcam_crop(f2, b) is not False:
+                    continue  # pas de confirmation -> pas touche
+                reg = vlm_probe.region(f1) or vlm_probe.region(f2)
+                nb = _quad_box(s, reg, f1)
+                if nb is not None:
+                    s["bbox"] = nb; vfixed += 1
+                else:
+                    s["host"] = "off"; s["bbox"] = None; voff += 1
+            elif s["host"] == "hero":
+                # FAUX HERO (autorise Boss 2026-07-17) : avatar plein ecran sur du contenu.
+                # Le VLM juge la scene (2 frames "pas un talking-head") — pas les heuristiques
+                # geometriques des reverts #4/#5. Cam trouvee -> hero devient pip ; rien -> off
+                # (le contenu reste visible, pas d'avatar dessus).
+                f1 = _afr(s["start"] + dur / 2)
+                if f1 is None: continue
+                if vlm_probe.fullface(f1) is not False:
+                    continue  # talking-head plein ecran (ou inexploitable) = vrai hero
+                f2 = _afr(s["start"] + dur * 0.25)
+                if f2 is None or vlm_probe.fullface(f2) is not False:
+                    continue  # pas de confirmation -> pas touche
+                reg = vlm_probe.region(f1) or vlm_probe.region(f2)
+                nb = _quad_box(s, reg, f1) if reg and reg != "none" else None
+                if nb is not None:
+                    s["host"] = "pip"; s["bbox"] = nb; vhero += 1
+                else:
+                    s["host"] = "off"; s["bbox"] = None; vherooff += 1
         acap.release()
-        if vfixed or voff:
-            print("arbitre VLM : %d box corrigee(s), %d seg(s) -> off (decoy sans cam trouvable)" % (vfixed, voff))
+        if vfixed or voff or vhero or vherooff:
+            print("arbitre VLM : %d box pip corrigee(s), %d pip -> off, %d faux hero -> pip, %d faux hero -> off"
+                  % (vfixed, voff, vhero, vherooff))
     except Exception as e:
         print("arbitre VLM saute (%s)" % e)
 
