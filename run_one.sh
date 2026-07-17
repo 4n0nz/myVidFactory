@@ -12,7 +12,13 @@ mkdir -p "$VG/out"
 source $VG/.venv/bin/activate
 echo "=== [$OUT] DOWNLOAD ==="
 rm -f source.mp4 source_dl.* source.webm source.mkv 2>/dev/null || true
-python3 -m yt_dlp -f 'bestvideo[height<=1080][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]' \
+FMT='bestvideo[height<=1080][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]'
+# AUDIO_LANG optionnelle (ex "fr") : prefere la piste audio de cette langue si dispo,
+# sinon fallback = format standard inchange. Pose par run_full.sh apres check yt-dlp.
+if [ -n "${AUDIO_LANG:-}" ]; then
+  FMT="bestvideo[height<=1080][vcodec^=avc1]+bestaudio[language^=${AUDIO_LANG}]/${FMT}"
+fi
+python3 -m yt_dlp --js-runtimes bun:/home/boss/.bun/bin/bun --remote-components ejs:github -f "$FMT" \
   --merge-output-format mp4 -o 'source_dl.%(ext)s' "$URL"
 DL=$(ls source_dl.* | head -1)
 H=$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "$DL")
