@@ -29,6 +29,16 @@ _PROMPT_HERO = (
     "Does this frame show a person's face or upper body filling most of the frame "
     "(a full-screen talking-head shot)? Answer with ONE word: yes or no.")
 
+# Test le plus fiable (valide vkmx 439.5, page truffee de vignettes-pieges) : CROP de la box
+# + question fermee. La recherche ouverte de region se fait distraire par les visages du
+# contenu ; la question orientee "y a-t-il une cam en bas-gauche ?" = complaisance ("yes"
+# partout). Le crop isole la zone -> discrimination nette webcam live vs vignette/graphique.
+_PROMPT_CROP = (
+    "This is a CROP from a YouTube video frame. Does this crop show a LIVE webcam view of "
+    "the video narrator (a real human filmed by their webcam)? A stylized thumbnail, a course "
+    "cover image, a graphic with text, or page content is NOT a webcam view. "
+    "Answer with ONE word: yes or no.")
+
 
 def _b64(frame):
     if isinstance(frame, str):
@@ -62,6 +72,25 @@ def region(frame):
 
 def fullface(frame):
     out = _ask(_PROMPT_HERO, frame)
+    if out.startswith("yes"):
+        return True
+    if out.startswith("no"):
+        return False
+    return None
+
+
+def webcam_crop(frame, bbox, margin=0.10):
+    """frame = ndarray cv2, bbox = [x,y,w,h] fractions. True si le crop (box + marge)
+    est une webcam live du narrateur, False si vignette/contenu, None si inexploitable."""
+    import cv2
+    H, W = frame.shape[:2]
+    bx, by, bw, bh = bbox
+    mx, my = bw * margin, bh * margin
+    x0 = max(0, int((bx - mx) * W)); y0 = max(0, int((by - my) * H))
+    x1 = min(W, int((bx + bw + mx) * W)); y1 = min(H, int((by + bh + my) * H))
+    if x1 - x0 < 16 or y1 - y0 < 16:
+        return None
+    out = _ask(_PROMPT_CROP, frame[y0:y1, x0:x1])
     if out.startswith("yes"):
         return True
     if out.startswith("no"):

@@ -144,21 +144,21 @@ if os.environ.get('QC_VLM', '1') != '0':
             if s.get('host') == 'pip' and s.get('bbox'):
                 b = s['bbox']
                 if b[2] >= 0.5 or b[3] >= 0.72:
-                    continue  # colonne/split : region VLM ambigue, on saute
-                want = _quadrant(b)
+                    continue  # colonne/split : crop plein de contenu, juge pas fiable
                 fr = _vframe(mid)
                 if fr is None: continue
-                r1 = vlm_probe.region(fr)
+                # test CROP (fiable, valide sur vkmx page-a-vignettes) : la box contient-elle
+                # une vraie webcam ? La recherche ouverte de region = distraite par les decoys.
+                w1 = vlm_probe.webcam_crop(fr, b)
                 n_vlm += 1
-                if r1 is None or r1 == want:
+                if w1 is not False:
                     continue
                 fr2 = _vframe(alt)
-                r2 = vlm_probe.region(fr2) if fr2 is not None else None
-                if r2 is not None and r2 != want and r2 == r1:
-                    if r1 == "none":
-                        flags.append((s, "VLM: aucune webcam vue dans la source (2 frames) — box pip %s = probable decoy/faux positif" % want))
-                    else:
-                        flags.append((s, "VLM: webcam vue en %s, box pip en %s (2 frames) — avatar au mauvais endroit" % (r1, want)))
+                w2 = vlm_probe.webcam_crop(fr2, b) if fr2 is not None else None
+                if w2 is False:
+                    hint = vlm_probe.region(fr)
+                    where = (" (VLM voit la webcam en %s)" % hint) if hint and hint != "none" else ""
+                    flags.append((s, "VLM: la box pip %s ne contient PAS de webcam (2 frames) — decoy ou cam ratee%s" % (_quadrant(b), where)))
             elif s.get('host') == 'hero':
                 fr = _vframe(mid)
                 if fr is None: continue
