@@ -513,8 +513,9 @@ if os.environ.get("VLM_ARBITER", "1") != "0":
                         if qx <= ccx <= qx + qw and qy <= ccy <= qy + qh:
                             dets.append((fx, fy, fw2, fh2))
                 if dets:
-                    fx = statistics.median([d[0] for d in dets]); fy = statistics.median([d[1] for d in dets])
-                    fw2 = statistics.median([d[2] for d in dets]); fh2 = statistics.median([d[3] for d in dets])
+                    # float() : YuNet sort du numpy float32, pas serialisable JSON
+                    fx = float(statistics.median([d[0] for d in dets])); fy = float(statistics.median([d[1] for d in dets]))
+                    fw2 = float(statistics.median([d[2] for d in dets])); fh2 = float(statistics.median([d[3] for d in dets]))
                     bh2 = min(0.62, max(0.30, 3.0 * fh2)); bw2 = min(0.50, max(0.20, bh2 * 0.75))
                     bx2 = min(1 - bw2, max(0.0, fx + fw2 / 2 - bw2 / 2))
                     by2 = min(1 - bh2, max(0.0, fy - 0.8 * fh2))
