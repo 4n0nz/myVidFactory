@@ -10,7 +10,14 @@
 #      Oracle = le meme signal live-visage que le detecteur : un vrai hero = gros
 #      visage centre ; un faux hero = petit visage decale en coin.
 #
-# La couche (2) est SAUTEE proprement si la source ou cv2/YuNet manquent (retro-compat).
+#  (3) VLM (source + gemma3 local via Ollama) : juge la SCENE comme un humain — 1 frame
+#      mediane par segment. pip: la region ou le VLM voit la webcam doit matcher le quadrant
+#      de la box (sinon decoy / cam ratee). hero: la frame doit etre un talking-head plein
+#      ecran (sinon faux hero). Toute contradiction est CONFIRMEE sur une 2e frame avant
+#      de flagger (anti-bruit). Attrape les 3 familles batch20 : decoys longue duree,
+#      faux heros, cams jamais detectees. ~2s/frame (gemma3 charge). Env QC_VLM=0 pour couper.
+#
+# Les couches (2) et (3) sont SAUTEES proprement si source/cv2/YuNet/Ollama manquent.
 # exit 0 = clean, 1 = flags. Ecrit <dir>/qc_report.txt.
 import json, sys, os
 
@@ -103,10 +110,78 @@ try:
 except Exception as e:
     cov_note = "couverture: SAUTEE (%s)" % e
 
+# ---------- couche (3) VLM (source + gemma3 via Ollama) ----------
+vlm_note = "vlm: OFF"
+if os.environ.get('QC_VLM', '1') != '0':
+    try:
+        import cv2
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'agent_yt'))
+        import vlm_probe
+
+        vcap = cv2.VideoCapture(src_path)
+        if not vcap.isOpened():
+            raise RuntimeError("source illisible")
+
+        def _vframe(t):
+            vcap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
+            ok, fr = vcap.read()
+            return fr if ok else None
+
+        def _quadrant(b):
+            cx, cy = b[0] + b[2] / 2, b[1] + b[3] / 2
+            if 0.30 <= cx <= 0.70 and 0.30 <= cy <= 0.70:
+                return "center"
+            return ("top" if cy < 0.5 else "bottom") + "-" + ("left" if cx < 0.5 else "right")
+
+        already = set(id(s) for s, _ in flags)
+        n_vlm = 0
+        for s in hm:
+            dur = s['end'] - s['start']
+            if dur < 2.0 or id(s) in already:
+                continue
+            mid = s['start'] + dur / 2
+            alt = s['start'] + dur * 0.25
+            if s.get('host') == 'pip' and s.get('bbox'):
+                b = s['bbox']
+                if b[2] >= 0.5 or b[3] >= 0.72:
+                    continue  # colonne/split : region VLM ambigue, on saute
+                want = _quadrant(b)
+                fr = _vframe(mid)
+                if fr is None: continue
+                r1 = vlm_probe.region(fr)
+                n_vlm += 1
+                if r1 is None or r1 == want:
+                    continue
+                fr2 = _vframe(alt)
+                r2 = vlm_probe.region(fr2) if fr2 is not None else None
+                if r2 is not None and r2 != want and r2 == r1:
+                    if r1 == "none":
+                        flags.append((s, "VLM: aucune webcam vue dans la source (2 frames) — box pip %s = probable decoy/faux positif" % want))
+                    else:
+                        flags.append((s, "VLM: webcam vue en %s, box pip en %s (2 frames) — avatar au mauvais endroit" % (r1, want)))
+            elif s.get('host') == 'hero':
+                fr = _vframe(mid)
+                if fr is None: continue
+                f1 = vlm_probe.fullface(fr)
+                n_vlm += 1
+                if f1 is not False:
+                    continue
+                fr2 = _vframe(alt)
+                f2 = vlm_probe.fullface(fr2) if fr2 is not None else None
+                if f2 is False:
+                    r = vlm_probe.region(fr)
+                    where = (" (webcam vue en %s)" % r) if r and r != "none" else ""
+                    flags.append((s, "VLM: pas un talking-head plein ecran (2 frames)%s — faux hero, l'avatar ecrase du contenu" % where))
+        vcap.release()
+        vlm_note = "vlm: %d segs juges (%s)" % (n_vlm, os.environ.get('VLM_MODEL', 'gemma3:12b'))
+    except Exception as e:
+        vlm_note = "vlm: SAUTE (%s)" % e
+
 npip = sum(1 for s in hm if s.get('host') == 'pip')
 nhero = sum(1 for s in hm if s.get('host') == 'hero')
 lines = ["QC host_map: %d segs (hero=%d pip=%d), flags=%d" % (len(hm), nhero, npip, len(flags)),
-         "  %s" % cov_note]
+         "  %s" % cov_note,
+         "  %s" % vlm_note]
 for s, why in flags:
     lines.append("  FLAG %.1f-%.1fs — %s" % (s['start'], s['end'], why))
 report = "\n".join(lines)
