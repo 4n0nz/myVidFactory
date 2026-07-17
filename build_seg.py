@@ -103,8 +103,8 @@ def pip_fc(w, h, x, y, rnd):
         return ("[1:v]%s,format=rgba[base];"
                 "color=c=black:s=%dx%d:r=%s,format=gray,geq=lum='%s',loop=loop=-1:size=1[m];"
                 "[base][m]alphamerge[av];[0:v][av]overlay=%d:%d:shortest=1[vo]"
-                % (cover(w, h), w, h, FPS, expr, x, y))
-    return "[1:v]%s[av];[0:v][av]overlay=%d:%d:shortest=1[vo]" % (cover(w, h), x, y)
+                % (cover_auto(w, h), w, h, FPS, expr, x, y))
+    return "[1:v]%s[av];[0:v][av]overlay=%d:%d:shortest=1[vo]" % (cover_auto(w, h), x, y)
 
 def seg_rect(bbox):
     fx, fy, fw, fh = bbox
@@ -118,6 +118,27 @@ def seg_rect(bbox):
 
 def cover(w, h):
     return "scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d" % (w, h, w, h)
+
+# --- colonnes verticales (batch20 QQEg) : le crop-to-fill plein centre donne un visage geant
+# coupe dans une box 1:3. A la place : fond = avatar zoome FLOU (crop-to-fill + boxblur),
+# avatar net fit-WIDTH pose au tiers haut (comme une vraie cam colonne). Toggle env PIP_COL=0
+# pour revenir a l'ancien crop-to-fill partout.
+COL_RATIO = 0.70
+PIP_COL = os.environ.get('PIP_COL', '1')
+
+def cover_col(w, h):
+    fgh = max(2, int(w * 9 / 16 / 2) * 2)  # hauteur avatar 16:9 fit-width, paire
+    fy = max(0, int(h * 0.10))
+    return ("split[cba][cbb];"
+            "[cba]scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,"
+            "boxblur=luma_radius=24:luma_power=2:chroma_radius=12[cbg];"
+            "[cbb]scale=%d:%d[cfg];[cbg][cfg]overlay=0:%d"
+            % (w, h, w, h, w, fgh, fy))
+
+def cover_auto(w, h):
+    if PIP_COL != '0' and h > 0 and (w / float(h)) < COL_RATIO:
+        return cover_col(w, h)
+    return cover(w, h)
 
 lines = ["#!/bin/bash", "set -e", "exec > %s/seg.log 2>&1" % workdir, "echo '=== START SEG RENDER ==='",
          "date", 'T0=$(date +%s)']
