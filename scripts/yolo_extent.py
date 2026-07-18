@@ -408,6 +408,7 @@ def _border_snap(b, wa, wb):
     return [round(nx0 / W, 4), round(ny0 / H, 4),
             round((nx1 - nx0) / W, 4), round((ny1 - ny0) / H, 4)]
 
+sys.path.insert(0, "/home/boss/videogen/agent_yt")  # vlm_probe dispo pour carte webcam ET arbitre
 # --- CARTE webcam (batch20 : 0sqC/_Kz/KKni/QQEg sous-couverts ou fausses colonnes) ---
 # La detection dimensionne sur le VISAGE ; les cartes webcam modernes (coin arrondi, 25-40%
 # ecran) sont bien plus grandes. On detecte la CARTE (plus grand contour rectangulaire net
@@ -507,7 +508,6 @@ if snapped:
 # Kill-switch env VLM_ARBITER=0 ; Ollama absent -> saute, pipeline inchange.
 if os.environ.get("VLM_ARBITER", "1") != "0":
     try:
-        sys.path.insert(0, "/home/boss/videogen/agent_yt")
         import vlm_probe
         acap = cv2.VideoCapture(source)
         def _afr(t):
