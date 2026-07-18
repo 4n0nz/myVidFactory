@@ -408,9 +408,43 @@ def _border_snap(b, wa, wb):
     return [round(nx0 / W, 4), round(ny0 / H, 4),
             round((nx1 - nx0) / W, 4), round((ny1 - ny0) / H, 4)]
 
+# --- CARTE webcam (batch20 : 0sqC/_Kz/KKni/QQEg sous-couverts ou fausses colonnes) ---
+# La detection dimensionne sur le VISAGE ; les cartes webcam modernes (coin arrondi, 25-40%
+# ecran) sont bien plus grandes. On detecte la CARTE (plus grand contour rectangulaire net
+# contenant le visage en cadrage webcam) et on remplace la box. GATE OBLIGATOIRE : la carte
+# trouvee doit etre APPROUVEE par le VLM crop-test (webcam ? oui) — sinon (page busy, faux
+# contour) on garde la box existante. Kill-switch CARD_DETECT=0.
+_card_moved = 0
+if os.environ.get("CARD_DETECT", "1") != "0":
+    try:
+        import card_extent, vlm_probe
+        _ccache = {}
+        for s in segs:
+            if s["host"] != "pip" or not s.get("bbox"):
+                continue
+            if (s["end"] - s["start"]) < 2.0:
+                continue
+            key = (round(s["start"], 1), round(s["end"], 1))
+            if key not in _ccache:
+                nb = card_extent.card_box(cap, W, H, s["start"], s["end"], _yfd)
+                ok = False
+                if nb is not None and nb != s["bbox"]:
+                    cap.set(cv2.CAP_PROP_POS_MSEC, (s["start"] + (s["end"]-s["start"])/2)*1000.0)
+                    r, fr = cap.read()
+                    if r and vlm_probe.webcam_crop(fr, nb) is True:
+                        ok = True
+                _ccache[key] = nb if ok else None
+            nb = _ccache[key]
+            if nb is not None:
+                s["bbox"] = list(nb); s["_card"] = True; _card_moved += 1
+        if _card_moved:
+            print("carte webcam : %d seg(s) redimensionnes a la carte complete (VLM-approuve)" % _card_moved)
+    except Exception as e:
+        print("carte webcam saute (%s)" % e)
+
 _bs_cache = {}; _bs_moved = 0
 for s in segs:
-    if s["host"] == "pip" and s.get("bbox"):
+    if s["host"] == "pip" and s.get("bbox") and not s.get("_card"):  # carte deja pleine -> pas de border-snap
         key = tuple(s["bbox"])
         if key not in _bs_cache:
             _bs_cache[key] = _border_snap(s["bbox"], s["start"], s["end"])
