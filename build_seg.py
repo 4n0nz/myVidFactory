@@ -124,7 +124,7 @@ def cover(w, h):
 # avatar net fit-WIDTH pose au tiers haut (comme une vraie cam colonne). Toggle env PIP_COL=0
 # pour revenir a l'ancien crop-to-fill partout.
 COL_RATIO = 0.70
-PIP_COL = os.environ.get('PIP_COL', '1')
+PIP_COL = os.environ.get('PIP_COL', '0')  # DEFAUT OFF : Boss rejette le fond flou (2026-07-18). Crop-to-fill partout.
 
 def cover_col(w, h):
     fgh = max(2, int(w * 9 / 16 / 2) * 2)  # hauteur avatar 16:9 fit-width, paire
