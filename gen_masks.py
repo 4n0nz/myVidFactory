@@ -26,7 +26,7 @@ def clean_shape(mask, bbox, W, H):
     rectangle-arrondi sinon) ajustee au bbox. Retourne masque cropu (uint8 0-255) au bbox."""
     # MARGE de sur-couverture : la forme est un peu PLUS GRANDE que la webcam detectee ->
     # garantit que le pip original est 100% cache (Boss : sous-couvrir = interdit, sur-couvrir = OK).
-    MG = 0.06
+    MG = 0.10
     cx0 = bbox[0]-bbox[2]*MG; cy0 = bbox[1]-bbox[3]*MG
     cw = bbox[2]*(1+2*MG); ch = bbox[3]*(1+2*MG)
     x = int(cx0*W); y = int(cy0*H); w = max(4,int(cw*W)); h = max(4,int(ch*H))
