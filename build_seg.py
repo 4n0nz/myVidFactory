@@ -156,6 +156,18 @@ for si, s in enumerate(hmap):
         cmd = ('ffmpeg -y -ss %s -t %s -i %s -stream_loop -1 -i %s '
                '-filter_complex "%s" -map "[vo]" -an -r %s -t %s %s "%s"'
                % (ss, d, source, avatar, fc, FPS, d, NV, sf))
+    elif host == 'pip' and s.get('mask') and not FIXED:
+        # COMPOSITE MASQUE (pixel-exact) : avatar passe a travers le masque de la fenetre webcam
+        # (grabCut) -> forme exacte (rond/arrondi), zero fuite. bbox = bbox du masque.
+        fx, fy, fw, fh = s['bbox']
+        x = int(fx * W); y = int(fy * H); w = even(int(fw * W)); h = even(int(fh * H))
+        mp = s['mask']
+        fc = ("[1:v]scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,format=rgba[av0];"
+              "[2:v]scale=%d:%d,format=gray[mk];[av0][mk]alphamerge[av];"
+              "[0:v][av]overlay=%d:%d:shortest=1[vo]" % (w, h, w, h, w, h, x, y))
+        cmd = ('ffmpeg -y -ss %s -t %s -i %s -stream_loop -1 -i %s -stream_loop -1 -i %s '
+               '-filter_complex "%s" -map "[vo]" -an -r %s -t %s %s "%s"'
+               % (ss, d, source, avatar, mp, fc, FPS, d, NV, sf))
     elif host == 'pip':
         rect = FIXED if FIXED else (seg_rect(s['bbox']) if s.get('bbox') else None)
         if rect:
