@@ -43,6 +43,23 @@ def _card_one(fr, fx, fy, fw, fh):
     want_top = max(0, int(fy - 0.6*fh))
     if y > want_top:
         h += (y - want_top); y = want_top
+    # extension BAS : le contour rate souvent le bas de la carte (torse/mains qui fuient sous
+    # l'avatar, cf 0sqC). On descend le bord bas tant que la colonne verticale sous le visage
+    # RESSEMBLE a la carte (continuite de bord/contenu), jusqu'a un bord horizontal net ou le
+    # bas de l'ecran. On scanne le gradient horizontal median dans la colonne du visage.
+    y1 = y + h
+    if y1 < H - 2:
+        col = gray[:, max(0, int(fcx - 0.1*w)):min(W, int(fcx + 0.1*w))]
+        gy = np.abs(cv2.Sobel(col, cv2.CV_32F, 0, 1, ksize=3)).mean(axis=1)
+        lim = min(H, y1 + int(0.35 * h))          # au plus +35% de la hauteur carte
+        seg = gy[y1:lim]
+        if len(seg) > 3:
+            j = int(np.argmax(seg))
+            if float(seg[j]) > 22.0:               # bord bas net trouve
+                y1 = y1 + j + 2
+            else:
+                y1 = lim                            # pas de bord -> etend au max (carte continue)
+        h = y1 - y
     return (x, y, w, h)
 
 def card_box(cap, W, H, t_start, t_end, yfd):
