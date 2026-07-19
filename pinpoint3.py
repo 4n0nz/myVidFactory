@@ -164,26 +164,29 @@ for sc in scenes:
     out.append({"start": round(float(sc["start"]),2), "end": round(float(sc["end"]),2),
                 "region": reg, "box": [round(float(x0),4), round(float(y0),4),
                 round(float(x1-x0),4), round(float(y1-y0),4)], "edges": [],
-                "n": len(cs), "src": "ident"})
+                "n": len(cs), "src": "ident", "_cards": cs})
 
-# clustering position (regle Boss : pip statique -> UNE box canonique enveloppe par position)
+# clustering position (regle Boss : pip statique -> UNE box canonique par position).
+# Canonique = PERCENTILES 10-90 sur TOUTES les cartes du cluster, PAS l'union enveloppe :
+# l'union gonflait la box jusqu'aux bords (Boss pin8 : avatar enorme sur un petit cercle).
+# Le QC attrape toute sous-couverture -> qc_fix patche localement, on peut serrer.
 clusters = []
 for s in out:
     if s["region"] == "hero": continue
     b = s["box"]; cx, cy = b[0]+b[2]/2, b[1]+b[3]/2
     hit = None
     for c in clusters:
-        bb = c["box"]; ccx, ccy = bb[0]+bb[2]/2, bb[1]+bb[3]/2
-        if abs(cx-ccx) < 0.09 and abs(cy-ccy) < 0.09: hit = c; break
+        if abs(cx-c["cx"]) < 0.07 and abs(cy-c["cy"]) < 0.07: hit = c; break
     if hit is None:
-        clusters.append({"box": list(b), "members": [s]})
+        clusters.append({"cx": cx, "cy": cy, "members": [s]})
     else:
-        bb = hit["box"]
-        x0 = min(bb[0], b[0]); y0 = min(bb[1], b[1])
-        x1 = max(bb[0]+bb[2], b[0]+b[2]); y1 = max(bb[1]+bb[3], b[1]+b[3])
-        hit["box"] = [x0, y0, x1-x0, y1-y0]; hit["members"].append(s)
+        n = len(hit["members"])
+        hit["cx"] = (hit["cx"]*n + cx)/(n+1); hit["cy"] = (hit["cy"]*n + cy)/(n+1)
+        hit["members"].append(s)
 for c in clusters:
-    x0, y0 = c["box"][0], c["box"][1]; x1, y1 = x0+c["box"][2], y0+c["box"][3]
+    allc = [card for s in c["members"] for card in s["_cards"]]
+    x0 = pc([a[0] for a in allc], 0.10); y0 = pc([a[1] for a in allc], 0.10)
+    x1 = pc([a[0]+a[2] for a in allc], 0.90); y1 = pc([a[1]+a[3] for a in allc], 0.90)
     edges = []
     if x0 < EDGE: x0 = 0.0; edges.append("L")
     if y0 < EDGE: y0 = 0.0; edges.append("T")
@@ -192,6 +195,8 @@ for c in clusters:
     cb = [round(float(x0),4), round(float(y0),4), round(float(x1-x0),4), round(float(y1-y0),4)]
     for s in c["members"]:
         s["box"] = list(cb); s["edges"] = edges
+for s in out:
+    s.pop("_cards", None)
 
 # fusion scenes adjacentes meme kind+box (apres canonisation elles sont identiques)
 out.sort(key=lambda s: s["start"])
