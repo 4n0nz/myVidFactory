@@ -61,7 +61,7 @@ _cache = {}   # box canonique (tuple) -> (mask_path, bbox, shape) — 1 masque p
 for sc in pin:
     if sc["start"]>prev+0.3:
         segs.append({"host":"off","start":round(prev,2),"end":round(sc["start"],2),"bbox":None})
-    if is_hero(sc["start"], sc["end"], sc["box"]):
+    if sc.get("region") == "hero" or (sc.get("src") != "ident" and is_hero(sc["start"], sc["end"], sc["box"])):
         segs.append({"host":"hero","start":round(sc["start"],2),"end":round(sc["end"],2),"bbox":None})
         nhero+=1
     else:

@@ -30,13 +30,18 @@ def _frame(t):
     cap.set(cv2.CAP_PROP_POS_MSEC, t*1000.0); ok, fr = cap.read()
     return fr if ok else None
 
-# 1. VLM coarse -> region par sample
+# 1. VLM coarse -> region par sample. region()=="none" peut vouloir dire deux choses :
+#    vrai contenu (off) OU narrateur PLEIN ECRAN sans overlay (hero) -> fullface tranche.
+#    Sans ca, les heros tombent dans les trous "off" et restent a decouvert (0sqC 1ere minute).
 vs = []
 t = 0.0
 while t < DUR:
     fr = _frame(t)
     r = vlm_probe.region(fr) if fr is not None else None
-    vs.append((round(t,2), r if r in QUAD else "none"))
+    r = r if r in QUAD else "none"
+    if r == "none" and fr is not None and vlm_probe.fullface(fr) is True:
+        r = "hero"
+    vs.append((round(t,2), r))
     t += VLM_STEP
 
 # 2. scenes = runs de region identique (!= none)
@@ -78,6 +83,11 @@ for sc in scenes:
     t0, t1 = sc["start"], sc["end"] + VLM_STEP
     t1 = min(round(t1,2), round(DUR,2))
     if t1 - t0 < 1.0: continue
+    if sc["region"] == "hero":
+        # hero = avatar plein ecran, pas de box a detecter (etapes OpenCV/fusion box sautees)
+        out.append({"start":float(t0),"end":float(t1),"region":"hero",
+                    "box":[0.0,0.0,1.0,1.0],"edges":["L","T","R","B"],"n":0})
+        continue
     quad = QUAD[sc["region"]]
     boxes = []
     t = t0 + 0.3
@@ -126,6 +136,7 @@ out = merged
 def _center(b): return (b[0]+b[2]/2, b[1]+b[3]/2)
 clusters = []
 for s in out:
+    if s["region"] == "hero": continue   # box plein ecran, ne doit pas avaler un cluster "center"
     cx, cy = _center(s["box"])
     hit = None
     for c in clusters:
@@ -152,6 +163,145 @@ for c in clusters:
     for s in c["members"]:
         s["box"] = list(cb); s["edges"] = edges
 print("clusters position : %d (box canonique partagee)" % len(clusters))
+
+# 3d. RECUPERATION DES TROUS (v2) : toute probe VLM SEULE flake (mesure 0sqC : region() rate
+# des pips 3 samples de suite, fullface rate un plein-ecran, crop-verify rate une cam cercle).
+# Donc DETERMINISTE d'abord : YuNet echantillonne chaque trou. Pas de visage -> vrai off, zero
+# VLM. Visage assez gros (>= 0.09*H, tue vignettes/avatars decoys) DANS une box canonique ->
+# crop-verify 2 frames (OR) -> scene pip inseree a la box canonique. Gros visage plein cadre
+# hors canonique -> fullface 2 frames (OR) -> scene hero. Sous-couvrir interdit (regle Boss).
+FACE_MIN = 0.09
+canon = {}
+for s in out:
+    if s["region"] != "hero":
+        canon.setdefault(tuple(s["box"]), s["region"])
+
+def _faces(fr):
+    _, fs = yfd.detect(fr)
+    return [] if fs is None else fs
+
+def _motion(t, box, fr=None):
+    """diff moyenne du crop entre t et t+0.8s. Cam LIVE qui parle >> 0 ; vignette/photo
+    statique ~ 0. Tranche ce que le VLM ne peut pas : photo du narrateur vs cam live (876s)."""
+    fr1 = fr if fr is not None else _frame(t)
+    fr2 = _frame(min(t+0.8, DUR-0.05))
+    if fr1 is None or fr2 is None: return 99.0
+    x=int(box[0]*W); y=int(box[1]*H); w=max(4,int(box[2]*W)); h=max(4,int(box[3]*H))
+    x=max(0,min(W-w,x)); y=max(0,min(H-h,y))
+    a=cv2.cvtColor(fr1[y:y+h,x:x+w],cv2.COLOR_BGR2GRAY)
+    b=cv2.cvtColor(fr2[y:y+h,x:x+w],cv2.COLOR_BGR2GRAY)
+    return float(cv2.absdiff(a,b).mean())
+
+def _card_box(fr, f):
+    """carte webcam autour du visage f (card_extent, fallback ancre-visage)."""
+    if card_extent is not None and hasattr(card_extent,"_card_one"):
+        cb = card_extent._card_one(fr, int(f[0]),int(f[1]),int(f[2]),int(f[3]))
+        if cb is not None:
+            x,y,w,h = cb; return [x/W,y/H,w/W,h/H]
+    fx,fy,fw,fh = f[0]/W,f[1]/H,f[2]/W,f[3]/H
+    return [max(0,fx-fw*0.6),max(0,fy-fh*0.7),min(1,fw*2.2),min(1,fh*3.0)]
+
+def _covers(cb, card):
+    """cb couvre >= 85% de la carte (sinon bas de carte a decouvert — fuite 26s pin5)."""
+    ix0=max(cb[0],card[0]); iy0=max(cb[1],card[1])
+    ix1=min(cb[0]+cb[2],card[0]+card[2]); iy1=min(cb[1]+cb[3],card[1]+card[3])
+    return max(0,ix1-ix0)*max(0,iy1-iy0) >= 0.85*card[2]*card[3]
+
+MOTION_MIN = 1.5
+
+def _gap_probe(t):
+    """decision pour un sample de trou : ("pip", box, region) | ("hero",) | None.
+    Ordre : gros visage -> hero d'abord (fuite plein ecran = pire cas), sinon match canonique."""
+    fr = _frame(t)
+    if fr is None: return None
+    faces = [f for f in _faces(fr) if f[3]/H >= FACE_MIN]
+    if not faces: return None
+    fr2 = _frame(min(t+1.5, DUR-0.1))
+    big = max(faces, key=lambda f: f[3])
+    if big[3]/H > 0.22:
+        if vlm_probe.fullface(fr) is True: return ("hero",)
+        if fr2 is not None and vlm_probe.fullface(fr2) is True: return ("hero",)
+    # box la plus PETITE d'abord : les grosses colonnes chevauchent tout l'ecran, sans tri
+    # le choix alterne d'un sample a l'autre -> avatar qui saute (flicker pin4 512-528s).
+    # Gates : box doit COUVRIR la carte detectee (fuite bas de carte 26s pin5) + MOUVEMENT
+    # dans la box (tue les photos/vignettes du narrateur que crop-verify prend pour une cam).
+    order = sorted(canon.items(), key=lambda kv: kv[0][2]*kv[0][3])
+    for f in faces:
+        cx, cy = (f[0]+f[2]/2)/W, (f[1]+f[3]/2)/H
+        card = _card_box(fr, f)
+        for cb, reg in order:
+            if not (cb[0] <= cx <= cb[0]+cb[2] and cb[1] <= cy <= cb[1]+cb[3]): continue
+            if not _covers(cb, card): continue
+            if _motion(t, list(cb), fr) < MOTION_MIN: continue
+            if vlm_probe.webcam_crop(fr, list(cb)) is True:
+                return ("pip", list(cb), reg)
+            if fr2 is not None and vlm_probe.webcam_crop(fr2, list(cb)) is True:
+                return ("pip", list(cb), reg)
+        # aucune canonique ne couvre la carte -> la carte elle-meme (+4% marge), memes gates
+        px0=max(0.0,float(card[0])-0.04); py0=max(0.0,float(card[1])-0.04)
+        px1=min(1.0,float(card[0]+card[2])+0.04); py1=min(1.0,float(card[1]+card[3])+0.04)
+        pad=[round(px0,4),round(py0,4),round(px1-px0,4),round(py1-py0,4)]
+        if _motion(t, pad, fr) >= MOTION_MIN:
+            if vlm_probe.webcam_crop(fr, pad) is True:
+                return ("pip", pad, "recup")
+            if fr2 is not None and vlm_probe.webcam_crop(fr2, pad) is True:
+                return ("pip", pad, "recup")
+    return None
+
+out.sort(key=lambda s: s["start"])
+extra = []
+edges_gap = [(0.0, out[0]["start"] if out else DUR)] + \
+            [(out[i]["end"], out[i+1]["start"]) for i in range(len(out)-1)] + \
+            ([(out[-1]["end"], DUR)] if out else [])
+for gap0, gap1 in edges_gap:
+    if gap1 - gap0 < 2.0: continue
+    t = gap0 + 1.0; cur = None
+    while t < gap1 - 0.5:
+        # STICKY : si une scene pip est en cours, verifier d'abord SA box (stabilite > re-decision).
+        # Gate mouvement AVANT le VLM : une box devenue statique = plus une cam, on re-decide.
+        if cur is not None and cur["region"] != "hero":
+            frs = _frame(t)
+            if (frs is not None and _motion(t, cur["box"], frs) >= MOTION_MIN
+                    and vlm_probe.webcam_crop(frs, cur["box"]) is True):
+                cur["end"] = round(float(min(t + 2.0, gap1)), 2)
+                t += 2.0; continue
+        d = _gap_probe(t)
+        key = None if d is None else (d[0], tuple(d[1]) if d[0] == "pip" else None)
+        end_t = round(float(min(t + 2.0, gap1)), 2)
+        if d is not None and cur is not None and cur["_key"] == key:
+            cur["end"] = end_t
+        elif d is not None:
+            if cur: extra.append(cur)
+            if d[0] == "hero":
+                cur = {"start": round(float(max(t-1.0, gap0)),2), "end": end_t, "region": "hero",
+                       "box": [0.0,0.0,1.0,1.0], "edges": ["L","T","R","B"], "n": 0, "_key": key}
+            else:
+                cur = {"start": round(float(max(t-1.0, gap0)),2), "end": end_t, "region": d[2],
+                       "box": list(d[1]), "edges": [], "n": 0, "_key": key}
+        else:
+            if cur: extra.append(cur); cur = None
+        t += 2.0
+    if cur: extra.append(cur)
+for e in extra:
+    e.pop("_key", None)
+    print("  RECUP trou : %.1f-%.1fs %s %s" % (e["start"], e["end"], e["region"], e["box"]))
+out.extend(extra)
+out.sort(key=lambda s: s["start"])
+
+# 3e. CHEVAUCHEMENTS + MERGE : les fenetres de recup se recouvrent (pin4 : videoonly 1035s vs
+# source 1002s -> desync A/V). Clip au precedent, fusion des adjacents meme box, vides jetes.
+clean = []
+for s in out:
+    if clean:
+        p = clean[-1]
+        same = (s["region"] == p["region"] and s["box"] == p["box"])
+        if s["start"] < p["end"] or (same and s["start"] - p["end"] < 0.5):
+            if same:
+                p["end"] = max(p["end"], s["end"]); continue
+            s["start"] = p["end"]
+            if s["end"] - s["start"] < 0.5: continue
+    clean.append(s)
+out = clean
 
 json.dump(out,open(os.path.join(wd,"host_map_pin.json"),"w"),indent=2)
 print("SCENES pip (%d) : start-end | duree | box | coin | bords" % len(out))
