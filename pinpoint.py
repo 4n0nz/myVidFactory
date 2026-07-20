@@ -70,9 +70,20 @@ def box_in_quad(fr, quad):
     if card_extent is not None and hasattr(card_extent,"_card_one"):
         cb = card_extent._card_one(fr, int(f[0]),int(f[1]),int(f[2]),int(f[3]))
         if cb is not None:
-            x,y,w,h = cb; return [x/W,y/H,w/W,h/H]
+            x,y,w,h = cb
+            bx,by,bw,bh = x/W, y/H, w/W, h/H
+            # Plausibilite carte vs visage (mesure 0sqC t=488-530 : card_extent accroche un
+            # contour de layout -> box 0.39 de large pour un cercle de 0.19). Une vraie carte
+            # webcam : largeur <= 6x le visage (sauf split/colonne >= 0.45) ET visage centre
+            # horizontalement dedans. Sinon -> fallback ancre-visage.
+            fcx = (f[0]+f[2]/2)/W; fwn = f[2]/W
+            sane_w = (bw >= 0.45) or (bw <= 6.0*fwn)
+            centered = abs(fcx - (bx+bw/2)) <= 0.25*bw
+            if sane_w and centered:
+                return [bx,by,bw,bh], "card"
     fx,fy,fw,fh = f[0]/W,f[1]/H,f[2]/W,f[3]/H
-    return [max(0,fx-fw*0.6),max(0,fy-fh*0.7),min(1,fw*2.2),min(1,fh*3.0)]
+    bx0 = max(0,fx-fw*0.6); by0 = max(0,fy-fh*0.7)
+    return [bx0,by0,min(1-bx0,fw*2.2),min(1-by0,fh*3.0)], "fall"
 
 # 3. box exacte par scene. EXTENT = percentile HAUT (sur-couvre, garantit couverture — Boss).
 #    Position (x0,y0) = percentile BAS ; coin oppose (x1,y1) = percentile HAUT -> box englobante.
@@ -89,15 +100,22 @@ for sc in scenes:
                     "box":[0.0,0.0,1.0,1.0],"edges":["L","T","R","B"],"n":0})
         continue
     quad = QUAD[sc["region"]]
-    boxes = []
+    boxes = []; srcs = []
     t = t0 + 0.3
     while t < t1:
         fr = _frame(t)
         if fr is not None:
-            b = box_in_quad(fr, quad)
-            if b: boxes.append(b)
+            r = box_in_quad(fr, quad)
+            if r: boxes.append(r[0]); srcs.append(r[1])
         t += BOX_STEP
     if len(boxes) < 3: continue
+    # Priorite CARD : le fallback ancre-visage (x2.2/x3.0) surestime et deborde en bas
+    # (mesure 0sqC : y1 median fallback = 1.01 -> snap bord a tort, avatar geant).
+    # Les box card (contour reel) sont serrees et stables -> si assez de samples card,
+    # les percentiles se calculent sur elles seules.
+    cards = [b for b, s in zip(boxes, srcs) if s == "card"]
+    if len(cards) >= max(3, int(0.10*len(boxes))):
+        boxes = cards
     x0 = pc([b[0] for b in boxes], 0.15); y0 = pc([b[1] for b in boxes], 0.15)
     x1 = pc([b[0]+b[2] for b in boxes], 0.85); y1 = pc([b[1]+b[3] for b in boxes], 0.85)
     edges = []

@@ -121,10 +121,15 @@ for s in samples:
              if _cos(fc["feat"], narr_feat) >= COS_SAME and fc["mo"] >= MOTION_MIN]
     # HERO = n'importe quel talking-head plein ecran qui bouge, narrateur OU PAS (invite/
     # celebrite plein cadre doit etre couvert aussi — N1r Mark Cuban intro, retour Boss)
-    bigface = any(fc["f"][3]/H > 0.25 and fc["mo"] >= MOTION_MIN for fc in s["faces"])
+    # hero = la CARTE couvre ~tout l'ecran (pas "gros visage" : un panneau split-screen
+    # 3-bords a un gros visage mais ne doit couvrir QUE le panneau — QU-f, retour Boss).
+    # Visage enorme (>0.4H) = plan serre sans carte mesurable -> hero aussi.
+    def _heroish(fc):
+        return (fc["card"][2] > 0.65 and fc["card"][3] > 0.85) or fc["f"][3]/H > 0.40
+    bigface = any(_heroish(fc) and fc["mo"] >= MOTION_MIN for fc in s["faces"])
     if not cands and not bigface:
         decisions.append((s["t"], None, None)); continue
-    if bigface or any((fc["card"][2] > 0.5 and fc["card"][3] > 0.7) for fc in cands):
+    if bigface or any(_heroish(fc) for fc in cands):
         decisions.append((s["t"], "hero", [0.0, 0.0, 1.0, 1.0]))
     else:
         x0 = min(fc["card"][0] for fc in cands); y0 = min(fc["card"][1] for fc in cands)
@@ -158,7 +163,7 @@ for c in pclust:
     c["box"] = [round(float(x0),4), round(float(y0),4), round(float(x1-x0),4), round(float(y1-y0),4)]
     c["edges"] = edges
     # box quasi plein ecran = narrateur geant -> HERO propre, pas d'ellipse/rect plein ecran
-    c["hero"] = (c["box"][2]*c["box"][3] > 0.5)
+    c["hero"] = (c["box"][2]*c["box"][3] > 0.75)
 print("clusters position (samples) : %d" % len(pclust))
 
 def _clid(card):
