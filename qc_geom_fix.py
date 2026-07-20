@@ -23,12 +23,10 @@ for f in fails:
         if s["region"] != "hero" and s["start"] <= t <= s["end"]:
             if f["type"] == "SOUS-COUVERTURE":
                 s["box"] = union(s["box"], f["carte"]); s["patched"] = True; n += 1
-            elif f["type"] == "TROP-GRAND" and not s.get("patched"):
-                c = f["carte"]; m = 0.02
-                x0 = max(0.0, c[0]-m); y0 = max(0.0, c[1]-m)
-                s["box"] = [round(x0,4), round(y0,4),
-                            round(min(1.0-x0, c[2]+2*m),4), round(min(1.0-y0, c[3]+2*m),4)]
-                n += 1
+            # TROP-GRAND : PAS de resserrage automatique — les deux boucles correctives
+            # s'ecrasaient mutuellement (ident elargit, geom resserre) -> oscillation
+            # destructrice, gb5 LEAK_242. Corrections MONOTONES (grandir seulement) =
+            # convergence garantie ; trop-grand reste au rapport, traite a la main.
             b = s["box"]
             adjusted[(round(b[0]+b[2]/2,1), round(b[1]+b[3]/2,1))] = (list(b), bool(s.get("patched")))
             break
