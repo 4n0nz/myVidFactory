@@ -93,6 +93,37 @@ def _true_rect(box, t0, t1):
     if L+R+T+B == 0: return None                # deja ajustee
     return [round((x+L)/W,4), round((y+T)/H,4), round(nw/W,4), round(nh/H,4)]
 
+def _motion_extend(box, t0, t1):
+    """etend la box vers les zones ADJACENTES qui bougent en continu (bandes 8%, max 5 pas).
+    Attrape ce que les scans de BORDS ne voient pas : torse noir-sur-noir sous la cam (TzJC),
+    narrateur libre sans carte. MONOTONE (grandit seulement). Page statique = zero extension."""
+    pairs = []
+    for frac in (0.3, 0.5, 0.7):
+        cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac)*1000.0); ok1, a = cap.read()
+        cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac+0.5)*1000.0); ok2, b = cap.read()
+        if ok1 and ok2:
+            pairs.append(cv2.absdiff(cv2.cvtColor(a, cv2.COLOR_BGR2GRAY),
+                                     cv2.cvtColor(b, cv2.COLOR_BGR2GRAY)))
+    if not pairs: return box
+    dm = np.maximum.reduce(pairs).astype('float32')
+    x0, y0 = box[0], box[1]; x1, y1 = box[0]+box[2], box[1]+box[3]
+    def _hot(ya, yb, xa, xb):
+        band = dm[max(0,int(ya*H)):min(H,int(yb*H)), max(0,int(xa*W)):min(W,int(xb*W))]
+        return band.size > 200 and float((band > 18).mean()) > 0.25
+    for _ in range(5):
+        grown = False
+        if y1 < 0.999 and _hot(y1, y1+0.08, x0, x1): y1 = min(1.0, y1+0.08); grown = True
+        if y0 > 0.001 and _hot(y0-0.08, y0, x0, x1): y0 = max(0.0, y0-0.08); grown = True
+        if x1 < 0.999 and _hot(y0, y1, x1, x1+0.08): x1 = min(1.0, x1+0.08); grown = True
+        if x0 > 0.001 and _hot(y0, y1, x0-0.08, x0): x0 = max(0.0, x0-0.08); grown = True
+        if not grown: break
+    # colle aux bords si proche (coherent avec le snap pinpoint)
+    if x0 < 0.08: x0 = 0.0
+    if y0 < 0.08: y0 = 0.0
+    if x1 > 0.92: x1 = 1.0
+    if y1 > 0.92: y1 = 1.0
+    return [round(x0,4), round(y0,4), round(x1-x0,4), round(y1-y0,4)]
+
 def _pmean(img, px, py):
     h, w = img.shape[:2]
     if px < 0 or py < 0 or px >= w or py >= h: return None
@@ -190,6 +221,13 @@ for p in pips:
         if p["patched"] and shp == "ellipse":
             shp = "rect"   # patch anti-fuite : l'ellipse ne couvre pas les coins de l'union
                            # (pLos popout : tete qui depasse du cercle -> boucle QC sterile)
+        abox = _motion_extend(list(abox), p["t0"], p["t1"])
+        if abox[2]*abox[3] > 0.8:
+            # l'extension revele un corps quasi plein cadre -> narrateur libre -> hero
+            p["seg"]["host"] = "hero"; p["seg"]["bbox"] = None
+            p["hero"] = True
+            p["shape"], p["abox"] = "rect90", abox
+            continue
         p["shape"],p["abox"]=shp,list(abox)
         if abox == p["box"] and not p["patched"]:
             _shape_cache[key]=(shp,list(abox))
@@ -200,7 +238,7 @@ for p in pips:
 def _ctr(b): return (b[0]+b[2]/2, b[1]+b[3]/2)
 groups=[]
 for p in pips:
-    if p["patched"]: continue
+    if p["patched"] or p.get("hero"): continue
     cx,cy=_ctr(p["abox"]); hit=None
     for g in groups:
         if g["shape"]==p["shape"] and abs(cx-g["cx"])<0.06 and abs(cy-g["cy"])<0.06:
@@ -220,6 +258,7 @@ for g in groups:
 # dessin : UN masque par (box finale, forme)
 _mask={}; mi=0
 for p in pips:
+    if p.get("hero"): continue
     k=(tuple(p["abox"]),p["shape"])
     if k not in _mask:
         _mask[k]=draw(p["abox"],p["shape"],mi); mi+=1
