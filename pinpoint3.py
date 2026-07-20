@@ -254,6 +254,12 @@ for s in out:
         merged2.append(s)
 out = merged2
 
+# bords temporels : une scene qui demarre dans les 5 premieres secondes s'etend a 0
+# (fade-in = YuNet rate les 1res frames -> narrateur a decouvert des la seconde 0, SdMp) ;
+# idem fin de video
+if out and out[0]["start"] <= 5.0: out[0]["start"] = 0.0
+if out and out[-1]["end"] >= DUR-5.0: out[-1]["end"] = round(float(DUR), 2)
+
 json.dump(out, open(os.path.join(wd, "host_map_pin.json"), "w"), indent=2)
 print("SCENES (%d) : start-end | duree | box | type | bords" % len(out))
 for s in out:
