@@ -17,14 +17,30 @@ cap = cv2.VideoCapture(src); W=int(cap.get(3)); H=int(cap.get(4)); DUR=cap.get(7
 yfd = cv2.FaceDetectorYN.create(YUNET, "", (W, H), score_threshold=0.6)
 mdir = os.path.join(wd, "masks"); os.makedirs(mdir, exist_ok=True)
 
-def shape_of(t0, t1, box):
-    """ellipse si le blob grabcut remplit ~78% du box (rond), sinon rect."""
+def shape_of(t0, t1, box, allow_shrink=True):
+    """(shape, box) : ellipse si le blob grabcut remplit ~78% du box (rond), sinon rect.
+    fill < 0.45 = la box detectee SUR-couvre largement le blob reel (card_extent qui deborde
+    sur page blanche : cercle rendu en rect geant, 0sqC 492-531s) -> RETRECIR la box au
+    bounding-box du blob (+marge) et re-decider la forme. allow_shrink=False pour les scenes
+    patchees par qc_fix (le shrink annulait leurs elargissements -> boucle QC sterile 6-6-6)."""
     m, _ = webcam_mask.seg_mask(cap, W, H, t0, t1, box, yfd)
-    if m is None: return "rect"
-    x=int(box[0]*W);y=int(box[1]*H);w=max(4,int(box[2]*W));h=max(4,int(box[3]*H))
-    x=max(0,min(W-w,x));y=max(0,min(H-h,y))
-    fr = float(m[y:y+h, x:x+w].sum())/max(1,w*h)
-    return "ellipse" if 0.55 < fr < 0.86 else "rect"
+    if m is None: return "rect", box
+    def _fill(b):
+        x=int(b[0]*W);y=int(b[1]*H);w=max(4,int(b[2]*W));h=max(4,int(b[3]*H))
+        x=max(0,min(W-w,x));y=max(0,min(H-h,y))
+        return float(m[y:y+h, x:x+w].sum())/max(1,w*h)
+    fr = _fill(box)
+    if fr < 0.45 and allow_shrink:
+        ys, xs = np.nonzero(m)
+        if len(xs) > 2000:
+            mg = 0.05
+            bx0,by0 = xs.min()/W, ys.min()/H; bx1,by1 = xs.max()/W, ys.max()/H
+            bw,bh = bx1-bx0, by1-by0
+            nb = [max(0.0,bx0-bw*mg), max(0.0,by0-bh*mg),
+                  min(1.0,bw*(1+2*mg)), min(1.0,bh*(1+2*mg))]
+            if nb[2] >= 0.04 and nb[3] >= 0.04:
+                box = [round(v,4) for v in nb]; fr = _fill(box)
+    return ("ellipse" if 0.55 < fr < 0.86 else "rect"), box
 
 def draw(box, shape, idx):
     cx0=box[0]-box[2]*MG; cy0=box[1]-box[3]*MG; cw=box[2]*(1+2*MG); ch=box[3]*(1+2*MG)
@@ -65,12 +81,15 @@ for sc in pin:
         segs.append({"host":"hero","start":round(sc["start"],2),"end":round(sc["end"],2),"bbox":None})
         nhero+=1
     else:
+        patched = bool(sc.get("patched")) or sc.get("region") == "patch"
         key = tuple(sc["box"])
-        if key not in _cache:
-            shp=shape_of(sc["start"],sc["end"],sc["box"])
-            mp,bb=draw(sc["box"],shp,i)
-            _cache[key]=(mp,bb,shp)
-        mp,bb,shp=_cache[key]
+        if key in _cache and not patched:
+            mp,bb,shp=_cache[key]
+        else:
+            shp,abox=shape_of(sc["start"],sc["end"],sc["box"], allow_shrink=not patched)
+            mp,bb=draw(abox,shp,i)
+            if abox == sc["box"] and not patched:   # box ajustee/patchee = pas de cache
+                _cache[key]=(mp,bb,shp)
         segs.append({"host":"pip","start":round(sc["start"],2),"end":round(sc["end"],2),"bbox":bb,"mask":mp,"shape":shp})
     prev=sc["end"]; i+=1
 print("heros: %d / positions uniques: %d" % (nhero, len(_cache)))

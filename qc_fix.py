@@ -48,7 +48,7 @@ def insert_patch(pin, t0, t1, pbox):
             out.append(dict(s, end=round(t0,2)))
         mid = dict(s, start=round(max(s["start"], t0),2), end=round(min(s["end"], t1),2))
         if s["region"] != "hero":
-            mid["box"] = union(s["box"], pbox)
+            mid["box"] = union(s["box"], pbox); mid["patched"] = True
         out.append(mid)
         if s["end"] > t1:
             out.append(dict(s, start=round(t1,2)))
