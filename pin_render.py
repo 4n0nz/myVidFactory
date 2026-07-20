@@ -199,7 +199,7 @@ pips=[]
 for sc in pin:
     if sc["start"]>prev+0.3:
         segs.append({"host":"off","start":round(prev,2),"end":round(sc["start"],2),"bbox":None})
-    if sc.get("region") == "hero" or sc["box"][2]*sc["box"][3] > 0.8 \
+    if sc.get("region") == "hero" or sc["box"][2]*sc["box"][3] > 0.85 \
             or (sc.get("src") != "ident" and is_hero(sc["start"], sc["end"], sc["box"])):
         segs.append({"host":"hero","start":round(sc["start"],2),"end":round(sc["end"],2),"bbox":None})
         nhero+=1
@@ -222,7 +222,7 @@ for p in pips:
             shp = "rect"   # patch anti-fuite : l'ellipse ne couvre pas les coins de l'union
                            # (pLos popout : tete qui depasse du cercle -> boucle QC sterile)
         abox = _motion_extend(list(abox), p["t0"], p["t1"])
-        if abox[2]*abox[3] > 0.8:
+        if abox[2]*abox[3] > 0.85:
             # l'extension revele un corps quasi plein cadre -> narrateur libre -> hero
             p["seg"]["host"] = "hero"; p["seg"]["bbox"] = None
             p["hero"] = True

@@ -131,7 +131,7 @@ for s in samples:
         # hero : carte quasi plein cadre, OU visage enorme, OU narrateur LIBRE dans la
         # scene (aucun bord de carte trouve) avec un gros visage (TzJC plein cadre sans
         # overlay -> ellipse tete au lieu de hero). Panneau split-screen = bounded -> pip.
-        return ((fc["card"][2] > 0.65 and fc["card"][3] > 0.85)
+        return ((fc["card"][2] > 0.85 and fc["card"][3] > 0.85)
                 or fc["f"][3]/H > 0.40
                 or (not fc.get("bounded", True) and fc["f"][3]/H > 0.20))
     bigface = any(_heroish(fc) and fc["mo"] >= MOTION_MIN for fc in s["faces"])
@@ -171,7 +171,7 @@ for c in pclust:
     c["box"] = [round(float(x0),4), round(float(y0),4), round(float(x1-x0),4), round(float(y1-y0),4)]
     c["edges"] = edges
     # box quasi plein ecran = narrateur geant -> HERO propre, pas d'ellipse/rect plein ecran
-    c["hero"] = (c["box"][2]*c["box"][3] > 0.75)
+    c["hero"] = (c["box"][2]*c["box"][3] > 0.85)
 print("clusters position (samples) : %d" % len(pclust))
 
 def _clid(card):
