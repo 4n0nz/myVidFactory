@@ -56,7 +56,7 @@ def shape_of(t0, t1, box, allow_shrink=True):
     sub=m[y:y+h, x:x+w]
     cs=[sub[:sq,:sq], sub[:sq,w-sq:], sub[h-sq:,:sq], sub[h-sq:,w-sq:]]
     occ=sum(float(c.mean()) if c.size else 0.0 for c in cs)/4.0
-    if occ < 0.25: return "ellipse", box
+    if occ < 0.12: return "ellipse", box   # rond = rare, evidence forte exigee
     if occ > 0.75: return "rect90", box
     return "rect", box
 
@@ -120,7 +120,9 @@ def _shape_src(box, t0, t1):
             if n(a1-po)+15 < n(a1-pe): v1 += 1
             if n(a2-po)+15 < n(a2-pe): v2 += 1
     if valid < 6: return None
-    if v2*2 >= valid: return "ellipse"
+    # les pips RONDS sont RARES (retour Boss) : ellipse seulement si evidence quasi unanime
+    # aux DEUX profondeurs ; tout cas ambigu = rect
+    if v2 >= valid*0.85 and v1 >= valid*0.85: return "ellipse"
     if v1*2 >= valid: return "rect"
     return "rect90"
 
