@@ -7,7 +7,7 @@ REPORT=/tmp/batch20_report.tsv
 PROG=/tmp/batch20.progress
 exec 9>/tmp/vf_render.flock; flock -n 9 || { echo "FLOCK_BUSY — un autre render tourne, abort"; exit 1; }
 
-printf "id\tqc\tscenes\theros\tmasques\tdur_ok\ttaille\ttours\n" > "$REPORT"
+printf "id\tqc\tgeom\tscenes\theros\tmasques\tdur_ok\ttaille\ttours\n" > "$REPORT"
 : > "$PROG"
 n=0; tot=$(ls -d $VG/wk_b_*/ 2>/dev/null | wc -l)
 for WD in $VG/wk_b_*/; do
@@ -45,12 +45,14 @@ for WD in $VG/wk_b_*/; do
   leaks=$(grep -oE 'QC FUITES : [0-9]+' /tmp/qc.log | grep -oE '[0-9]+' | tail -1)
   [ "$qc" = "LEAK" ] && qc="LEAK_${leaks}"
 
+  if $PY $VG/qc_geom.py "$WD" > /tmp/qg.log 2>&1; then geom="OK"
+  else geom="GEOM_$(grep -oE 'ECHECS : [0-9]+' /tmp/qg.log | grep -oE '[0-9]+')"; fi
   sdur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WD/source.mp4")
   vdur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WD/segs/videoonly.mp4" 2>/dev/null)
   durok=$($PY -c "print('OK' if abs($sdur-($vdur or 0))<0.5 else 'DESYNC(%.1f)'%($vdur or 0))" 2>/dev/null)
   sz=$(du -h "$VG/out/$OUT" | cut -f1)
 
-  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$id" "$qc" "$scenes" "$heros" "$masks" "$durok" "$sz" "$tours" >> "$REPORT"
+  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$id" "$qc" "$geom" "$scenes" "$heros" "$masks" "$durok" "$sz" "$tours" >> "$REPORT"
   echo "[$n/$tot] $id — $qc ($narr, scenes=$scenes)" >> "$PROG"
 done
 echo "BATCH_DONE $(date)" >> "$PROG"
