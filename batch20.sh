@@ -34,7 +34,7 @@ for WD in $VG/wk_b_*/; do
   fi
 
   qc="LEAK"; tours=0
-  for i in 1 2 3; do
+  for i in 1 2 3 4 5; do
     tours=$i
     if $PY $VG/qc_ident.py "$WD" "$VG/out/$OUT" > /tmp/qc.log 2>&1; then qc="CLEAN"; break; fi
     $PY $VG/qc_fix.py "$WD" > /dev/null 2>&1
