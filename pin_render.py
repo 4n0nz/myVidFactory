@@ -93,6 +93,36 @@ def _true_rect(box, t0, t1):
     if L+R+T+B == 0: return None                # deja ajustee
     return [round((x+L)/W,4), round((y+T)/H,4), round(nw/W,4), round(nh/H,4)]
 
+def _narrator_region(box, t0, t1):
+    """bbox de la PRESENCE narrateur dans la box : blob grabcut ∪ mouvement SOUTENU.
+    Mouvement soutenu = pixel qui bouge dans >=3 paires sur 5 etalees sur la scene —
+    un narrateur qui parle bouge en continu, un scroll de page est transitoire.
+    C'est l'ancrage du cap trop-grand : les scans de bords sont aveugles dans une box
+    gonflee pleine de contenu (transitions partout), le blob+mouvement non. None si
+    presence introuvable ou scene trop courte pour mesurer."""
+    x = int(box[0]*W); y = int(box[1]*H); w = max(8, int(box[2]*W)); h = max(8, int(box[3]*H))
+    x = max(0, min(W-w, x)); y = max(0, min(H-h, y))
+    m, _ = webcam_mask.seg_mask(cap, W, H, t0, t1, box, yfd)
+    acc = np.zeros((H, W), np.uint8)
+    npairs = 0
+    for frac in (0.15, 0.3, 0.5, 0.7, 0.85):
+        cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac)*1000.0); ok1, a = cap.read()
+        cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac+0.5)*1000.0); ok2, b = cap.read()
+        if not (ok1 and ok2): continue
+        d = cv2.absdiff(cv2.cvtColor(a, cv2.COLOR_BGR2GRAY), cv2.cvtColor(b, cv2.COLOR_BGR2GRAY))
+        acc += (d > 18).astype(np.uint8)
+        npairs += 1
+    if npairs < 4: return None
+    sust = np.zeros((H, W), bool)
+    sust[y:y+h, x:x+w] = acc[y:y+h, x:x+w] >= 3
+    if m is not None:
+        blob = m.astype(bool)
+        blob_in = np.zeros((H, W), bool); blob_in[y:y+h, x:x+w] = blob[y:y+h, x:x+w]
+        sust |= blob_in
+    ys, xs = np.nonzero(sust)
+    if len(xs) < 2000: return None
+    return [xs.min()/W, ys.min()/H, (xs.max()-xs.min()+1)/W, (ys.max()-ys.min()+1)/H]
+
 def _motion_extend(box, t0, t1):
     """etend la box vers les zones ADJACENTES qui bougent en continu (bandes 8%, max 5 pas).
     Attrape ce que les scans de BORDS ne voient pas : torse noir-sur-noir sous la cam (TzJC),
@@ -254,6 +284,34 @@ for p in pips:
 for g in groups:
     for p in g["members"]:
         p["abox"]=[round(float(v),4) for v in g["box"]]
+
+# CAP TROP-GRAND terminal — UNE passe apres toute la chaine de croissance (percentiles
+# pinpoint + motion_extend + unions), JAMAIS en boucle donc pas d'oscillation possible.
+# Les scenes patchees qc_fix ne passent pas ici (exclues des groupes) : doctrine monotone
+# respectee. Box finale > 1.6x la presence narrateur reelle -> resserree a cette presence
+# (+4% de marge), forme re-decidee dans le nouveau referentiel (avatar 2x trop grand :
+# 0sq/eglV/ADJj, verdicts Boss 2026-07-20).
+ncap = 0
+for g in groups:
+    p0 = max(g["members"], key=lambda p: p["t1"]-p["t0"])
+    reg = _narrator_region(g["box"], p0["t0"], p0["t1"])
+    if reg is None: continue
+    mg = 0.04
+    nb = [max(0.0, reg[0]-reg[2]*mg), max(0.0, reg[1]-reg[3]*mg),
+          min(1.0, reg[2]*(1+2*mg)), min(1.0, reg[3]*(1+2*mg))]
+    # clamp DANS la box existante (le cap resserre, il n'etend jamais)
+    x0 = max(nb[0], g["box"][0]); y0 = max(nb[1], g["box"][1])
+    x1 = min(nb[0]+nb[2], g["box"][0]+g["box"][2]); y1 = min(nb[1]+nb[3], g["box"][1]+g["box"][3])
+    if x1-x0 < 0.04 or y1-y0 < 0.04: continue
+    nb = [round(x0,4), round(y0,4), round(x1-x0,4), round(y1-y0,4)]
+    if g["box"][2]*g["box"][3] <= 1.6*nb[2]*nb[3]: continue
+    s = _shape_src(nb, p0["t0"], p0["t1"])
+    ncap += 1
+    for p in g["members"]:
+        p["abox"] = list(nb)
+        if s is not None: p["shape"] = s
+    g["box"] = list(nb)
+if ncap: print("cap trop-grand: %d groupes resserres" % ncap)
 
 # dessin : UN masque par (box finale, forme)
 _mask={}; mi=0
