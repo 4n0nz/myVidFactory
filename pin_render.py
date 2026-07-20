@@ -29,8 +29,15 @@ def shape_of(t0, t1, box, allow_shrink=True):
         x=int(b[0]*W);y=int(b[1]*H);w=max(4,int(b[2]*W));h=max(4,int(b[3]*H))
         x=max(0,min(W-w,x));y=max(0,min(H-h,y))
         return float(m[y:y+h, x:x+w].sum())/max(1,w*h)
+    # ORDRE : bords REELS de la carte d'abord (_true_rect sur la box canonique). Le shrink
+    # au blob grabcut passe APRES et SEULEMENT si aucun bord trouve : sinon il retrecissait
+    # la box au buste AU MILIEU d'une vraie carte rect -> sondes de forme dans un referentiel
+    # casse (l'exterieur = encore la carte) -> petite ellipse grotesque (w_Px).
     fr = _fill(box)
-    if fr < 0.45 and allow_shrink:
+    tr = _true_rect(box, t0, t1)
+    if tr is not None:
+        box = tr
+    elif fr < 0.45 and allow_shrink:
         ys, xs = np.nonzero(m)
         if len(xs) > 2000:
             mg = 0.05
@@ -39,14 +46,9 @@ def shape_of(t0, t1, box, allow_shrink=True):
             nb = [max(0.0,bx0-bw*mg), max(0.0,by0-bh*mg),
                   min(1.0,bw*(1+2*mg)), min(1.0,bh*(1+2*mg))]
             if nb[2] >= 0.04 and nb[3] >= 0.04:
-                box = [round(v,4) for v in nb]; fr = _fill(box)
-    # FORME = copie de l'original (regle Boss), mesuree sur la SOURCE (le blob grabcut est
-    # lui-meme arrondi -> confondait cercle et rect arrondi, Iup). Geometrie : le long de la
-    # diagonale du coin, un CERCLE inscrit reste vide jusqu'a ~14.6% de profondeur, un rect
-    # arrondi (rayon ~10%) seulement jusqu'a ~3%. Sonde a 2% et 8% :
-    # vide/vide = ellipse ; vide/plein = rect arrondi ; plein/plein = rect90.
-    tr = _true_rect(box, t0, t1)
-    if tr is not None: box = tr
+                box = [round(v,4) for v in nb]
+    # FORME mesuree sur la SOURCE : cercle inscrit vide jusqu'a ~14.6% de profondeur de coin,
+    # rect arrondi (~10% rayon) jusqu'a ~3%. Sondes 2% et 8%.
     s = _shape_src(box, t0, t1)
     if s is not None: return s, box
     # fallback blob si mesure source pas fiable
