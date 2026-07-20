@@ -47,13 +47,15 @@ def _frame(t):
     return fr if ok else None
 
 def _card(fr, f):
+    """(box, bounded) : bounded=True si card_extent a trouve de VRAIS bords de carte.
+    False = fallback ancre-visage -> narrateur probablement LIBRE dans la scene."""
     if card_extent is not None and hasattr(card_extent, "_card_one"):
         cb = card_extent._card_one(fr, int(f[0]), int(f[1]), int(f[2]), int(f[3]))
         if cb is not None:
             x, y, w, h = cb
-            return [x/W, y/H, w/W, h/H]
+            return [x/W, y/H, w/W, h/H], True
     fx, fy, fw, fh = f[0]/W, f[1]/H, f[2]/W, f[3]/H
-    return [max(0, fx-fw*0.6), max(0, fy-fh*0.7), min(1, fw*2.2), min(1, fh*3.0)]
+    return [max(0, fx-fw*0.6), max(0, fy-fh*0.7), min(1, fw*2.2), min(1, fh*3.0)], False
 
 def _motion(fa, fb, box):
     if fa is None or fb is None: return 99.0
@@ -87,10 +89,11 @@ while t < DUR:
                 feat = rec.feature(crop).flatten().astype(np.float32)
             except Exception:
                 continue
-            card = _card(fr, f)
+            card, bounded = _card(fr, f)
             mo = _motion(fr, fr2, card)
             entry["faces"].append({"f": [float(v) for v in f[:4]], "feat": feat,
-                                   "card": [float(v) for v in card], "mo": mo})
+                                   "card": [float(v) for v in card], "mo": mo,
+                                   "bounded": bounded})
     samples.append(entry)
     t += STEP
 
@@ -125,7 +128,12 @@ for s in samples:
     # 3-bords a un gros visage mais ne doit couvrir QUE le panneau — QU-f, retour Boss).
     # Visage enorme (>0.4H) = plan serre sans carte mesurable -> hero aussi.
     def _heroish(fc):
-        return (fc["card"][2] > 0.65 and fc["card"][3] > 0.85) or fc["f"][3]/H > 0.40
+        # hero : carte quasi plein cadre, OU visage enorme, OU narrateur LIBRE dans la
+        # scene (aucun bord de carte trouve) avec un gros visage (TzJC plein cadre sans
+        # overlay -> ellipse tete au lieu de hero). Panneau split-screen = bounded -> pip.
+        return ((fc["card"][2] > 0.65 and fc["card"][3] > 0.85)
+                or fc["f"][3]/H > 0.40
+                or (not fc.get("bounded", True) and fc["f"][3]/H > 0.20))
     bigface = any(_heroish(fc) and fc["mo"] >= MOTION_MIN for fc in s["faces"])
     if not cands and not bigface:
         decisions.append((s["t"], None, None)); continue
