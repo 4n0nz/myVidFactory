@@ -181,6 +181,9 @@ for p in pips:
         p["shape"],p["abox"]=_shape_cache[key]
     else:
         shp,abox=shape_of(p["t0"],p["t1"],p["box"],allow_shrink=not p["patched"])
+        if p["patched"] and shp == "ellipse":
+            shp = "rect"   # patch anti-fuite : l'ellipse ne couvre pas les coins de l'union
+                           # (pLos popout : tete qui depasse du cercle -> boucle QC sterile)
         p["shape"],p["abox"]=shp,list(abox)
         if abox == p["box"] and not p["patched"]:
             _shape_cache[key]=(shp,list(abox))
