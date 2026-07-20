@@ -79,6 +79,28 @@ for g in groups:
     pin = insert_patch(pin, t0, t1, g["box"])
     print("PATCH %.1f-%.1fs box=%s (%d->" % (t0, t1, g["box"], len(pin)))
 
+# UNIFICATION des patches par position : chaque tour QC produisait des unions de tailles
+# differentes -> l'avatar changeait sans que le pip source bouge (pLos popout). Toutes les
+# scenes pip d'une position patchee recoivent LA box du groupe (le popout est permanent).
+pgroups = []
+for s in pin:
+    if not s.get("patched"): continue
+    b = s["box"]; cx, cy = b[0]+b[2]/2, b[1]+b[3]/2
+    hit = None
+    for g in pgroups:
+        if abs(cx-g["cx"]) < 0.08 and abs(cy-g["cy"]) < 0.08: hit = g; break
+    if hit is None:
+        pgroups.append({"cx": cx, "cy": cy, "box": list(b)})
+    else:
+        hit["box"] = union(hit["box"], b)
+        hit["cx"], hit["cy"] = hit["box"][0]+hit["box"][2]/2, hit["box"][1]+hit["box"][3]/2
+for g in pgroups:
+    for s in pin:
+        if s["region"] == "hero": continue
+        b = s["box"]; cx, cy = b[0]+b[2]/2, b[1]+b[3]/2
+        if abs(cx-g["cx"]) < 0.08 and abs(cy-g["cy"]) < 0.08:
+            s["box"] = [round(v,4) for v in g["box"]]; s["patched"] = True
+
 # scenes degeneres jetees
 pin = [s for s in pin if s["end"] - s["start"] >= 0.3]
 json.dump(pin, open(pinf, "w"), indent=2)
