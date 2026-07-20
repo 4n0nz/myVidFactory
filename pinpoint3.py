@@ -119,9 +119,12 @@ decisions = []   # (t, "hero"|"pip"|None, box)
 for s in samples:
     cands = [fc for fc in s["faces"]
              if _cos(fc["feat"], narr_feat) >= COS_SAME and fc["mo"] >= MOTION_MIN]
-    if not cands:
+    # HERO = n'importe quel talking-head plein ecran qui bouge, narrateur OU PAS (invite/
+    # celebrite plein cadre doit etre couvert aussi — N1r Mark Cuban intro, retour Boss)
+    bigface = any(fc["f"][3]/H > 0.25 and fc["mo"] >= MOTION_MIN for fc in s["faces"])
+    if not cands and not bigface:
         decisions.append((s["t"], None, None)); continue
-    if any((fc["card"][2] > 0.5 and fc["card"][3] > 0.7) or fc["f"][3]/H > 0.25 for fc in cands):
+    if bigface or any((fc["card"][2] > 0.5 and fc["card"][3] > 0.7) for fc in cands):
         decisions.append((s["t"], "hero", [0.0, 0.0, 1.0, 1.0]))
     else:
         x0 = min(fc["card"][0] for fc in cands); y0 = min(fc["card"][1] for fc in cands)
@@ -145,8 +148,8 @@ for t, kind, card in decisions:
         hit["cards"].append(card)
 for c in pclust:
     cs = c["cards"]
-    x0 = pc([a[0] for a in cs], 0.10); y0 = pc([a[1] for a in cs], 0.10)
-    x1 = pc([a[0]+a[2] for a in cs], 0.90); y1 = pc([a[1]+a[3] for a in cs], 0.90)
+    x0 = pc([a[0] for a in cs], 0.05); y0 = pc([a[1] for a in cs], 0.05)
+    x1 = pc([a[0]+a[2] for a in cs], 0.95); y1 = pc([a[1]+a[3] for a in cs], 0.95)
     edges = []
     if x0 < EDGE: x0 = 0.0; edges.append("L")
     if y0 < EDGE: y0 = 0.0; edges.append("T")

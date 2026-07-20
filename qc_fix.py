@@ -48,7 +48,13 @@ def insert_patch(pin, t0, t1, pbox):
             out.append(dict(s, end=round(t0,2)))
         mid = dict(s, start=round(max(s["start"], t0),2), end=round(min(s["end"], t1),2))
         if s["region"] != "hero":
-            mid["box"] = union(s["box"], pbox); mid["patched"] = True
+            ub = union(s["box"], pbox)
+            if ub[2]*ub[3] > 0.5:
+                # union quasi plein ecran : une ellipse/rect geant ne couvre pas ses coins
+                # (KKni 56.5s, boucle QC sterile) -> hero plein ecran
+                mid["region"] = "hero"; mid["box"] = [0.0,0.0,1.0,1.0]; mid["edges"] = ["L","T","R","B"]
+            else:
+                mid["box"] = ub; mid["patched"] = True
         out.append(mid)
         if s["end"] > t1:
             out.append(dict(s, start=round(t1,2)))

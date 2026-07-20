@@ -33,7 +33,8 @@ while t < DUR:
                 feat = rec.feature(rec.alignCrop(fr, f)).flatten().astype(np.float32)
             except Exception:
                 continue
-            if _cos(feat, narr) < 0.363: continue
+            big = f[3]/H > 0.22   # plein ecran = fuite peu importe l'identite
+            if not big and _cos(feat, narr) < 0.363: continue
             x=max(0,int(f[0])); y=max(0,int(f[1])); w=int(f[2]); h=int(f[3])
             if fr2 is not None:
                 a = cv2.cvtColor(fr[y:y+h, x:x+w], cv2.COLOR_BGR2GRAY)

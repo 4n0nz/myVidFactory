@@ -8,7 +8,7 @@ sys.path.insert(0, "/home/boss/videogen/agent_yt")
 sys.path.insert(0, "/home/boss/yolo/scripts")
 import webcam_mask, vlm_probe
 YUNET = "/home/boss/videogen/face_detection_yunet_2023mar.onnx"
-MG = 0.05
+MG = 0.08
 
 wd = sys.argv[1]
 pin = json.load(open(os.path.join(wd, "host_map_pin.json")))
@@ -40,17 +40,58 @@ def shape_of(t0, t1, box, allow_shrink=True):
                   min(1.0,bw*(1+2*mg)), min(1.0,bh*(1+2*mg))]
             if nb[2] >= 0.04 and nb[3] >= 0.04:
                 box = [round(v,4) for v in nb]; fr = _fill(box)
-    # FORME = copie de l'original (regle Boss) : occupation des COINS du blob dans la box.
-    # Coins vides = rond -> ellipse ; coins pleins = 90 degres -> rect sec ; entre-deux = arrondi.
+    # FORME = copie de l'original (regle Boss), mesuree sur la SOURCE (le blob grabcut est
+    # lui-meme arrondi -> confondait cercle et rect arrondi, Iup). Geometrie : le long de la
+    # diagonale du coin, un CERCLE inscrit reste vide jusqu'a ~14.6% de profondeur, un rect
+    # arrondi (rayon ~10%) seulement jusqu'a ~3%. Sonde a 2% et 8% :
+    # vide/vide = ellipse ; vide/plein = rect arrondi ; plein/plein = rect90.
+    s = _shape_src(box, t0, t1)
+    if s is not None: return s, box
+    # fallback blob si mesure source pas fiable
     x=int(box[0]*W);y=int(box[1]*H);w=max(8,int(box[2]*W));h=max(8,int(box[3]*H))
     x=max(0,min(W-w,x));y=max(0,min(H-h,y))
-    s=max(4,int(min(w,h)*0.15))
+    sq=max(4,int(min(w,h)*0.15))
     sub=m[y:y+h, x:x+w]
-    cs=[sub[:s,:s], sub[:s,w-s:], sub[h-s:,:s], sub[h-s:,w-s:]]
+    cs=[sub[:sq,:sq], sub[:sq,w-sq:], sub[h-sq:,:sq], sub[h-sq:,w-sq:]]
     occ=sum(float(c.mean()) if c.size else 0.0 for c in cs)/4.0
     if occ < 0.25: return "ellipse", box
     if occ > 0.75: return "rect90", box
     return "rect", box
+
+def _pmean(img, px, py):
+    h, w = img.shape[:2]
+    if px < 0 or py < 0 or px >= w or py >= h: return None
+    x0 = max(0, px-2); y0 = max(0, py-2)
+    p = img[y0:min(h, py+3), x0:min(w, px+3)]
+    return None if p.size == 0 else p.reshape(-1, 3).mean(axis=0)
+
+def _shape_src(box, t0, t1):
+    """coin vide a 2% ET 8% de profondeur = cercle ; vide a 2% seulement = rect arrondi ;
+    plein aux deux = rect90. Vote 4 coins x 3 frames vs fond exterieur / contenu centre.
+    None si pas assez de coins mesurables (box collee aux bords)."""
+    x = int(box[0]*W); y = int(box[1]*H); w = max(8, int(box[2]*W)); h = max(8, int(box[3]*H))
+    x = max(0, min(W-w, x)); y = max(0, min(H-h, y))
+    d1 = max(2, int(min(w, h)*0.02)); d2 = max(6, int(min(w, h)*0.08))
+    v1 = 0; v2 = 0; valid = 0
+    for frac in (0.3, 0.5, 0.7):
+        cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac)*1000.0)
+        ok, img = cap.read()
+        if not ok: continue
+        img = img.astype('float32')
+        pe = _pmean(img, x+w//2, y+h//2)
+        for cx, cy, sx, sy in ((x, y, 1, 1), (x+w-1, y, -1, 1), (x, y+h-1, 1, -1), (x+w-1, y+h-1, -1, -1)):
+            po = _pmean(img, cx-sx*8, cy-sy*8)
+            a1 = _pmean(img, cx+sx*d1, cy+sy*d1)
+            a2 = _pmean(img, cx+sx*d2, cy+sy*d2)
+            if po is None or pe is None or a1 is None or a2 is None: continue
+            n = np.linalg.norm
+            valid += 1
+            if n(a1-po)+15 < n(a1-pe): v1 += 1
+            if n(a2-po)+15 < n(a2-pe): v2 += 1
+    if valid < 6: return None
+    if v2*2 >= valid: return "ellipse"
+    if v1*2 >= valid: return "rect"
+    return "rect90"
 
 def draw(box, shape, idx):
     cx0=box[0]-box[2]*MG; cy0=box[1]-box[3]*MG; cw=box[2]*(1+2*MG); ch=box[3]*(1+2*MG)
@@ -90,7 +131,8 @@ pips=[]
 for sc in pin:
     if sc["start"]>prev+0.3:
         segs.append({"host":"off","start":round(prev,2),"end":round(sc["start"],2),"bbox":None})
-    if sc.get("region") == "hero" or (sc.get("src") != "ident" and is_hero(sc["start"], sc["end"], sc["box"])):
+    if sc.get("region") == "hero" or sc["box"][2]*sc["box"][3] > 0.55 \
+            or (sc.get("src") != "ident" and is_hero(sc["start"], sc["end"], sc["box"])):
         segs.append({"host":"hero","start":round(sc["start"],2),"end":round(sc["end"],2),"bbox":None})
         nhero+=1
     else:

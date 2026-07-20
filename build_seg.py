@@ -36,6 +36,13 @@ if _env:
 TOP_EXT = 0.0    # v2.1: la bbox = deja le vrai rectangle webcam (edge-scan + marge) -> pas d'extension
 SIDE    = 0.0
 
+# Filtre couleur applique a l'AVATAR (pip et hero) avant overlay. Env AVATAR_FX pour
+# override ; defaut = tint vert #00ff00 (Boss 2026-07-20) : G booste, R/B reduits.
+AVFX = os.environ.get('AVATAR_FX', 'colorchannelmixer=rr=0.6:gg=1.25:bb=0.6').strip()
+def av_in():
+    """entree avatar [1:v] avec le filtre couleur si defini."""
+    return "[1:v]%s," % AVFX if AVFX else "[1:v]"
+
 # coins arrondis sur l'avatar pip (les webcams ont un border-radius) -> l'overlay epouse
 # le cadre au lieu de deborder aux coins. Rayon = RADIUS_FRAC du petit cote de la box.
 # PIP_ROUND: '0' = jamais rond, '1' = toujours rond, 'auto' (defaut) = detection par
@@ -100,11 +107,11 @@ def pip_fc(w, h, x, y, rnd):
     if rnd:
         r = max(2, int(min(w, h) * RADIUS_FRAC))
         expr = rounded_lum(w, h, r)
-        return ("[1:v]%s,format=rgba[base];"
+        return (av_in()+"%s,format=rgba[base];"
                 "color=c=black:s=%dx%d:r=%s,format=gray,geq=lum='%s',loop=loop=-1:size=1[m];"
                 "[base][m]alphamerge[av];[0:v][av]overlay=%d:%d:shortest=1[vo]"
                 % (cover_auto(w, h), w, h, FPS, expr, x, y))
-    return "[1:v]%s[av];[0:v][av]overlay=%d:%d:shortest=1[vo]" % (cover_auto(w, h), x, y)
+    return av_in()+"%s[av];[0:v][av]overlay=%d:%d:shortest=1[vo]" % (cover_auto(w, h), x, y)
 
 def seg_rect(bbox):
     fx, fy, fw, fh = bbox
@@ -152,7 +159,7 @@ for si, s in enumerate(hmap):
     ss = s['start']; host = s['host']
 
     if host == 'hero':
-        fc = "[1:v]%s[av];[0:v][av]overlay=0:0:shortest=1[vo]" % cover(W, H)
+        fc = av_in()+"%s[av];[0:v][av]overlay=0:0:shortest=1[vo]" % cover(W, H)
         cmd = ('ffmpeg -y -ss %s -t %s -i %s -stream_loop -1 -i %s '
                '-filter_complex "%s" -map "[vo]" -an -r %s -t %s %s "%s"'
                % (ss, d, source, avatar, fc, FPS, d, NV, sf))
@@ -162,7 +169,7 @@ for si, s in enumerate(hmap):
         fx, fy, fw, fh = s['bbox']
         x = int(fx * W); y = int(fy * H); w = even(int(fw * W)); h = even(int(fh * H))
         mp = s['mask']
-        fc = ("[1:v]scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,format=rgba[av0];"
+        fc = (av_in()+"scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,format=rgba[av0];"
               "[2:v]scale=%d:%d,format=gray[mk];[av0][mk]alphamerge[av];"
               "[0:v][av]overlay=%d:%d:shortest=1[vo]" % (w, h, w, h, w, h, x, y))
         cmd = ('ffmpeg -y -ss %s -t %s -i %s -stream_loop -1 -i %s -stream_loop -1 -i %s '
