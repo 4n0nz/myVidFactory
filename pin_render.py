@@ -45,6 +45,8 @@ def shape_of(t0, t1, box, allow_shrink=True):
     # diagonale du coin, un CERCLE inscrit reste vide jusqu'a ~14.6% de profondeur, un rect
     # arrondi (rayon ~10%) seulement jusqu'a ~3%. Sonde a 2% et 8% :
     # vide/vide = ellipse ; vide/plein = rect arrondi ; plein/plein = rect90.
+    tr = _true_rect(box, t0, t1)
+    if tr is not None: box = tr
     s = _shape_src(box, t0, t1)
     if s is not None: return s, box
     # fallback blob si mesure source pas fiable
@@ -57,6 +59,35 @@ def shape_of(t0, t1, box, allow_shrink=True):
     if occ < 0.25: return "ellipse", box
     if occ > 0.75: return "rect90", box
     return "rect", box
+
+def _true_rect(box, t0, t1):
+    """bords REELS de la carte dans la box. La box canonique sur-couvre souvent le fond ->
+    sondes de coin hors carte = fausse ellipse + avatar trop grand (o9x8). Scan de la
+    transition fond->carte au MILIEU de chaque cote (mediane 3 frames). None si douteux."""
+    x = int(box[0]*W); y = int(box[1]*H); w = max(8, int(box[2]*W)); h = max(8, int(box[3]*H))
+    x = max(0, min(W-w, x)); y = max(0, min(H-h, y))
+    def scan(line):
+        if len(line) < 10: return 0
+        ref = line[:4].mean(axis=0)
+        for i in range(4, len(line)):
+            if np.linalg.norm(line[i]-ref) > 35: return i
+        return 0
+    res = []
+    for frac in (0.3, 0.5, 0.7):
+        cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac)*1000.0)
+        ok, img = cap.read()
+        if not ok: continue
+        img = img.astype('float32')
+        row = img[y+h//2, x:x+w]; col = img[y:y+h, x+w//2]
+        res.append((scan(row[:w//2]), scan(row[::-1][:w//2]),
+                    scan(col[:h//2]), scan(col[::-1][:h//2])))
+    if len(res) < 2: return None
+    med = [sorted(r[i] for r in res)[len(res)//2] for i in range(4)]
+    L, R, T, B = med
+    nw = w-L-R; nh = h-T-B
+    if nw < w*0.5 or nh < h*0.5: return None   # scan delirant -> on garde la box
+    if L+R+T+B == 0: return None                # deja ajustee
+    return [round((x+L)/W,4), round((y+T)/H,4), round(nw/W,4), round(nh/H,4)]
 
 def _pmean(img, px, py):
     h, w = img.shape[:2]
