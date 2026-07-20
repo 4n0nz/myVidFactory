@@ -45,8 +45,21 @@ for WD in $VG/wk_b_*/; do
   leaks=$(grep -oE 'QC FUITES : [0-9]+' /tmp/qc.log | grep -oE '[0-9]+' | tail -1)
   [ "$qc" = "LEAK" ] && qc="LEAK_${leaks}"
 
-  if $PY $VG/qc_geom.py "$WD" > /tmp/qg.log 2>&1; then geom="OK"
-  else geom="GEOM_$(grep -oE 'ECHECS : [0-9]+' /tmp/qg.log | grep -oE '[0-9]+')"; fi
+  # QC geometrique CORRECTIF : sous-couverture/trop-grand -> box ajustee a la carte reelle,
+  # re-render, max 2 tours (les fuites SANS visage sont invisibles au QC identite - TzJC torse)
+  geom="FAIL"
+  for j in 1 2 3; do
+    if $PY $VG/qc_geom.py "$WD" > /tmp/qg.log 2>&1; then geom="OK"; break; fi
+    [ $j -eq 3 ] && break
+    $PY $VG/qc_geom_fix.py "$WD" > /dev/null 2>&1
+    $PY $VG/pin_render.py "$WD" > /dev/null 2>&1
+    $PY $VG/build_seg.py "$WD" "$OUT" > /dev/null 2>&1 && "$WD/run_seg.sh" > /dev/null 2>&1
+  done
+  if [ "$geom" != "OK" ]; then
+    geom="GEOM_$(grep -oE 'ECHECS : [0-9]+' /tmp/qg.log | grep -oE '[0-9]+')"
+    # re-verif identite apres les re-renders geometriques
+    $PY $VG/qc_ident.py "$WD" "$VG/out/$OUT" > /tmp/qc.log 2>&1 && qc="CLEAN" || qc="LEAK_$(grep -oE 'QC FUITES : [0-9]+' /tmp/qc.log | grep -oE '[0-9]+' | tail -1)"
+  fi
   sdur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WD/source.mp4")
   vdur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WD/segs/videoonly.mp4" 2>/dev/null)
   durok=$($PY -c "print('OK' if abs($sdur-($vdur or 0))<0.5 else 'DESYNC(%.1f)'%($vdur or 0))" 2>/dev/null)
