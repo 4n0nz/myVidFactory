@@ -34,7 +34,9 @@ def shape_of(t0, t1, box, allow_shrink=True):
     # la box au buste AU MILIEU d'une vraie carte rect -> sondes de forme dans un referentiel
     # casse (l'exterieur = encore la carte) -> petite ellipse grotesque (w_Px).
     fr = _fill(box)
-    tr = _true_rect(box, t0, t1)
+    # scenes patchees (allow_shrink=False) : box INTOUCHABLE — _true_rect re-retrecissait
+    # aux bords de carte, excluant la tete popout que le patch venait couvrir (ADJj LEAK_2)
+    tr = _true_rect(box, t0, t1) if allow_shrink else None
     if tr is not None:
         box = tr
     elif fr < 0.45 and allow_shrink:
