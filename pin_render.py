@@ -40,7 +40,17 @@ def shape_of(t0, t1, box, allow_shrink=True):
                   min(1.0,bw*(1+2*mg)), min(1.0,bh*(1+2*mg))]
             if nb[2] >= 0.04 and nb[3] >= 0.04:
                 box = [round(v,4) for v in nb]; fr = _fill(box)
-    return ("ellipse" if 0.55 < fr < 0.86 else "rect"), box
+    # FORME = copie de l'original (regle Boss) : occupation des COINS du blob dans la box.
+    # Coins vides = rond -> ellipse ; coins pleins = 90 degres -> rect sec ; entre-deux = arrondi.
+    x=int(box[0]*W);y=int(box[1]*H);w=max(8,int(box[2]*W));h=max(8,int(box[3]*H))
+    x=max(0,min(W-w,x));y=max(0,min(H-h,y))
+    s=max(4,int(min(w,h)*0.15))
+    sub=m[y:y+h, x:x+w]
+    cs=[sub[:s,:s], sub[:s,w-s:], sub[h-s:,:s], sub[h-s:,w-s:]]
+    occ=sum(float(c.mean()) if c.size else 0.0 for c in cs)/4.0
+    if occ < 0.25: return "ellipse", box
+    if occ > 0.75: return "rect90", box
+    return "rect", box
 
 def draw(box, shape, idx):
     cx0=box[0]-box[2]*MG; cy0=box[1]-box[3]*MG; cw=box[2]*(1+2*MG); ch=box[3]*(1+2*MG)
@@ -49,6 +59,9 @@ def draw(box, shape, idx):
     out=np.zeros((h,w),np.uint8)
     if shape=="ellipse":
         cv2.ellipse(out,(w//2,h//2),(w//2-1,h//2-1),0,0,360,255,-1)
+    elif shape=="rect90":
+        # coins source a 90 degres -> rect sec, pas d'arrondi (regle Boss)
+        cv2.rectangle(out,(0,0),(w,h),255,-1)
     else:
         r=max(2,int(min(w,h)*0.10))
         cv2.rectangle(out,(r,0),(w-r,h),255,-1);cv2.rectangle(out,(0,r),(w,h-r),255,-1)

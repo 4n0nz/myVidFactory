@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 # pinpoint3.py <workdir> — tracking IDENTITE du narrateur. ZERO VLM dans la decision.
 #
-# Pourquoi v3 : pin2..pin5 = chaque decision passait par un VLM (region/fullface/crop-verify)
-# et chaque probe VLM flake ~5-10% -> fuites au hasard, rustine sur rustine. Ici :
-#   1. Pass 1 (1 sample/s) : YuNet detecte les visages, SFace fait l'embedding de chacun.
-#   2. Le NARRATEUR = le plus gros cluster d'identite de toute la video (talking-head).
-#   3. Decision par sample, deterministe : visage narrateur (cosine >= seuil standard 0.363)
-#      + MOUVEMENT dans la carte (photo/vignette statique du narrateur exclue, cas 876s)
-#      -> hero si plein cadre, sinon pip a la carte card_extent.
-#   4. Scenes = runs bridge (trous <= 3s combles — sous-couvrir interdit, regle Boss),
-#      clustering position -> box canonique enveloppe (pip statique), edge-snap.
-# Sortie : host_map_pin.json meme format que pinpoint v2 -> pin_render/build_seg inchanges.
-# Scenes marquees "src":"ident" -> pin_render saute son is_hero() VLM (decide ici).
+# v2 (stabilisation globale) : la geometrie derive des CLUSTERS DE POSITION calcules sur
+# TOUS les samples de la video, jamais des scenes individuelles. Le bruit card_extent par
+# sample fragmentait en micro-scenes d'1s aux boxes delirantes (KKni : 31 pips d'1s,
+# ellipse quasi plein ecran). Ici : box canonique = percentiles 10-90 sur l'ensemble des
+# cartes d'un cluster (robuste), scenes = runs d'ID de cluster (stables par nature).
+#
+#   1. Pass 1 (1 sample/s) : YuNet visages + SFace embedding chacun + mouvement carte.
+#   2. Narrateur = plus gros cluster d'identite (talking-head).
+#   3. Decision par sample : visage(s) narrateur (cos >= 0.363) + mouvement >= 0.35
+#      (photo statique ~0.1, humain immobile ~0.5) -> hero si un visage/carte plein cadre,
+#      sinon pip = UNION des cartes de TOUS ses visages (cam + previews de lui).
+#   4. Clusters de position globaux -> box canonique percentile + edge-snap 8%.
+#      Cluster > 50% de l'ecran = narrateur geant -> HERO propre (pas d'ellipse plein ecran).
+#   5. Scenes = runs de cluster, trous <= 4s combles (sous-couvrir interdit), hero
+#      prioritaire aux frontieres, micro-scenes absorbees.
+# Sortie : host_map_pin.json (format pinpoint) -> pin_render/build_seg inchanges.
+# Scenes "src":"ident" -> pin_render saute son is_hero() VLM.
 import sys, os, json, cv2, numpy as np
 
 sys.path.insert(0, "/home/boss/videogen/agent_yt")
@@ -29,11 +35,10 @@ rec = cv2.FaceRecognizerSF.create(VG+"/face_recognition_sface_2021dec.onnx", "")
 
 STEP = 1.0
 COS_SAME = 0.363      # seuil standard SFace meme personne
-COS_CLUST = 0.40      # assignation cluster (plus strict que SAME)
-MOTION_MIN = 0.35     # diff moyenne grayscale 0.5s ; photo statique ~0.1, humain IMMOBILE ~0.5
-                      # (1.2 excluait le narrateur assis tranquille -> trou 496-500s pin6)
-FACE_MIN = 0.045      # visage < 4.5% H = trop petit pour etre la cam (vignettes)
-EDGE = 0.025
+COS_CLUST = 0.40      # assignation cluster identite
+MOTION_MIN = 0.35     # photo statique ~0.1, humain IMMOBILE ~0.5 (1.2 excluait le narrateur calme)
+FACE_MIN = 0.045      # visage < 4.5% H = vignette, pas la cam
+EDGE = 0.08           # snap-bord : box a <8% d'un bord = cam collee -> etend au bord
 QUADS = {"top-left":(0.25,0.25),"top-right":(0.75,0.25),"bottom-left":(0.25,0.75),
          "bottom-right":(0.75,0.75),"center":(0.5,0.5)}
 
@@ -62,8 +67,11 @@ def _motion(fa, fb, box):
 def _cos(a, b):
     return float(np.dot(a, b) / (np.linalg.norm(a)*np.linalg.norm(b) + 1e-9))
 
-# ---- PASS 1 : visages + embeddings sur toute la video ----
-samples = []   # (t, frame_pas_garde) -> liste de (facebox, feat)
+def pc(vals, q):
+    v = sorted(vals); return v[min(len(v)-1, max(0, int(q*(len(v)-1))))]
+
+# ---- PASS 1 : visages + embeddings + mouvement ----
+samples = []
 t = 0.0
 while t < DUR:
     fr = _frame(t)
@@ -87,7 +95,7 @@ while t < DUR:
     t += STEP
 
 # ---- PASS 2 : clustering identite -> narrateur = plus gros cluster ----
-cents = []   # {"sum": vec, "n": int}
+cents = []
 for s in samples:
     for fc in s["faces"]:
         best, bi = -1.0, -1
@@ -99,22 +107,20 @@ for s in samples:
         else:
             cents.append({"sum": fc["feat"].copy(), "n": 1})
 if not cents:
-    print("AUCUN visage dans la video — rien a couvrir"); json.dump([], open(os.path.join(wd,"host_map_pin.json"),"w")); sys.exit(0)
+    print("AUCUN visage dans la video — rien a couvrir")
+    json.dump([], open(os.path.join(wd, "host_map_pin.json"), "w")); sys.exit(0)
 narr = max(cents, key=lambda c: c["n"])
 narr_feat = narr["sum"]/narr["n"]
 np.save(os.path.join(wd, "narrator_feat.npy"), narr_feat)
 print("clusters identite: %d | narrateur: %d/%d visages" % (len(cents), narr["n"], sum(c["n"] for c in cents)))
 
 # ---- PASS 3 : decision par sample ----
-# hero si carte quasi plein cadre OU visage tres gros ; pip sinon ; None si pas de narrateur vivant
 decisions = []   # (t, "hero"|"pip"|None, box)
 for s in samples:
     cands = [fc for fc in s["faces"]
              if _cos(fc["feat"], narr_feat) >= COS_SAME and fc["mo"] >= MOTION_MIN]
     if not cands:
         decisions.append((s["t"], None, None)); continue
-    # TOUS ses visages comptent : cam + previews video de lui sur la meme frame (fuite 872-886s
-    # pin6 ou seul le plus gros etait couvert) -> box = UNION des cartes. Hero si un seul est gros.
     if any((fc["card"][2] > 0.5 and fc["card"][3] > 0.7) or fc["f"][3]/H > 0.25 for fc in cands):
         decisions.append((s["t"], "hero", [0.0, 0.0, 1.0, 1.0]))
     else:
@@ -123,92 +129,91 @@ for s in samples:
         y1 = max(fc["card"][1]+fc["card"][3] for fc in cands)
         decisions.append((s["t"], "pip", [x0, y0, x1-x0, y1-y0]))
 
-# ---- PASS 4 : runs -> scenes (bridge trous <= 3 samples : YuNet cligne, sous-couvrir interdit)
-def _pos_close(a, b):
-    return abs(a[0]+a[2]/2-(b[0]+b[2]/2)) < 0.09 and abs(a[1]+a[3]/2-(b[1]+b[3]/2)) < 0.09
-scenes = []; cur = None; miss = 0
+# ---- PASS 4 : clusters de POSITION globaux (stabilisation) ----
+pclust = []
 for t, kind, card in decisions:
-    if kind is None:
-        if cur:
-            miss += 1
-            if miss > 4: scenes.append(cur); cur = None; miss = 0
-        continue
-    if cur and cur["kind"] == kind and (kind == "hero" or _pos_close(cur["cards"][-1], card)):
-        cur["end"] = t + STEP; cur["cards"].append(card); miss = 0
-    else:
-        # PRIORITE HERO aux frontieres : le hero demarre 1s AVANT son 1er sample et rogne la
-        # scene precedente (fuite 769.5s pin6 : la scene pip mordait sur le plein ecran)
-        start = max(0.0, t-1.0) if kind == "hero" else max(0.0, t-0.5)
-        if cur:
-            if kind == "hero" and cur["end"] > start: cur["end"] = start
-            scenes.append(cur)
-        cur = {"kind": kind, "start": start, "end": t + STEP, "cards": [card]}; miss = 0
-if cur: scenes.append(cur)
-scenes = [s for s in scenes if s["end"]-s["start"] >= 1.0]
-
-# ---- PASS 5 : box par scene = enveloppe percentile 10-90 des cartes, puis clustering position
-def pc(vals, q):
-    v = sorted(vals); return v[min(len(v)-1, max(0, int(q*(len(v)-1))))]
-out = []
-for sc in scenes:
-    if sc["kind"] == "hero":
-        out.append({"start": round(float(sc["start"]),2), "end": round(float(sc["end"]),2),
-                    "region": "hero", "box": [0.0,0.0,1.0,1.0], "edges": ["L","T","R","B"],
-                    "n": len(sc["cards"]), "src": "ident"})
-        continue
-    cs = sc["cards"]
-    x0 = pc([c[0] for c in cs], 0.10); y0 = pc([c[1] for c in cs], 0.10)
-    x1 = pc([c[0]+c[2] for c in cs], 0.90); y1 = pc([c[1]+c[3] for c in cs], 0.90)
-    cx, cy = (x0+x1)/2, (y0+y1)/2
-    reg = min(QUADS, key=lambda k: (QUADS[k][0]-cx)**2 + (QUADS[k][1]-cy)**2)
-    out.append({"start": round(float(sc["start"]),2), "end": round(float(sc["end"]),2),
-                "region": reg, "box": [round(float(x0),4), round(float(y0),4),
-                round(float(x1-x0),4), round(float(y1-y0),4)], "edges": [],
-                "n": len(cs), "src": "ident", "_cards": cs})
-
-# clustering position (regle Boss : pip statique -> UNE box canonique par position).
-# Canonique = PERCENTILES 10-90 sur TOUTES les cartes du cluster, PAS l'union enveloppe :
-# l'union gonflait la box jusqu'aux bords (Boss pin8 : avatar enorme sur un petit cercle).
-# Le QC attrape toute sous-couverture -> qc_fix patche localement, on peut serrer.
-clusters = []
-for s in out:
-    if s["region"] == "hero": continue
-    b = s["box"]; cx, cy = b[0]+b[2]/2, b[1]+b[3]/2
+    if kind != "pip": continue
+    cx, cy = card[0]+card[2]/2, card[1]+card[3]/2
     hit = None
-    for c in clusters:
-        if abs(cx-c["cx"]) < 0.07 and abs(cy-c["cy"]) < 0.07: hit = c; break
+    for c in pclust:
+        if abs(cx-c["cx"]) < 0.10 and abs(cy-c["cy"]) < 0.10: hit = c; break
     if hit is None:
-        clusters.append({"cx": cx, "cy": cy, "members": [s]})
+        pclust.append({"cx": cx, "cy": cy, "cards": [card]})
     else:
-        n = len(hit["members"])
-        hit["cx"] = (hit["cx"]*n + cx)/(n+1); hit["cy"] = (hit["cy"]*n + cy)/(n+1)
-        hit["members"].append(s)
-for c in clusters:
-    allc = [card for s in c["members"] for card in s["_cards"]]
-    x0 = pc([a[0] for a in allc], 0.10); y0 = pc([a[1] for a in allc], 0.10)
-    x1 = pc([a[0]+a[2] for a in allc], 0.90); y1 = pc([a[1]+a[3] for a in allc], 0.90)
+        n = len(hit["cards"])
+        hit["cx"] = (hit["cx"]*n+cx)/(n+1); hit["cy"] = (hit["cy"]*n+cy)/(n+1)
+        hit["cards"].append(card)
+for c in pclust:
+    cs = c["cards"]
+    x0 = pc([a[0] for a in cs], 0.10); y0 = pc([a[1] for a in cs], 0.10)
+    x1 = pc([a[0]+a[2] for a in cs], 0.90); y1 = pc([a[1]+a[3] for a in cs], 0.90)
     edges = []
     if x0 < EDGE: x0 = 0.0; edges.append("L")
     if y0 < EDGE: y0 = 0.0; edges.append("T")
     if x1 > 1-EDGE: x1 = 1.0; edges.append("R")
     if y1 > 1-EDGE: y1 = 1.0; edges.append("B")
-    cb = [round(float(x0),4), round(float(y0),4), round(float(x1-x0),4), round(float(y1-y0),4)]
-    for s in c["members"]:
-        s["box"] = list(cb); s["edges"] = edges
-for s in out:
-    s.pop("_cards", None)
+    c["box"] = [round(float(x0),4), round(float(y0),4), round(float(x1-x0),4), round(float(y1-y0),4)]
+    c["edges"] = edges
+    # box quasi plein ecran = narrateur geant -> HERO propre, pas d'ellipse/rect plein ecran
+    c["hero"] = (c["box"][2]*c["box"][3] > 0.5)
+print("clusters position (samples) : %d" % len(pclust))
 
-# fusion scenes adjacentes meme kind+box (apres canonisation elles sont identiques)
+def _clid(card):
+    cx, cy = card[0]+card[2]/2, card[1]+card[3]/2
+    best, bi = 1e9, -1
+    for i, c in enumerate(pclust):
+        d = (cx-c["cx"])**2 + (cy-c["cy"])**2
+        if d < best: best, bi = d, i
+    return bi
+
+# ---- PASS 5 : scenes = runs de (kind, cluster) ; trous <= 4 ; hero prioritaire ----
+scenes = []; cur = None; miss = 0
+for t, kind, card in decisions:
+    if kind == "pip" and pclust and pclust[_clid(card)]["hero"]:
+        kind = "hero"
+    key = ("hero", None) if kind == "hero" else (("pip", _clid(card)) if kind == "pip" else None)
+    if key is None:
+        if cur:
+            miss += 1
+            if miss > 4: scenes.append(cur); cur = None; miss = 0
+        continue
+    if cur and cur["key"] == key:
+        cur["end"] = t + STEP; miss = 0
+    else:
+        start = max(0.0, t-1.0) if key[0] == "hero" else max(0.0, t-0.5)
+        if cur:
+            if key[0] == "hero" and cur["end"] > start: cur["end"] = start
+            scenes.append(cur)
+        cur = {"key": key, "start": start, "end": t + STEP}; miss = 0
+if cur: scenes.append(cur)
+scenes = [s for s in scenes if s["end"]-s["start"] >= 1.0]
+
+out = []
+for sc in scenes:
+    if sc["key"][0] == "hero":
+        out.append({"start": round(float(sc["start"]),2), "end": round(float(sc["end"]),2),
+                    "region": "hero", "box": [0.0,0.0,1.0,1.0], "edges": ["L","T","R","B"],
+                    "n": 0, "src": "ident"})
+    else:
+        c = pclust[sc["key"][1]]
+        b = c["box"]; bcx, bcy = b[0]+b[2]/2, b[1]+b[3]/2
+        reg = min(QUADS, key=lambda k: (QUADS[k][0]-bcx)**2 + (QUADS[k][1]-bcy)**2)
+        out.append({"start": round(float(sc["start"]),2), "end": round(float(sc["end"]),2),
+                    "region": reg, "box": list(b), "edges": list(c["edges"]),
+                    "n": len(c["cards"]), "src": "ident"})
 out.sort(key=lambda s: s["start"])
+
+# fusion scenes adjacentes meme region+box
 merged = []
 for s in out:
     if merged and s["region"] == merged[-1]["region"] and s["box"] == merged[-1]["box"] \
             and s["start"] - merged[-1]["end"] <= 2.0:
-        merged[-1]["end"] = s["end"]; merged[-1]["n"] += s["n"]
+        merged[-1]["end"] = s["end"]
     else:
         merged.append(s)
 out = merged
-# chevauchements (bridge/start-0.5) : PRIORITE HERO (rogne le voisin), sinon clip au precedent
+
+# chevauchements : PRIORITE HERO (rogne le voisin), sinon clip au precedent
 for i in range(1, len(out)):
     if out[i]["start"] < out[i-1]["end"]:
         if out[i]["region"] == "hero" and out[i-1]["region"] != "hero":
@@ -217,8 +222,31 @@ for i in range(1, len(out)):
             out[i]["start"] = out[i-1]["end"]
 out = [s for s in out if s["end"]-s["start"] >= 0.5]
 
+# micro-scene pip (<2s) collee a un hero = transition de zoom -> devient hero (sur-couvre)
+for i in range(1, len(out)-1):
+    b = out[i]
+    if b["end"]-b["start"] < 2.0 and b["region"] != "hero" \
+            and (out[i-1]["region"] == "hero" or out[i+1]["region"] == "hero"):
+        b["region"] = "hero"; b["box"] = [0.0,0.0,1.0,1.0]; b["edges"] = ["L","T","R","B"]
+
+# micro-scenes (<2.5s) coincees entre deux scenes de MEME box -> absorbees puis re-fusionnees
+for i in range(1, len(out)-1):
+    b = out[i]
+    if (b["region"] != "hero" and out[i-1]["region"] != "hero"
+            and out[i-1]["box"] == out[i+1]["box"] and b["box"] != out[i-1]["box"]
+            and b["end"] - b["start"] < 2.5):
+        b["box"] = list(out[i-1]["box"]); b["region"] = out[i-1]["region"]
+        b["edges"] = list(out[i-1]["edges"])
+merged2 = []
+for s in out:
+    if merged2 and s["region"] == merged2[-1]["region"] and s["box"] == merged2[-1]["box"] \
+            and s["start"] - merged2[-1]["end"] <= 2.0:
+        merged2[-1]["end"] = s["end"]
+    else:
+        merged2.append(s)
+out = merged2
+
 json.dump(out, open(os.path.join(wd, "host_map_pin.json"), "w"), indent=2)
-print("clusters position : %d" % len(clusters))
 print("SCENES (%d) : start-end | duree | box | type | bords" % len(out))
 for s in out:
     print("  %.1f-%.1fs | %5.1fs | [%.3f,%.3f,%.3f,%.3f] | %-12s | %s"
