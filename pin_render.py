@@ -71,9 +71,9 @@ def is_hero(t0, t1, box):
     ff2 = vlm_probe.fullface(fr) if ok else None
     return ff2 is True
 
-segs=[]; prev=0.0; i=0
+segs=[]; prev=0.0
 nhero=0
-_cache = {}   # box canonique (tuple) -> (mask_path, bbox, shape) — 1 masque par POSITION
+pips=[]
 for sc in pin:
     if sc["start"]>prev+0.3:
         segs.append({"host":"off","start":round(prev,2),"end":round(sc["start"],2),"bbox":None})
@@ -81,18 +81,56 @@ for sc in pin:
         segs.append({"host":"hero","start":round(sc["start"],2),"end":round(sc["end"],2),"bbox":None})
         nhero+=1
     else:
-        patched = bool(sc.get("patched")) or sc.get("region") == "patch"
-        key = tuple(sc["box"])
-        if key in _cache and not patched:
-            mp,bb,shp=_cache[key]
-        else:
-            shp,abox=shape_of(sc["start"],sc["end"],sc["box"], allow_shrink=not patched)
-            mp,bb=draw(abox,shp,i)
-            if abox == sc["box"] and not patched:   # box ajustee/patchee = pas de cache
-                _cache[key]=(mp,bb,shp)
-        segs.append({"host":"pip","start":round(sc["start"],2),"end":round(sc["end"],2),"bbox":bb,"mask":mp,"shape":shp})
-    prev=sc["end"]; i+=1
-print("heros: %d / positions uniques: %d" % (nhero, len(_cache)))
+        seg={"host":"pip","start":round(sc["start"],2),"end":round(sc["end"],2)}
+        segs.append(seg)
+        pips.append({"seg":seg,"t0":sc["start"],"t1":sc["end"],"box":sc["box"],
+                     "patched":bool(sc.get("patched")) or sc.get("region")=="patch"})
+    prev=sc["end"]
+
+# forme + shrink par scene (cache par box canonique non-shrinkee)
+_shape_cache={}
+for p in pips:
+    key=tuple(p["box"])
+    if key in _shape_cache and not p["patched"]:
+        p["shape"],p["abox"]=_shape_cache[key]
+    else:
+        shp,abox=shape_of(p["t0"],p["t1"],p["box"],allow_shrink=not p["patched"])
+        p["shape"],p["abox"]=shp,list(abox)
+        if abox == p["box"] and not p["patched"]:
+            _shape_cache[key]=(shp,list(abox))
+
+# UNIFICATION position+forme : le MEME pip source recoit LA MEME box finale partout.
+# Sans ca, une scene garde la canonique et l'autre la version shrinkee -> saut de forme
+# a la frontiere + bord du pip a decouvert (0sqC 485s, invisible au QC : pas un visage).
+def _ctr(b): return (b[0]+b[2]/2, b[1]+b[3]/2)
+groups=[]
+for p in pips:
+    if p["patched"]: continue
+    cx,cy=_ctr(p["abox"]); hit=None
+    for g in groups:
+        if g["shape"]==p["shape"] and abs(cx-g["cx"])<0.06 and abs(cy-g["cy"])<0.06:
+            hit=g; break
+    if hit is None:
+        groups.append({"shape":p["shape"],"cx":cx,"cy":cy,"box":list(p["abox"]),"members":[p]})
+    else:
+        b=hit["box"]; nb=p["abox"]
+        x0=min(b[0],nb[0]); y0=min(b[1],nb[1])
+        x1=max(b[0]+b[2],nb[0]+nb[2]); y1=max(b[1]+b[3],nb[1]+nb[3])
+        hit["box"]=[x0,y0,x1-x0,y1-y0]; hit["members"].append(p)
+        hit["cx"],hit["cy"]=_ctr(hit["box"])
+for g in groups:
+    for p in g["members"]:
+        p["abox"]=[round(float(v),4) for v in g["box"]]
+
+# dessin : UN masque par (box finale, forme)
+_mask={}; mi=0
+for p in pips:
+    k=(tuple(p["abox"]),p["shape"])
+    if k not in _mask:
+        _mask[k]=draw(p["abox"],p["shape"],mi); mi+=1
+    mp,bb=_mask[k]
+    p["seg"].update({"bbox":bb,"mask":mp,"shape":p["shape"]})
+print("heros: %d / masques uniques: %d / groupes position: %d" % (nhero, len(_mask), len(groups)))
 if prev<DUR-0.3:
     segs.append({"host":"off","start":round(prev,2),"end":round(DUR,2),"bbox":None})
 
