@@ -238,11 +238,15 @@ for i in range(1, len(out)):
             out[i]["start"] = out[i-1]["end"]
 out = [s for s in out if s["end"]-s["start"] >= 0.5]
 
-# micro-scene pip (<2s) collee a un hero = transition de zoom -> devient hero (sur-couvre)
+# micro-scene pip collee a un hero = transition/bruit -> devient hero (sur-couvre) :
+# <2s avec UN voisin hero, ou <=5s en SANDWICH hero-hero (XzEg : card_extent accroche le
+# decor par intermittence pendant un plan plein cadre continu -> flicker hero/pip 3s)
 for i in range(1, len(out)-1):
     b = out[i]
-    if b["end"]-b["start"] < 2.0 and b["region"] != "hero" \
-            and (out[i-1]["region"] == "hero" or out[i+1]["region"] == "hero"):
+    if b["region"] == "hero": continue
+    dur = b["end"]-b["start"]
+    prev_h = out[i-1]["region"] == "hero"; next_h = out[i+1]["region"] == "hero"
+    if (dur < 2.0 and (prev_h or next_h)) or (dur <= 5.0 and prev_h and next_h):
         b["region"] = "hero"; b["box"] = [0.0,0.0,1.0,1.0]; b["edges"] = ["L","T","R","B"]
 
 # micro-scenes (<2.5s) coincees entre deux scenes de MEME box -> absorbees puis re-fusionnees
