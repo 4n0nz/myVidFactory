@@ -94,15 +94,15 @@ def _true_rect(box, t0, t1):
     return [round((x+L)/W,4), round((y+T)/H,4), round(nw/W,4), round(nh/H,4)]
 
 def _narrator_region(box, t0, t1):
-    """bbox de la PRESENCE narrateur dans la box : blob grabcut ∪ mouvement SOUTENU.
-    Mouvement soutenu = pixel qui bouge dans >=3 paires sur 5 etalees sur la scene —
-    un narrateur qui parle bouge en continu, un scroll de page est transitoire.
-    C'est l'ancrage du cap trop-grand : les scans de bords sont aveugles dans une box
-    gonflee pleine de contenu (transitions partout), le blob+mouvement non. None si
-    presence introuvable ou scene trop courte pour mesurer."""
+    """bbox de la PRESENCE narrateur dans la box, ancree sur le mouvement SOUTENU :
+    pixel qui bouge dans >=3 paires sur 5 etalees sur la scene — un narrateur qui parle
+    bouge en continu, un scroll de page est transitoire. Mesure sur eglV 90-418s :
+    motion bbox [0.036,0.572,0.19,0.38] vs carte reelle [0.03,0.55,0.22,0.40] = fidele,
+    alors que le blob grabcut debordait jusqu'a y=1.0 -> blob = FALLBACK seulement.
+    Les scans de bords sont aveugles dans une box gonflee pleine de contenu ; pas ca.
+    None si presence introuvable ou scene trop courte pour mesurer."""
     x = int(box[0]*W); y = int(box[1]*H); w = max(8, int(box[2]*W)); h = max(8, int(box[3]*H))
     x = max(0, min(W-w, x)); y = max(0, min(H-h, y))
-    m, _ = webcam_mask.seg_mask(cap, W, H, t0, t1, box, yfd)
     acc = np.zeros((H, W), np.uint8)
     npairs = 0
     for frac in (0.15, 0.3, 0.5, 0.7, 0.85):
@@ -113,15 +113,14 @@ def _narrator_region(box, t0, t1):
         acc += (d > 18).astype(np.uint8)
         npairs += 1
     if npairs < 4: return None
-    sust = np.zeros((H, W), bool)
-    sust[y:y+h, x:x+w] = acc[y:y+h, x:x+w] >= 3
-    if m is not None:
-        blob = m.astype(bool)
-        blob_in = np.zeros((H, W), bool); blob_in[y:y+h, x:x+w] = blob[y:y+h, x:x+w]
-        sust |= blob_in
+    sust = acc[y:y+h, x:x+w] >= 3
     ys, xs = np.nonzero(sust)
-    if len(xs) < 2000: return None
-    return [xs.min()/W, ys.min()/H, (xs.max()-xs.min()+1)/W, (ys.max()-ys.min()+1)/H]
+    if len(xs) < 2000:
+        m, _ = webcam_mask.seg_mask(cap, W, H, t0, t1, box, yfd)
+        if m is None: return None
+        ys, xs = np.nonzero(m[y:y+h, x:x+w])
+        if len(xs) < 2000: return None
+    return [(x+xs.min())/W, (y+ys.min())/H, (xs.max()-xs.min()+1)/W, (ys.max()-ys.min()+1)/H]
 
 def _motion_extend(box, t0, t1):
     """etend la box vers les zones ADJACENTES qui bougent en continu (bandes 8%, max 5 pas).
@@ -304,7 +303,10 @@ for g in groups:
     x1 = min(nb[0]+nb[2], g["box"][0]+g["box"][2]); y1 = min(nb[1]+nb[3], g["box"][1]+g["box"][3])
     if x1-x0 < 0.04 or y1-y0 < 0.04: continue
     nb = [round(x0,4), round(y0,4), round(x1-x0,4), round(y1-y0,4)]
-    if g["box"][2]*g["box"][3] <= 1.6*nb[2]*nb[3]: continue
+    # 1.25 et pas 1.6 : une box correcte vs sa presence narrateur ratio ~1.05 (eglV) ;
+    # a 1.6 le cas reel 1.4x passait. Les slivers de carte decouverts par un resserrage
+    # trop zele sont rattrapes par qc_geom SOUS-COUVERTURE (union monotone vers la carte)
+    if g["box"][2]*g["box"][3] <= 1.25*nb[2]*nb[3]: continue
     s = _shape_src(nb, p0["t0"], p0["t1"])
     ncap += 1
     for p in g["members"]:
