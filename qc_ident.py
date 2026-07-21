@@ -29,10 +29,20 @@ def covered_by_avatar(t, fb, fr=None, fr2=None):
                         y0 = int(min(H-2, (b[1]+b[3])*H)); y1 = int(min(H, (b[1]+b[3]+0.15)*H))
                         x0 = int(b[0]*W); x1 = int(min(W, (b[0]+b[2])*W))
                         if y1 > y0+4 and x1 > x0+4:
-                            d = cv2.absdiff(cv2.cvtColor(fr[y0:y1, x0:x1], cv2.COLOR_BGR2GRAY),
-                                            cv2.cvtColor(fr2[y0:y1, x0:x1], cv2.COLOR_BGR2GRAY))
-                            if float((d > 18).mean()) > 0.25:
-                                return False   # corps qui bouge sous le pip = hero rate
+                            def _hot(a, c):
+                                d = cv2.absdiff(cv2.cvtColor(a[y0:y1, x0:x1], cv2.COLOR_BGR2GRAY),
+                                                cv2.cvtColor(c[y0:y1, x0:x1], cv2.COLOR_BGR2GRAY))
+                                return float((d > 18).mean()) > 0.25
+                            # corps = mouvement SOUTENU : 2 fenetres espacees d'1s toutes
+                            # les deux chaudes. Une seule paire declenchait sur un scroll/
+                            # curseur sous le pip -> qc_fix etendait la box pleine hauteur
+                            # en patch intouchable (T-chq h=1.0, QQE 0.99x0.97, avatar
+                            # geant, verdicts Boss). Un scroll est transitoire ; un corps
+                            # qui parle bouge aux deux fenetres.
+                            if _hot(fr, fr2):
+                                f3 = _frame(t+1.0); f4 = _frame(t+1.5)
+                                if f3 is not None and f4 is not None and _hot(f3, f4):
+                                    return False   # corps qui bouge sous le pip = hero rate
                     return True
     return False
 cap = cv2.VideoCapture(rend)
