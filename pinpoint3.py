@@ -131,9 +131,15 @@ for s in samples:
         # hero : carte quasi plein cadre, OU visage enorme, OU narrateur LIBRE dans la
         # scene (aucun bord de carte trouve) avec un gros visage (TzJC plein cadre sans
         # overlay -> ellipse tete au lieu de hero). Panneau split-screen = bounded -> pip.
+        # LIBRE exige aussi un visage au CENTRE horizontal : un vrai narrateur plein
+        # cadre est cadre central (TzJC cx=0.51), un gros pip de coin dont card_extent
+        # rate les bords ne l'est pas (O58 cx=0.88, faceH=0.22 -> faux hero 80-286s,
+        # avatar plein ecran sur la page). Mesure : pips de coin cx~0.89.
+        cx = (fc["f"][0]+fc["f"][2]/2)/W
         return ((fc["card"][2] > 0.85 and fc["card"][3] > 0.85)
                 or fc["f"][3]/H > 0.40
-                or (not fc.get("bounded", True) and fc["f"][3]/H > 0.20))
+                or (not fc.get("bounded", True) and fc["f"][3]/H > 0.20
+                    and 0.25 < cx < 0.75))
     bigface = any(_heroish(fc) and fc["mo"] >= MOTION_MIN for fc in s["faces"])
     if not cands and not bigface:
         decisions.append((s["t"], None, None)); continue
