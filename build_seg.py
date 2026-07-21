@@ -25,6 +25,7 @@ W, H = int(r[0]), int(r[1])
 num, den = r[2].split('/'); FPS = round(float(num) / float(den), 4)
 
 NV = "-c:v h264_nvenc -preset p4 -rc vbr -cq 23 -b:v 0"
+AVIN = ('-f lavfi -i color=c=0x00FF00:s=%dx%d:r=%s' % (W, H, FPS)) if os.environ.get('GREEN_PIP','0').strip()=='1' else None
 
 # Mode FIXE si PIP_RECT fourni (env "x,y,w,h"), sinon mode PAR-SEGMENT (bbox detectee).
 _env = os.environ.get('PIP_RECT', '').strip()
@@ -39,6 +40,14 @@ SIDE    = 0.0
 # Filtre couleur applique a l'AVATAR (pip et hero) avant overlay. Env AVATAR_FX pour
 # override ; defaut = tint vert #00ff00 (Boss 2026-07-20) : G booste, R/B reduits.
 AVFX = os.environ.get('AVATAR_FX', 'colorchannelmixer=rr=0.6:gg=1.25:bb=0.6').strip()
+
+# GREEN_PIP=1 : le pip original est rempli de VERT CHROMA pur (#00ff00) au lieu de
+# l'avatar (Boss 2026-07-20) — validation visuelle immediate de la geometrie + keying
+# possible en post. L'entree [1:v] devient une source couleur lavfi ; formes, coins,
+# masques, overlay : inchanges.
+GREEN = os.environ.get('GREEN_PIP', '0').strip() == '1'
+if GREEN:
+    AVFX = ''
 def av_in():
     """entree avatar [1:v] avec le filtre couleur si defini."""
     return "[1:v]%s," % AVFX if AVFX else "[1:v]"
@@ -160,9 +169,9 @@ for si, s in enumerate(hmap):
 
     if host == 'hero':
         fc = av_in()+"%s[av];[0:v][av]overlay=0:0:shortest=1[vo]" % cover(W, H)
-        cmd = ('ffmpeg -y -ss %s -t %s -i %s -stream_loop -1 -i %s '
+        cmd = ('ffmpeg -y -ss %s -t %s -i %s %s '
                '-filter_complex "%s" -map "[vo]" -an -r %s -t %s %s "%s"'
-               % (ss, d, source, avatar, fc, FPS, d, NV, sf))
+               % (ss, d, source, AVIN or ('-stream_loop -1 -i ' + avatar), fc, FPS, d, NV, sf))
     elif host == 'pip' and s.get('mask') and not FIXED:
         # COMPOSITE MASQUE (pixel-exact) : avatar passe a travers le masque de la fenetre webcam
         # (grabCut) -> forme exacte (rond/arrondi), zero fuite. bbox = bbox du masque.
@@ -172,9 +181,9 @@ for si, s in enumerate(hmap):
         fc = (av_in()+"scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,format=rgba[av0];"
               "[2:v]scale=%d:%d,format=gray[mk];[av0][mk]alphamerge[av];"
               "[0:v][av]overlay=%d:%d:shortest=1[vo]" % (w, h, w, h, w, h, x, y))
-        cmd = ('ffmpeg -y -ss %s -t %s -i %s -stream_loop -1 -i %s -stream_loop -1 -i %s '
+        cmd = ('ffmpeg -y -ss %s -t %s -i %s %s -stream_loop -1 -i %s '
                '-filter_complex "%s" -map "[vo]" -an -r %s -t %s %s "%s"'
-               % (ss, d, source, avatar, mp, fc, FPS, d, NV, sf))
+               % (ss, d, source, AVIN or ('-stream_loop -1 -i ' + avatar), mp, fc, FPS, d, NV, sf))
     elif host == 'pip':
         rect = FIXED if FIXED else (seg_rect(s['bbox']) if s.get('bbox') else None)
         if rect:
@@ -183,9 +192,9 @@ for si, s in enumerate(hmap):
             elif PIP_ROUND == '0': rnd = False
             else: rnd = detect_round(x, y, w, h, ss, d)
             fc = pip_fc(w, h, x, y, rnd)
-            cmd = ('ffmpeg -y -ss %s -t %s -i %s -stream_loop -1 -i %s '
+            cmd = ('ffmpeg -y -ss %s -t %s -i %s %s '
                    '-filter_complex "%s" -map "[vo]" -an -r %s -t %s %s "%s"'
-                   % (ss, d, source, avatar, fc, FPS, d, NV, sf))
+                   % (ss, d, source, AVIN or ('-stream_loop -1 -i ' + avatar), fc, FPS, d, NV, sf))
         else:  # pip sans bbox exploitable -> source brute
             cmd = ('ffmpeg -y -ss %s -t %s -i %s -an -r %s -t %s %s "%s"'
                    % (ss, d, source, FPS, d, NV, sf))

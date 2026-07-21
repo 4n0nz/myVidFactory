@@ -246,9 +246,35 @@ for sc in pin:
                      "patched":bool(sc.get("patched")) or sc.get("region")=="patch"})
     prev=sc["end"]
 
+# CONSENSUS TEMPOREL (box_consensus.py, lance par le batch apres pinpoint3) : box+forme
+# mesurees par cluster de position sur TOUTE la video (activite temporelle + bords
+# persistants + anneau-juge). Prioritaire sur toute la tour heuristique par scene.
+_cons = []
+_cpath = os.path.join(wd, "box_consensus.json")
+if os.path.exists(_cpath):
+    try: _cons = json.load(open(_cpath))
+    except Exception: _cons = []
+def _cons_match(b):
+    cx = b[0]+b[2]/2; cy = b[1]+b[3]/2
+    for c in _cons:
+        cb = c["box"]
+        if abs(cx-(cb[0]+cb[2]/2)) < 0.15 and abs(cy-(cb[1]+cb[3]/2)) < 0.15:
+            return c
+    return None
+
 # forme + shrink par scene (cache par box canonique non-shrinkee)
 _shape_cache={}
 for p in pips:
+    if not p["patched"]:
+        c = _cons_match(p["box"])
+        if c is not None:
+            if c["box"][2]*c["box"][3] > 0.85:
+                p["seg"]["host"] = "hero"; p["seg"]["bbox"] = None; p["hero"] = True
+                p["shape"], p["abox"] = "rect90", list(c["box"])
+            else:
+                p["shape"], p["abox"] = c["shape"], list(c["box"])
+                p["cons"] = True
+            continue
     key=tuple(p["box"])
     if key in _shape_cache and not p["patched"]:
         p["shape"],p["abox"]=_shape_cache[key]
@@ -299,6 +325,8 @@ for g in groups:
 # 0sq/eglV/ADJj, verdicts Boss 2026-07-20).
 ncap = 0
 for g in groups:
+    if any(p.get("cons") for p in g["members"]):
+        continue   # box consensus : l'anneau-juge a deja valide la taille, pas de cap
     p0 = max(g["members"], key=lambda p: p["t1"]-p["t0"])
     reg = _narrator_region(g["box"], p0["t0"], p0["t1"])
     if reg is None: continue

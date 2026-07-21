@@ -3,6 +3,7 @@
 # Rapport TSV : id | qc | scenes | heros | masques | dur_ok | taille | tours
 PY=/home/boss/videogen/.venv/bin/python
 VG=/home/boss/videogen
+export GREEN_PIP=1   # passe verte : pip source -> vert chroma (Boss 2026-07-20)
 REPORT=/tmp/batch20_report.tsv
 PROG=/tmp/batch20.progress
 exec 9>/tmp/vf_render.flock; flock -n 9 || { echo "FLOCK_BUSY — un autre render tourne, abort"; exit 1; }
@@ -17,6 +18,7 @@ for WD in $VG/wk_b_*/; do
   echo "[$n/$tot] $id — pinpoint3..." >> "$PROG"
 
   plog=$($PY $VG/pinpoint3.py "$WD" 2>&1)
+  $PY $VG/box_consensus.py "$WD" > /tmp/bc.log 2>&1
   narr=$(echo "$plog" | grep -o 'narrateur: [0-9]*/[0-9]*' | head -1)
   if [ ! -s "$WD/narrator_feat.npy" ]; then
     printf "%s\tNO_NARRATOR\t-\t-\t-\t-\t-\t-\n" "$id" >> "$REPORT"; continue

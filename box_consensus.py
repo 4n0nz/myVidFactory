@@ -1,0 +1,267 @@
+#!/usr/bin/env python3
+# box_consensus.py <workdir> [draw_prefix] — mesure CONSENSUS TEMPOREL de la box pip.
+#
+# Principe (remplace la tour card_extent/motion_extend/grabcut/cap) : le pip est une
+# VIDEO live -> bruit temporel PARTOUT et EN CONTINU (capteur, compression, respiration).
+# La page derriere est STATIQUE -> pixels identiques entre frames sauf scroll (transitoire,
+# minoritaire sur N paires). Carte d'activite = part des paires ou le pixel change.
+# Le blob d'activite autour du visage narrateur = la carte, au pixel. Ses coins vides
+# d'activite = la forme (rond / rect arrondi / rect90). UNE box par cluster de position,
+# mesuree sur TOUTES ses scenes — aucune boucle corrective necessaire.
+import sys, os, json, cv2, numpy as np
+
+VG = "/home/boss/videogen"
+wd = sys.argv[1].rstrip("/")
+draw_prefix = sys.argv[2] if len(sys.argv) > 2 else None
+
+src = os.path.join(wd, "source.mp4")
+narr = np.load(os.path.join(wd, "narrator_feat.npy"))
+cap = cv2.VideoCapture(src)
+W = int(cap.get(3)); H = int(cap.get(4)); FPS = cap.get(5) or 30; DUR = cap.get(7)/FPS
+yfd = cv2.FaceDetectorYN.create(VG+"/face_detection_yunet_2023mar.onnx", "", (W, H), score_threshold=0.6)
+rec = cv2.FaceRecognizerSF.create(VG+"/face_recognition_sface_2021dec.onnx", "")
+
+COS_SAME = 0.363
+ACT_DIFF = 5        # seuil de changement pixel (attrape le bruit video, pas le rendu statique)
+ACT_MIN = 0.55      # pixel "carte" = change dans >55% des paires
+NPAIRS = 60
+
+def _frame(t):
+    cap.set(cv2.CAP_PROP_POS_MSEC, t*1000.0); ok, fr = cap.read()
+    return fr if ok else None
+
+def _cos(a, b):
+    return float(np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b)+1e-9))
+
+# ---- 1. echantillonnage narrateur (1/s) ----
+samples = []
+t = 0.0
+while t < DUR:
+    fr = _frame(t)
+    if fr is not None:
+        _, faces = yfd.detect(fr)
+        if faces is not None:
+            for f in faces:
+                if f[3]/H < 0.045: continue
+                try:
+                    feat = rec.feature(rec.alignCrop(fr, f)).flatten().astype(np.float32)
+                except Exception:
+                    continue
+                if _cos(feat, narr) >= COS_SAME:
+                    samples.append({"t": t, "f": [float(v) for v in f[:4]]})
+    t += 1.0
+if not samples:
+    print("aucun sample narrateur"); sys.exit(1)
+
+# ---- 2. clusters de position (memes criteres que pinpoint3), heros ecartes ----
+clusters = []
+for s in samples:
+    fh = s["f"][3]/H
+    if fh > 0.40: continue                       # hero plein cadre : pas une box a mesurer
+    cx = (s["f"][0]+s["f"][2]/2)/W; cy = (s["f"][1]+s["f"][3]/2)/H
+    hit = None
+    for c in clusters:
+        if abs(cx-c["cx"]) < 0.10 and abs(cy-c["cy"]) < 0.10: hit = c; break
+    if hit is None:
+        clusters.append({"cx": cx, "cy": cy, "members": [s]})
+    else:
+        n = len(hit["members"])
+        hit["cx"] = (hit["cx"]*n+cx)/(n+1); hit["cy"] = (hit["cy"]*n+cy)/(n+1)
+        hit["members"].append(s)
+clusters = [c for c in clusters if len(c["members"]) >= 8]
+
+# ---- 3. par cluster : carte d'activite temporelle -> box + forme ----
+def consensus(c):
+    ms = c["members"]
+    fw = float(np.median([m["f"][2] for m in ms])); fh = float(np.median([m["f"][3] for m in ms]))
+    x0 = max(0, int(min(m["f"][0] for m in ms) - 2.2*fw))
+    y0 = max(0, int(min(m["f"][1] for m in ms) - 1.2*fh))
+    x1 = min(W, int(max(m["f"][0]+m["f"][2] for m in ms) + 2.2*fw))
+    y1 = min(H, int(max(m["f"][1]+m["f"][3] for m in ms) + 3.2*fh))
+    ts = [m["t"] for m in ms]
+    idx = np.linspace(0, len(ts)-1, min(NPAIRS, len(ts))).astype(int)
+    cntF = np.zeros((H, W), np.float32)     # activite PLEIN CADRE (l'anneau peut sortir
+    gcnt = np.zeros((y1-y0, x1-x0), np.float32)   # de la fenetre visage)
+    npairs = 0
+    for i in idx:
+        a = _frame(ts[i]); b = _frame(min(ts[i]+0.4, DUR-0.05))
+        if a is None or b is None: continue
+        gaF = cv2.cvtColor(a, cv2.COLOR_BGR2GRAY)
+        gbF = cv2.cvtColor(b, cv2.COLOR_BGR2GRAY)
+        cntF += (cv2.absdiff(gaF, gbF) > ACT_DIFF).astype(np.float32)
+        ga = gaF[y0:y1, x0:x1]
+        gx = cv2.Sobel(ga, cv2.CV_32F, 1, 0, ksize=3); gy = cv2.Sobel(ga, cv2.CV_32F, 0, 1, ksize=3)
+        gcnt += (cv2.magnitude(gx, gy) > 60).astype(np.float32)
+        npairs += 1
+    if npairs < 10: return None
+    actF = cntF / npairs
+    act = actF[y0:y1, x0:x1]
+    gper = gcnt / npairs   # persistance de gradient : bord de CARTE = ligne droite
+                           # presente sur ~toutes les frames (le contenu bouge, pas elle)
+    blob = (act >= ACT_MIN).astype(np.uint8)
+    blob = cv2.morphologyEx(blob, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
+    nl, lab, stats, _ = cv2.connectedComponentsWithStats(blob)
+    fcx = int(np.median([m["f"][0]+m["f"][2]/2 for m in ms])) - x0
+    fcy = int(np.median([m["f"][1]+m["f"][3]/2 for m in ms])) - y0
+    best = -1; ba = 0
+    for i in range(1, nl):
+        lx, ly, lw, lh, area = stats[i]
+        if lx <= fcx <= lx+lw and ly <= fcy <= ly+lh and area > ba:
+            best = i; ba = area
+    if best < 0: return None
+    lx, ly, lw, lh, _ = stats[best]
+    # EXTENSION AUX BORDS DE CARTE : les zones sombres statiques du pip sont des
+    # skip-blocks H.264 (zero diff) -> le blob d'activite = la partie VIVE seulement
+    # (eglV : largeur 0.10 vs carte 0.22). Le bord reel = ligne de gradient PERSISTANTE
+    # (presente sur ~toutes les frames) la plus forte a moins d'une taille de visage.
+    # portee ASYMETRIQUE verticale : le visage vit dans le tiers HAUT de la carte ->
+    # le bord bas peut etre a 2.5 hauteurs de visage sous le blob (T-chq h mesuree 0.19
+    # vs 0.42 reelle, moitie basse = bureau sombre statique hors de portee de recherche)
+    rx = int(1.5*fw); ry = int(1.2*fh); ryb = int(2.5*fh)
+    hgt, wdt = gper.shape
+    colstr = np.mean(gper[ly:ly+lh, :], axis=0)   # force de ligne verticale par colonne
+    rowstr = np.mean(gper[:, lx:lx+lw], axis=1)   # force de ligne horizontale par rangee
+    def _best(vals, rng, thr=0.35):
+        cand, strength = None, thr
+        for p in rng:
+            if 0 <= p < len(vals) and float(vals[p]) > strength:
+                cand, strength = p, float(vals[p])
+        return cand
+    eL = _best(colstr, range(max(0, lx-rx), lx))                   # gauche
+    if eL is not None: lw += lx-eL; lx = eL
+    eR = _best(colstr, range(lx+lw, min(wdt, lx+lw+rx)))           # droite
+    if eR is not None: lw = eR+1-lx
+    eT = _best(rowstr, range(max(0, ly-ry), ly))                   # haut
+    if eT is not None: lh += ly-eT; ly = eT
+    eB = _best(rowstr, range(ly+lh, min(hgt, ly+lh+ryb)))          # bas
+    if eB is not None: lh = eB+1-ly
+    # SYMETRIE : la personne est ~centree horizontalement dans sa cam. Un bord lateral
+    # trouve + l'autre invisible (bord de carte sombre-sur-sombre en PERMANENCE, aucun
+    # gradient a moyenner — eglV bord droit) -> bord manquant = miroir du bord trouve
+    # autour du centre visage, affine par la ligne la plus forte a ±0.35fw (seuil 0.2),
+    # sinon miroir sec. Extension seulement, jamais sous le blob.
+    fL = eL is not None; fR = eR is not None; fT = eT is not None; fB = eB is not None
+    if fL and not fR:
+        mr = int(2*fcx - lx)
+        if mr > lx+lw:
+            e = _best(colstr, range(max(0, mr-int(0.35*fw)), min(wdt, mr+int(0.35*fw))), 0.2)
+            lw = min(wdt, (e if e is not None else mr)+1) - lx
+            fR = True
+    elif fR and not fL:
+        ml = int(2*fcx - (lx+lw))
+        if ml < lx:
+            e = _best(colstr, range(max(0, ml-int(0.35*fw)), min(wdt, ml+int(0.35*fw))), 0.2)
+            nl = max(0, e if e is not None else ml)
+            lw += lx-nl; lx = nl
+            fL = True
+    # PLANCHER ancre-visage, PAR COTE SANS BORD DETECTE seulement (un bord mesure fait
+    # toujours foi), et SEULEMENT si le blob d'activite est quasi vide (fill < 0.10 :
+    # T-chq 0.04). Un blob nourri (og_i 0.23) donne deja une bonne box — le plancher
+    # proportionnel au visage EXPLOSAIT les gros visages (og_i 0.34H, marges geantes).
+    fillpre = float(np.mean(act[ly:ly+lh, lx:lx+lw] >= ACT_MIN))
+    def _pcv(vals, q):
+        v = sorted(vals); return v[min(len(v)-1, max(0, int(q*(len(v)-1))))]
+    ffx0 = int(_pcv([m["f"][0] for m in ms], 0.10) - 0.6*fw) - x0
+    ffx1 = int(_pcv([m["f"][0]+m["f"][2] for m in ms], 0.90) + 0.6*fw) - x0
+    ffy0 = int(_pcv([m["f"][1] for m in ms], 0.10) - 0.7*fh) - y0
+    ffy1 = int(_pcv([m["f"][1]+m["f"][3] for m in ms], 0.90) + 1.6*fh) - y0
+    r0 = lx+lw; b0 = ly+lh
+    if fillpre < 0.10:
+        if not fL: lx = max(0, min(lx, ffx0))
+        if not fR: r0 = min(wdt, max(r0, ffx1))
+        if not fT: ly = max(0, min(ly, ffy0))
+        if not fB: b0 = min(hgt, max(b0, ffy1))
+    lw = r0-lx; lh = b0-ly
+    box = [(x0+lx)/W, (y0+ly)/H, lw/W, lh/H]
+    # ANNEAU-JUGE (l'oeil de Boss, automatise) : bande adjacente a chaque cote de la box —
+    # activite video soutenue dans la bande = pip a decouvert (cheveux au-dessus du vert
+    # QPZ, torse sous la box og_i) -> grandir jusqu'au silence. Mesure sur la SOURCE,
+    # aucun render requis. Monotone, borne ecran + cap 2.5x par dimension (une demo video
+    # qui joue sur la page adjacente ne doit pas avaler l'ecran).
+    bx0 = int(box[0]*W); by0 = int(box[1]*H)
+    bx1 = bx0+int(box[2]*W); by1 = by0+int(box[3]*H)
+    w0 = max(1, bx1-bx0); h0 = max(1, by1-by0)
+    band = max(6, int(0.025*min(W, H)))
+    def _hotband(xa, xb, ya, yb):
+        z = actF[max(0,ya):min(H,yb), max(0,xa):min(W,xb)]
+        return z.size > 100 and float(np.mean(z >= 0.30)) > 0.10
+    for _ in range(10):
+        grew = False
+        if by0 > 0 and (by1-by0) < 2.5*h0 and _hotband(bx0, bx1, by0-band, by0):
+            by0 = max(0, by0-band); grew = True
+        if by1 < H and (by1-by0) < 2.5*h0 and _hotband(bx0, bx1, by1, by1+band):
+            by1 = min(H, by1+band); grew = True
+        if bx0 > 0 and (bx1-bx0) < 2.5*w0 and _hotband(bx0-band, bx0, by0, by1):
+            bx0 = max(0, bx0-band); grew = True
+        if bx1 < W and (bx1-bx0) < 2.5*w0 and _hotband(bx1, bx1+band, by0, by1):
+            bx1 = min(W, bx1+band); grew = True
+        if not grew: break
+    lx = bx0-x0; ly = by0-y0; lw = bx1-bx0; lh = by1-by0
+    box = [bx0/W, by0/H, lw/W, lh/H]
+    # snap bords ecran (<2%)
+    if box[0] < 0.02: box[2] += box[0]; box[0] = 0.0
+    if box[1] < 0.02: box[3] += box[1]; box[1] = 0.0
+    if box[0]+box[2] > 0.98: box[2] = 1.0-box[0]
+    if box[1]+box[3] > 0.98: box[3] = 1.0-box[1]
+    # forme : sondes de coin MULTI-FRAMES (in/out aux profondeurs 2% et 8%), un coin ne
+    # vote que si contraste exterieur/carte a cet instant (dark-on-dark = abstention).
+    # Vote majoritaire sur ~20 frames : les moments contrastes decident, le reste se tait.
+    bx = x0+lx; by = y0+ly
+    d1 = max(2, int(min(lw, lh)*0.02)); d2 = max(6, int(min(lw, lh)*0.08))
+    def _pm(img, px, py):
+        if px < 4 or py < 4 or px >= W-4 or py >= H-4: return None
+        return img[py-2:py+3, px-2:px+3].reshape(-1, 3).mean(axis=0)
+    v1 = v2 = valid = 0
+    for i in idx[::3]:
+        fr = _frame(ts[i])
+        if fr is None: continue
+        img = fr.astype("float32")
+        pe = _pm(img, bx+lw//2, by+lh//2)
+        for cxp, cyp, sx, sy in ((bx, by, 1, 1), (bx+lw-1, by, -1, 1),
+                                 (bx, by+lh-1, 1, -1), (bx+lw-1, by+lh-1, -1, -1)):
+            po = _pm(img, cxp-sx*8, cyp-sy*8)
+            a1 = _pm(img, cxp+sx*d1, cyp+sy*d1)
+            a2 = _pm(img, cxp+sx*d2, cyp+sy*d2)
+            if po is None or pe is None or a1 is None or a2 is None: continue
+            n = np.linalg.norm
+            if n(po-pe) < 40: continue          # sonde aveugle : pas de vote
+            valid += 1
+            if n(a1-po)+15 < n(a1-pe): v1 += 1
+            if n(a2-po)+15 < n(a2-pe): v2 += 1
+    if valid >= 8:
+        r1, r2 = v1/valid, v2/valid
+        shape = "ellipse" if (r1 > 0.8 and r2 > 0.8) else ("rect" if r1 > 0.4 else "rect90")
+    else:
+        shape = "rect"                          # prior Boss : rond rare, ambigu = rect
+    sub = actF[by0:by1, bx0:bx1]      # coords absolues : l'anneau peut sortir de la fenetre
+    fill = float(np.mean(sub >= ACT_MIN))
+    return {"box": [round(v, 4) for v in box], "shape": shape, "n": len(ms),
+            "npairs": npairs, "fill": round(fill, 2),
+            "votes": [valid, round(v1/max(1,valid), 2), round(v2/max(1,valid), 2)]}
+
+out = []
+for c in clusters:
+    r = consensus(c)
+    if r: out.append(r)
+    print("cluster cx=%.2f cy=%.2f n=%d ->" % (c["cx"], c["cy"], len(c["members"])),
+          r if r else "ECHEC mesure")
+
+# ---- 4. dessin de controle ----
+if draw_prefix and out:
+    tbest, vbest = None, -1
+    for m in clusters[0]["members"][:: max(1, len(clusters[0]["members"])//20)]:
+        fr = _frame(m["t"])
+        if fr is None: continue
+        v = float(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY).mean())
+        if v > vbest: vbest, tbest = v, m["t"]
+    fr = _frame(tbest if tbest is not None else clusters[0]["members"][0]["t"])
+    for r in out:
+        b = r["box"]
+        p1 = (int(b[0]*W), int(b[1]*H)); p2 = (int((b[0]+b[2])*W), int((b[1]+b[3])*H))
+        cv2.rectangle(fr, p1, p2, (0, 255, 0), 3)
+        cv2.putText(fr, "%s n=%d fill=%.2f" % (r["shape"], r["n"], r["fill"]),
+                    (p1[0]+4, max(20, p1[1]-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    cv2.imwrite(draw_prefix + ".jpg", fr)
+    print("image:", draw_prefix + ".jpg")
+
+json.dump(out, open(os.path.join(wd, "box_consensus.json"), "w"), indent=2)
