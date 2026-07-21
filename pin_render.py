@@ -60,7 +60,10 @@ def shape_of(t0, t1, box, allow_shrink=True):
     sub=m[y:y+h, x:x+w]
     cs=[sub[:sq,:sq], sub[:sq,w-sq:], sub[h-sq:,:sq], sub[h-sq:,w-sq:]]
     occ=sum(float(c.mean()) if c.size else 0.0 for c in cs)/4.0
-    if occ < 0.12: return "ellipse", box   # rond = rare, evidence forte exigee
+    # PAS d'ellipse au fallback blob : le blob = une personne, jamais dans les coins
+    # d'une carte rect -> occ bas meme sur pip rect (4D7). Rond = seulement via sondes
+    # source contrastees (_shape_src). Rect couvre un rond entierement = sur-couverture
+    # benigne ; l'inverse (rond sur rect) = coins de carte a decouvert.
     if occ > 0.75: return "rect90", box
     return "rect", box
 
@@ -180,6 +183,10 @@ def _shape_src(box, t0, t1):
             a2 = _pmean(img, cx+sx*d2, cy+sy*d2)
             if po is None or pe is None or a1 is None or a2 is None: continue
             n = np.linalg.norm
+            # sonde AVEUGLE si pas de contraste exterieur/carte a ce coin : pip rect a
+            # coins sombres sur fond sombre = "vide" aux 2 profondeurs = fausse ellipse
+            # (4D7 rond sur pip rect 90deg, verdict Boss). Pas de contraste = pas de vote.
+            if n(po-pe) < 40: continue
             valid += 1
             if n(a1-po)+15 < n(a1-pe): v1 += 1
             if n(a2-po)+15 < n(a2-pe): v2 += 1
