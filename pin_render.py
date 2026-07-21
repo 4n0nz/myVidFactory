@@ -197,8 +197,8 @@ def _shape_src(box, t0, t1):
     if v1*2 >= valid: return "rect"
     return "rect90"
 
-def draw(box, shape, idx):
-    cx0=box[0]-box[2]*MG; cy0=box[1]-box[3]*MG; cw=box[2]*(1+2*MG); ch=box[3]*(1+2*MG)
+def draw(box, shape, idx, mg=MG):
+    cx0=box[0]-box[2]*mg; cy0=box[1]-box[3]*mg; cw=box[2]*(1+2*mg); ch=box[3]*(1+2*mg)
     x=int(cx0*W);y=int(cy0*H);w=max(4,int(cw*W));h=max(4,int(ch*H))
     x=max(0,min(W-w,x));y=max(0,min(H-h,y));  w=min(w,W-x); h=min(h,H-y)
     out=np.zeros((h,w),np.uint8)
@@ -243,7 +243,8 @@ for sc in pin:
         seg={"host":"pip","start":round(sc["start"],2),"end":round(sc["end"],2)}
         segs.append(seg)
         pips.append({"seg":seg,"t0":sc["start"],"t1":sc["end"],"box":sc["box"],
-                     "patched":bool(sc.get("patched")) or sc.get("region")=="patch"})
+                     "patched":bool(sc.get("patched")) or sc.get("region")=="patch",
+                     "pident":bool(sc.get("patched_ident")) or sc.get("region")=="patch"})
     prev=sc["end"]
 
 # CONSENSUS TEMPOREL (box_consensus.py, lance par le batch apres pinpoint3) : box+forme
@@ -265,7 +266,9 @@ def _cons_match(b):
 # forme + shrink par scene (cache par box canonique non-shrinkee)
 _shape_cache={}
 for p in pips:
-    if not p["patched"]:
+    # consensus AUTORITAIRE sur les patches GEOM (true_rect surestime sur fond sombre,
+    # 4D7 verdict Boss) ; les patches IDENTITE (vrai visage qui fuit) gardent priorite
+    if not p.get("pident"):
         c = _cons_match(p["box"])
         if c is not None:
             if c["box"][2]*c["box"][3] > 0.85:
@@ -354,9 +357,9 @@ if ncap: print("cap trop-grand: %d groupes resserres" % ncap)
 _mask={}; mi=0
 for p in pips:
     if p.get("hero"): continue
-    k=(tuple(p["abox"]),p["shape"])
+    k=(tuple(p["abox"]),p["shape"],bool(p.get("cons")))
     if k not in _mask:
-        _mask[k]=draw(p["abox"],p["shape"],mi); mi+=1
+        _mask[k]=draw(p["abox"],p["shape"],mi,mg=0.02 if p.get("cons") else MG); mi+=1
     mp,bb=_mask[k]
     p["seg"].update({"bbox":bb,"mask":mp,"shape":p["shape"]})
 print("heros: %d / masques uniques: %d / groupes position: %d" % (nhero, len(_mask), len(groups)))

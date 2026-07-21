@@ -54,7 +54,7 @@ def insert_patch(pin, t0, t1, pbox):
                 # (KKni 56.5s, boucle QC sterile) -> hero plein ecran
                 mid["region"] = "hero"; mid["box"] = [0.0,0.0,1.0,1.0]; mid["edges"] = ["L","T","R","B"]
             else:
-                mid["box"] = ub; mid["patched"] = True
+                mid["box"] = ub; mid["patched"] = True; mid["patched_ident"] = True
         out.append(mid)
         if s["end"] > t1:
             out.append(dict(s, start=round(t1,2)))
@@ -99,7 +99,7 @@ for g in pgroups:
         if s["region"] == "hero": continue
         b = s["box"]; cx, cy = b[0]+b[2]/2, b[1]+b[3]/2
         if abs(cx-g["cx"]) < 0.08 and abs(cy-g["cy"]) < 0.08:
-            s["box"] = [round(v,4) for v in g["box"]]; s["patched"] = True
+            s["box"] = [round(v,4) for v in g["box"]]; s["patched"] = True; s["patched_ident"] = True
 
 # scenes degeneres jetees
 pin = [s for s in pin if s["end"] - s["start"] >= 0.3]

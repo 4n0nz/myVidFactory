@@ -10,6 +10,23 @@ fails = json.load(open(os.path.join(wd, "qc_geom.json")))
 pinf = os.path.join(wd, "host_map_pin.json")
 pin = json.load(open(pinf))
 
+# CONSENSUS AUTORITAIRE : une scene qui matche un cluster box_consensus ne se fait PAS
+# patcher par le QC geometrique — son true_rect SURESTIME la carte sur fond sombre et
+# ecrasait la mesure globale validee (4D7 : consensus 0.21x0.25 correct -> patch 0.28x0.28
+# -> +marge = vert +60% d'aire, verdict Boss). Sous-couverture reelle -> rapport seulement.
+_cons = []
+_cp = os.path.join(wd, "box_consensus.json")
+if os.path.exists(_cp):
+    try: _cons = json.load(open(_cp))
+    except Exception: _cons = []
+def _cons_matched(b):
+    cx = b[0]+b[2]/2; cy = b[1]+b[3]/2
+    for c in _cons:
+        cb = c["box"]
+        if abs(cx-(cb[0]+cb[2]/2)) < 0.15 and abs(cy-(cb[1]+cb[3]/2)) < 0.15:
+            return True
+    return False
+
 def union(a, b):
     x0 = min(a[0], b[0]); y0 = min(a[1], b[1])
     x1 = max(a[0]+a[2], b[0]+b[2]); y1 = max(a[1]+a[3], b[1]+b[3])
@@ -21,7 +38,7 @@ for f in fails:
     t = f["t"]
     for s in pin:
         if s["region"] != "hero" and s["start"] <= t <= s["end"]:
-            if f["type"] == "SOUS-COUVERTURE":
+            if f["type"] == "SOUS-COUVERTURE" and not _cons_matched(s["box"]):
                 s["box"] = union(s["box"], f["carte"]); s["patched"] = True; n += 1
             # TROP-GRAND : PAS de resserrage automatique — les deux boucles correctives
             # s'ecrasaient mutuellement (ident elargit, geom resserre) -> oscillation
