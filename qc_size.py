@@ -48,10 +48,17 @@ def check(wd, out):
         if reg is None: continue
         ratio = (bb[2]*bb[3]) / max(1e-6, reg[2]*reg[3])
         dc = ((bb[0]+bb[2]/2 - (reg[0]+reg[2]/2))**2 + (bb[1]+bb[3]/2 - (reg[1]+reg[3]/2))**2) ** 0.5
-        if ratio > RATIO_MAX or dc > DECAL_MAX:
+        # PRESENCE-DEBORDE (verdict Boss ADJj 0:08 : oeuf vert sur la tete, corps visible) :
+        # part de la presence narrateur CONTENUE dans la box. Tete couverte + corps dehors
+        # = le QC identite est aveugle (pas de visage) mais la presence deborde massivement.
+        ix0 = max(bb[0], reg[0]); iy0 = max(bb[1], reg[1])
+        ix1 = min(bb[0]+bb[2], reg[0]+reg[2]); iy1 = min(bb[1]+bb[3], reg[1]+reg[3])
+        inter = max(0.0, ix1-ix0) * max(0.0, iy1-iy0)
+        contain = inter / max(1e-6, reg[2]*reg[3])
+        if ratio > RATIO_MAX or dc > DECAL_MAX or contain < 0.60:
             nflag += 1
-            out.write("%s\t%.1f-%.1fs\tratio=%.2f\tdecal=%.3f\tavatar=%s\tpresence=%s\n"
-                      % (vid, s["start"], s["end"], ratio, dc,
+            out.write("%s\t%.1f-%.1fs\tratio=%.2f\tdecal=%.3f\tcontain=%.2f\tavatar=%s\tpresence=%s\n"
+                      % (vid, s["start"], s["end"], ratio, dc, contain,
                          [round(v,3) for v in bb], [round(v,3) for v in reg]))
     hp = hero_d/dur
     verdict = []
