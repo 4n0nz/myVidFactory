@@ -233,10 +233,22 @@ def consensus(c):
         shape = "ellipse" if (r1 > 0.8 and r2 > 0.8) else ("rect" if r1 > 0.4 else "rect90")
     else:
         shape = "rect"                          # prior Boss : rond rare, ambigu = rect
+    # CLASSIFICATION pip vs NARRATEUR PLEIN ECRAN : un vrai pip a des bords de carte
+    # (lignes persistantes trouvees OU box collee aux bords ecran). Un narrateur libre
+    # flottant sur son decor n'en a AUCUN + visage central -> kind=hero (ecran vert
+    # complet), jamais une box (ADJj 0:08 : oeuf vert sur la tete, corps visible,
+    # verdict Boss). Le juge qc_size a le test miroir (presence deborde).
+    edges_found = sum(1 for e in (eL, eR, eT, eB) if e is not None)
+    if box[0] < 0.02: edges_found += 1
+    if box[1] < 0.02: edges_found += 1
+    if box[0]+box[2] > 0.98: edges_found += 1
+    if box[1]+box[3] > 0.98: edges_found += 1
+    ccx = box[0]+box[2]/2
+    kind = "hero" if (edges_found <= 1 and 0.30 < ccx < 0.70) else "pip"
     sub = actF[by0:by1, bx0:bx1]      # coords absolues : l'anneau peut sortir de la fenetre
     fill = float(np.mean(sub >= ACT_MIN))
     return {"box": [round(v, 4) for v in box], "shape": shape, "n": len(ms),
-            "npairs": npairs, "fill": round(fill, 2),
+            "kind": kind, "npairs": npairs, "fill": round(fill, 2),
             "votes": [valid, round(v1/max(1,valid), 2), round(v2/max(1,valid), 2)]}
 
 out = []

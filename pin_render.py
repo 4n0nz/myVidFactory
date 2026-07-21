@@ -279,7 +279,9 @@ for p in pips:
     if not p.get("pident"):
         c = _cons_match(p["box"])
         if c is not None:
-            if c["box"][2]*c["box"][3] > 0.85:
+            if c.get("kind") == "hero" or c["box"][2]*c["box"][3] > 0.85:
+                # cluster narrateur plein ecran (aucun bord de carte, visage central)
+                # -> HERO complet, jamais une box sur la tete (ADJj 0:08, verdict Boss)
                 p["seg"]["host"] = "hero"; p["seg"]["bbox"] = None; p["hero"] = True
                 p["shape"], p["abox"] = "rect90", list(c["box"])
             else:
