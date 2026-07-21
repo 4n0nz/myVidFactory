@@ -256,12 +256,20 @@ if os.path.exists(_cpath):
     try: _cons = json.load(open(_cpath))
     except Exception: _cons = []
 def _cons_match(b):
+    # match par centres proches OU par CONTENANCE : une box de scene gonflee (union
+    # pinpoint3 cam+previews, AAmd 0.79x0.84) a son centre loin du cluster mais le
+    # CONTIENT — le consensus doit quand meme la remplacer. Plus proche si plusieurs.
     cx = b[0]+b[2]/2; cy = b[1]+b[3]/2
+    best = None; bd = 9.0
     for c in _cons:
-        cb = c["box"]
-        if abs(cx-(cb[0]+cb[2]/2)) < 0.15 and abs(cy-(cb[1]+cb[3]/2)) < 0.15:
-            return c
-    return None
+        cb = c["box"]; ccx = cb[0]+cb[2]/2; ccy = cb[1]+cb[3]/2
+        near = abs(cx-ccx) < 0.15 and abs(cy-ccy) < 0.15
+        inside = (b[0]-0.02 <= ccx <= b[0]+b[2]+0.02
+                  and b[1]-0.02 <= ccy <= b[1]+b[3]+0.02)
+        if near or inside:
+            d = abs(cx-ccx)+abs(cy-ccy)
+            if d < bd: best, bd = c, d
+    return best
 
 # forme + shrink par scene (cache par box canonique non-shrinkee)
 _shape_cache={}
