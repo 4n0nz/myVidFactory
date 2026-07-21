@@ -230,7 +230,9 @@ def consensus(c):
             if n(a2-po)+15 < n(a2-pe): v2 += 1
     if valid >= 8:
         r1, r2 = v1/valid, v2/valid
-        shape = "ellipse" if (r1 > 0.8 and r2 > 0.8) else ("rect" if r1 > 0.4 else "rect90")
+        # plus JAMAIS d'ellipse (regle Boss 2026-07-21 : trop de faux positifs) —
+        # un pip rond est couvert par un rect arrondi (le rect contient le cercle)
+        shape = "rect" if r1 > 0.4 else "rect90"
     else:
         shape = "rect"                          # prior Boss : rond rare, ambigu = rect
     # CLASSIFICATION pip vs NARRATEUR PLEIN ECRAN : un vrai pip a des bords de carte

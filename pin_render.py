@@ -193,8 +193,8 @@ def _shape_src(box, t0, t1):
     if valid < 6: return None
     # les pips RONDS sont RARES (retour Boss) : ellipse seulement si evidence quasi unanime
     # aux DEUX profondeurs ; tout cas ambigu = rect
-    if v2 >= valid*0.85 and v1 >= valid*0.85: return "ellipse"
-    if v1*2 >= valid: return "rect"
+    # plus JAMAIS d'ellipse (regle Boss 2026-07-21) : rond couvert par rect arrondi
+    if v1*2 >= valid or (v2 >= valid*0.85 and v1 >= valid*0.85): return "rect"
     return "rect90"
 
 def draw(box, shape, idx, mg=MG):
