@@ -372,6 +372,52 @@ for g in groups:
     g["box"] = list(nb)
 if ncap: print("cap trop-grand: %d groupes resserres" % ncap)
 
+def _ring_scene(box, t0, t1):
+    """ANNEAU-JUGE par SCENE : bande adjacente a la box en mouvement SOUTENU (>=3/5
+    paires sur la duree de LA scene) = presence narrateur a decouvert -> etendre.
+    Attrape les layouts de scene qui divergent du cluster (Id9G 16-19s : narrateur
+    FLOUTE en fond de colonne droite, tete au-dessus de la box cluster — aucun visage
+    detectable, ident aveugle, seule l'activite le voit). Monotone, cap 2.5x/dim."""
+    acc = np.zeros((H, W), np.uint8); n = 0
+    for frac in (0.15, 0.3, 0.5, 0.7, 0.85):
+        cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac)*1000.0); ok1, a = cap.read()
+        cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac+0.4)*1000.0); ok2, b = cap.read()
+        if not (ok1 and ok2): continue
+        acc += (cv2.absdiff(cv2.cvtColor(a, cv2.COLOR_BGR2GRAY),
+                            cv2.cvtColor(b, cv2.COLOR_BGR2GRAY)) > 5).astype(np.uint8)
+        n += 1
+    if n < 4: return box
+    sust = acc >= 3
+    bx0 = int(box[0]*W); by0 = int(box[1]*H)
+    bx1 = bx0+int(box[2]*W); by1 = by0+int(box[3]*H)
+    w0 = max(1, bx1-bx0); h0 = max(1, by1-by0)
+    band = max(6, int(0.025*min(W, H)))
+    def hot(xa, xb, ya, yb):
+        z = sust[max(0,ya):min(H,yb), max(0,xa):min(W,xb)]
+        return z.size > 100 and float(z.mean()) > 0.12
+    for _ in range(10):
+        grew = False
+        if by0 > 0 and (by1-by0) < 2.5*h0 and hot(bx0, bx1, by0-band, by0):
+            by0 = max(0, by0-band); grew = True
+        if by1 < H and (by1-by0) < 2.5*h0 and hot(bx0, bx1, by1, by1+band):
+            by1 = min(H, by1+band); grew = True
+        if bx0 > 0 and (bx1-bx0) < 2.5*w0 and hot(bx0-band, bx0, by0, by1):
+            bx0 = max(0, bx0-band); grew = True
+        if bx1 < W and (bx1-bx0) < 2.5*w0 and hot(bx1, bx1+band, by0, by1):
+            bx1 = min(W, bx1+band); grew = True
+        if not grew: break
+    # snap bords ecran
+    if bx0 < 0.02*W: bx0 = 0
+    if by0 < 0.02*H: by0 = 0
+    if bx1 > 0.98*W: bx1 = W
+    if by1 > 0.98*H: by1 = H
+    return [round(bx0/W,4), round(by0/H,4), round((bx1-bx0)/W,4), round((by1-by0)/H,4)]
+
+# anneau par scene sur TOUTES les box pip finales (consensus, pkeep, legacy)
+for p in pips:
+    if p.get("hero"): continue
+    p["abox"] = _ring_scene(list(p["abox"]), p["t0"], p["t1"])
+
 # dessin : UN masque par (box finale, forme)
 _mask={}; mi=0
 for p in pips:
