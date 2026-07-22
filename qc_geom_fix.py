@@ -38,8 +38,17 @@ for f in fails:
     t = f["t"]
     for s in pin:
         if s["region"] != "hero" and s["start"] <= t <= s["end"]:
-            if f["type"] == "SOUS-COUVERTURE" and not _cons_matched(s["box"]):
-                s["box"] = union(s["box"], f["carte"]); s["patched"] = True; n += 1
+            if f["type"] == "SOUS-COUVERTURE":
+                ub = union(s["box"], f["carte"])
+                small = ub[2]*ub[3] <= 1.15 * s["box"][2]*s["box"][3]
+                if not _cons_matched(s["box"]):
+                    s["box"] = ub; s["patched"] = True; n += 1
+                elif small:
+                    # scene consensus : SEUL un petit ajustement de bord passe (<=15%
+                    # d'aire, sliver Id9G t=17.5). Les grosses unions (true_rect qui
+                    # surestime, 4D7 +60%) restent bloquees. patched_keep = respecte
+                    # par pin_render (le consensus ne l'ecrase pas).
+                    s["box"] = ub; s["patched"] = True; s["patched_keep"] = True; n += 1
             # TROP-GRAND : PAS de resserrage automatique — les deux boucles correctives
             # s'ecrasaient mutuellement (ident elargit, geom resserre) -> oscillation
             # destructrice, gb5 LEAK_242. Corrections MONOTONES (grandir seulement) =

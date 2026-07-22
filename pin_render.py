@@ -244,7 +244,8 @@ for sc in pin:
         segs.append(seg)
         pips.append({"seg":seg,"t0":sc["start"],"t1":sc["end"],"box":sc["box"],
                      "patched":bool(sc.get("patched")) or sc.get("region")=="patch",
-                     "pident":bool(sc.get("patched_ident")) or sc.get("region")=="patch"})
+                     "pident":bool(sc.get("patched_ident")) or sc.get("region")=="patch"
+                             or bool(sc.get("patched_keep"))})
     prev=sc["end"]
 
 # CONSENSUS TEMPOREL (box_consensus.py, lance par le batch apres pinpoint3) : box+forme
