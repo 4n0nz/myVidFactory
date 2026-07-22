@@ -244,8 +244,8 @@ for sc in pin:
         segs.append(seg)
         pips.append({"seg":seg,"t0":sc["start"],"t1":sc["end"],"box":sc["box"],
                      "patched":bool(sc.get("patched")) or sc.get("region")=="patch",
-                     "pident":bool(sc.get("patched_ident")) or sc.get("region")=="patch"
-                             or bool(sc.get("patched_keep"))})
+                     "pident":bool(sc.get("patched_ident")) or sc.get("region")=="patch",
+                     "pkeep":bool(sc.get("patched_keep"))})
     prev=sc["end"]
 
 # CONSENSUS TEMPOREL (box_consensus.py, lance par le batch apres pinpoint3) : box+forme
@@ -275,6 +275,14 @@ def _cons_match(b):
 # forme + shrink par scene (cache par box canonique non-shrinkee)
 _shape_cache={}
 for p in pips:
+    # patched_keep (petit ajustement de bord geom sur scene consensus) : box TELLE QUELLE
+    # — c'est deja consensus ∪ carte mesuree. La passer au legacy la regonflait via
+    # motion_extend (Id9G 16-19s : bord ajuste -> colonne pleine hauteur)
+    if p.get("pkeep") and not p.get("pident"):
+        c = _cons_match(p["box"])
+        p["shape"] = (c["shape"] if c is not None else "rect")
+        p["abox"] = list(p["box"]); p["cons"] = True
+        continue
     # consensus AUTORITAIRE sur les patches GEOM (true_rect surestime sur fond sombre,
     # 4D7 verdict Boss) ; les patches IDENTITE (vrai visage qui fuit) gardent priorite
     if not p.get("pident"):
