@@ -406,6 +406,18 @@ def _ring_scene(box, t0, t1):
         if bx1 < W and (bx1-bx0) < 2.5*w0 and hot(bx1, bx1+band, by0, by1):
             bx1 = min(W, bx1+band); grew = True
         if not grew: break
+    # UNION BLOB : un torse STATIQUE en vetement uni ne bouge pas assez pour l anneau
+    # (og_i chemise blanche visible sous le vert, tous les juges aveugles : tete couverte
+    # = pas de visage, presence=motion = contain OK). Le grabcut segmente le statique.
+    # Union bornee par le meme cap 2.5x.
+    m, _ = webcam_mask.seg_mask(cap, W, H, [bx0/W, by0/H, (bx1-bx0)/W, (by1-by0)/H], yfd)
+    if m is not None:
+        ys, xs = np.nonzero(m)
+        if len(xs) > 2000:
+            nx0 = min(bx0, int(xs.min())); ny0 = min(by0, int(ys.min()))
+            nx1 = max(bx1, int(xs.max())+1); ny1 = max(by1, int(ys.max())+1)
+            if (nx1-nx0) <= 2.5*w0 and (ny1-ny0) <= 2.5*h0:
+                bx0, by0, bx1, by1 = nx0, ny0, nx1, ny1
     # snap bords ecran
     if bx0 < 0.02*W: bx0 = 0
     if by0 < 0.02*H: by0 = 0
