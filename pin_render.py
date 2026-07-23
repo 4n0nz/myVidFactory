@@ -410,7 +410,7 @@ def _ring_scene(box, t0, t1):
     # (og_i chemise blanche visible sous le vert, tous les juges aveugles : tete couverte
     # = pas de visage, presence=motion = contain OK). Le grabcut segmente le statique.
     # Union bornee par le meme cap 2.5x.
-    m, _ = webcam_mask.seg_mask(cap, W, H, [bx0/W, by0/H, (bx1-bx0)/W, (by1-by0)/H], yfd)
+    m, _ = webcam_mask.seg_mask(cap, W, H, t0, t1, [bx0/W, by0/H, (bx1-bx0)/W, (by1-by0)/H], yfd)
     if m is not None:
         ys, xs = np.nonzero(m)
         if len(xs) > 2000:
