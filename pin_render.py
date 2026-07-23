@@ -211,6 +211,13 @@ def draw(box, shape, idx, mg=MG):
         r=max(2,int(min(w,h)*0.10))
         cv2.rectangle(out,(r,0),(w-r,h),255,-1);cv2.rectangle(out,(0,r),(w,h-r),255,-1)
         for a,b in ((r,r),(w-r,r),(r,h-r),(w-r,h-r)): cv2.circle(out,(a,b),r,255,-1)
+        # coins colles a un bord d'ECRAN = CARRES : la carte y est tronquee par l'ecran,
+        # l'arrondi du masque laissait un sliver au coin (og_i chemise coin bas-droit)
+        eL = x <= 1; eT = y <= 1; eR = x+w >= W-1; eB = y+h >= H-1
+        if eL or eT: out[:r, :r] = 255
+        if eR or eT: out[:r, w-r:] = 255
+        if eL or eB: out[h-r:, :r] = 255
+        if eR or eB: out[h-r:, w-r:] = 255
     out=cv2.GaussianBlur(out,(5,5),0)
     p=os.path.join(mdir,"seg_%04d.png"%idx); cv2.imwrite(p,out)
     return p,[round(x/W,4),round(y/H,4),round(w/W,4),round(h/H,4)]
