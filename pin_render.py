@@ -431,7 +431,7 @@ def _ring_scene(box, t0, t1):
     if bx0 < 0.02*W: bx0 = 0
     if by0 < 0.02*H: by0 = 0
     if bx1 > 0.98*W: bx1 = W
-    if by1 > 0.90*H: by1 = H
+    if by1 > 0.85*H: by1 = H
     return [round(bx0/W,4), round(by0/H,4), round((bx1-bx0)/W,4), round((by1-by0)/H,4)]
 
 # anneau par scene sur TOUTES les box pip finales (consensus, pkeep, legacy)
