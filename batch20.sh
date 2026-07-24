@@ -32,7 +32,13 @@ for WD in $VG/wk_b_*/; do
 
   $PY $VG/build_seg.py "$WD" "$OUT" > /tmp/bs.log 2>&1 && "$WD/run_seg.sh" > /dev/null 2>&1
   if [ ! -s "$VG/out/$OUT" ]; then
-    printf "%s\tRENDER_FAIL\t%s\t%s\t%s\t-\t-\t-\n" "$id" "$scenes" "$heros" "$masks" >> "$REPORT"; continue
+    printf "%s\tRENDER_FAIL\t%s\t%s\t%s\t-\t-\t-\n" "$id" "$scenes" "$heros" "$masks" >> "$REPORT"
+    # sonde NVENC : encodeur GPU mort (driver mis a jour sous le module charge, 2026-07-23)
+    # = ABORT immediat au lieu d'enchainer 40 RENDER_FAIL
+    if ! ffmpeg -y -v error -f lavfi -i color=c=red:s=320x180:r=30 -t 1 -c:v h264_nvenc /tmp/nvenc_probe.mp4 2>/dev/null; then
+      echo "NVENC_DOWN — batch abort" >> "$PROG"; exit 2
+    fi
+    continue
   fi
 
   qc="LEAK"; tours=0
