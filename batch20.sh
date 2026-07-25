@@ -4,6 +4,12 @@
 PY=/home/boss/videogen/.venv/bin/python
 VG=/home/boss/videogen
 export GREEN_PIP=1   # passe verte : pip source -> vert chroma (Boss 2026-07-20)
+# encodeur : NVENC si vivant, sinon CPU libx264 (driver upgrade sous module charge)
+if ffmpeg -y -v error -f lavfi -i color=c=red:s=320x180:r=30 -t 1 -c:v h264_nvenc /tmp/nvenc_probe.mp4 2>/dev/null; then
+  export VF_ENC=gpu
+else
+  export VF_ENC=cpu
+fi
 REPORT=/tmp/batch20_report.tsv
 PROG=/tmp/batch20.progress
 exec 9>/tmp/vf_render.flock; flock -n 9 || { echo "FLOCK_BUSY — un autre render tourne, abort"; exit 1; }
@@ -33,12 +39,12 @@ for WD in $VG/wk_b_*/; do
   $PY $VG/build_seg.py "$WD" "$OUT" > /tmp/bs.log 2>&1 && "$WD/run_seg.sh" > /dev/null 2>&1
   if [ ! -s "$VG/out/$OUT" ]; then
     printf "%s\tRENDER_FAIL\t%s\t%s\t%s\t-\t-\t-\n" "$id" "$scenes" "$heros" "$masks" >> "$REPORT"
-    # sonde NVENC : encodeur GPU mort (driver mis a jour sous le module charge, 2026-07-23)
-    # = ABORT immediat au lieu d'enchainer 40 RENDER_FAIL
-    if ! ffmpeg -y -v error -f lavfi -i color=c=red:s=320x180:r=30 -t 1 -c:v h264_nvenc /tmp/nvenc_probe.mp4 2>/dev/null; then
-      echo "NVENC_DOWN — batch abort" >> "$PROG"; exit 2
+    # sonde NVENC : mort en cours de batch -> bascule CPU et re-render CETTE video
+    if [ "$VF_ENC" != "cpu" ] && ! ffmpeg -y -v error -f lavfi -i color=c=red:s=320x180:r=30 -t 1 -c:v h264_nvenc /tmp/nvenc_probe.mp4 2>/dev/null; then
+      echo "NVENC_DOWN — bascule encodage CPU" >> "$PROG"; export VF_ENC=cpu
+      $PY $VG/build_seg.py "$WD" "$OUT" > /dev/null 2>&1 && "$WD/run_seg.sh" > /dev/null 2>&1
     fi
-    continue
+    [ -s "$VG/out/$OUT" ] || continue
   fi
 
   qc="LEAK"; tours=0

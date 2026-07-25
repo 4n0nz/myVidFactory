@@ -25,6 +25,10 @@ W, H = int(r[0]), int(r[1])
 num, den = r[2].split('/'); FPS = round(float(num) / float(den), 4)
 
 NV = "-c:v h264_nvenc -preset p4 -rc vbr -cq 23 -b:v 0"
+# VF_ENC=cpu : fallback libx264 quand NVENC est mort (driver upgrade sous module charge,
+# 2026-07-23 — reload = sudo, indisponible). Le contenu vert compresse vite en CPU.
+if os.environ.get('VF_ENC', '').strip() == 'cpu':
+    NV = "-c:v libx264 -preset fast -crf 23"
 AVIN = ('-f lavfi -i color=c=0x00FF00:s=%dx%d:r=%s' % (W, H, FPS)) if os.environ.get('GREEN_PIP','0').strip()=='1' else None
 
 # Mode FIXE si PIP_RECT fourni (env "x,y,w,h"), sinon mode PAR-SEGMENT (bbox detectee).
