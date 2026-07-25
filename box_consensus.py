@@ -127,31 +127,13 @@ def consensus(c):
             if 0 <= p < len(vals) and float(vals[p]) > strength:
                 cand, strength = p, float(vals[p])
         return cand
-    def _sep(side, pos):
-        """une ligne-bord VALIDE separe le VIVANT (interieur, activite) du MORT
-        (exterieur, statique). Une colonne de code vim est persistante mais a zero
-        activite des DEUX cotes -> fausse ligne (FkEh cluster +40% vers le code).
-        bande 3% de chaque cote de la ligne candidate, dans l'emprise du blob."""
-        b = max(4, int(0.03*min(wdt, hgt)))
-        if side in ("L", "R"):
-            ia = act[ly:ly+lh, pos+1:pos+1+b] if side == "L" else act[ly:ly+lh, max(0,pos-b):pos]
-            oa = act[ly:ly+lh, max(0,pos-b):pos] if side == "L" else act[ly:ly+lh, pos+1:pos+1+b]
-        else:
-            ia = act[pos+1:pos+1+b, lx:lx+lw] if side == "T" else act[max(0,pos-b):pos, lx:lx+lw]
-            oa = act[max(0,pos-b):pos, lx:lx+lw] if side == "T" else act[pos+1:pos+1+b, lx:lx+lw]
-        if ia.size < 50 or oa.size < 50: return False
-        return float(np.mean(ia >= 0.30)) > 0.06 and float(np.mean(oa >= 0.30)) < 0.03
     eL = _best(colstr, range(max(0, lx-rx), lx))                   # gauche
-    if eL is not None and not _sep("L", eL): eL = None
     if eL is not None: lw += lx-eL; lx = eL
     eR = _best(colstr, range(lx+lw, min(wdt, lx+lw+rx)))           # droite
-    if eR is not None and not _sep("R", eR): eR = None
     if eR is not None: lw = eR+1-lx
     eT = _best(rowstr, range(max(0, ly-ry), ly))                   # haut
-    if eT is not None and not _sep("T", eT): eT = None
     if eT is not None: lh += ly-eT; ly = eT
     eB = _best(rowstr, range(ly+lh, min(hgt, ly+lh+ryb)))          # bas
-    if eB is not None and not _sep("B", eB): eB = None
     if eB is not None: lh = eB+1-ly
     # SYMETRIE : la personne est ~centree horizontalement dans sa cam. Un bord lateral
     # trouve + l'autre invisible (bord de carte sombre-sur-sombre en PERMANENCE, aucun
