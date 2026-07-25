@@ -27,7 +27,14 @@ num, den = r[2].split('/'); FPS = round(float(num) / float(den), 4)
 NV = "-c:v h264_nvenc -preset p4 -rc vbr -cq 23 -b:v 0"
 # VF_ENC=cpu : fallback libx264 quand NVENC est mort (driver upgrade sous module charge,
 # 2026-07-23 — reload = sudo, indisponible). Le contenu vert compresse vite en CPU.
-if os.environ.get('VF_ENC', '').strip() == 'cpu':
+_enc = os.environ.get('VF_ENC', '').strip()
+if not _enc:
+    # pas d'indication de l'appelant -> sonde NVENC directe (les chaines unitaires
+    # n'exportent pas VF_ENC ; gOQZ run_seg mort sur NVENC HS, 2026-07-25)
+    _enc = 'gpu' if os.system(
+        "ffmpeg -y -v error -f lavfi -i color=c=red:s=320x180:r=30 -t 1 "
+        "-c:v h264_nvenc /tmp/nvenc_probe.mp4 2>/dev/null") == 0 else 'cpu'
+if _enc == 'cpu':
     NV = "-c:v libx264 -preset fast -crf 23"
 AVIN = ('-f lavfi -i color=c=0x00FF00:s=%dx%d:r=%s' % (W, H, FPS)) if os.environ.get('GREEN_PIP','0').strip()=='1' else None
 
