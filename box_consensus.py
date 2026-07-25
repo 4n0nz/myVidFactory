@@ -140,10 +140,7 @@ def consensus(c):
             ia = act[pos+1:pos+1+b, lx:lx+lw] if side == "T" else act[max(0,pos-b):pos, lx:lx+lw]
             oa = act[max(0,pos-b):pos, lx:lx+lw] if side == "T" else act[pos+1:pos+1+b, lx:lx+lw]
         if ia.size < 50 or oa.size < 50: return False
-        # seuils RELATIFS a l'activite du blob : un pip sombre a peu d'activite absolue
-        # (FkEh fill 0.16 -> sous-couverture avec seuils absolus)
-        ref = max(0.02, float(np.mean(act[ly:ly+lh, lx:lx+lw] >= 0.30)))
-        return float(np.mean(ia >= 0.30)) > 0.4*ref and float(np.mean(oa >= 0.30)) < 0.2*ref
+        return float(np.mean(ia >= 0.30)) > 0.06 and float(np.mean(oa >= 0.30)) < 0.03
     eL = _best(colstr, range(max(0, lx-rx), lx))                   # gauche
     if eL is not None and not _sep("L", eL): eL = None
     if eL is not None: lw += lx-eL; lx = eL
@@ -187,12 +184,9 @@ def consensus(c):
     ffy0 = int(_pcv([m["f"][1] for m in ms], 0.10) - 0.7*fh) - y0
     ffy1 = int(_pcv([m["f"][1]+m["f"][3] for m in ms], 0.90) + 1.6*fh) - y0
     r0 = lx+lw; b0 = ly+lh
-    # plancher LATERAL toujours actif (les visages bornent bien la largeur de carte —
-    # FkEh sous-couvert de moitie sans lui) ; plancher VERTICAL seulement si blob quasi
-    # vide (les regressions og_i/4D7 venaient du floor Y sur gros visages)
-    if not fL: lx = max(0, min(lx, ffx0))
-    if not fR: r0 = min(wdt, max(r0, ffx1))
     if fillpre < 0.10:
+        if not fL: lx = max(0, min(lx, ffx0))
+        if not fR: r0 = min(wdt, max(r0, ffx1))
         if not fT: ly = max(0, min(ly, ffy0))
         if not fB: b0 = min(hgt, max(b0, ffy1))
     lw = r0-lx; lh = b0-ly
