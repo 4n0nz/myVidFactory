@@ -434,13 +434,24 @@ def _ring_scene(box, t0, t1):
             ny1 = max(by1, int(ys.max())+1) if aB else by1
             if (nx1-nx0) <= 2.5*w0 and (ny1-ny0) <= 2.5*h0:
                 bx0, by0, bx1, by1 = nx0, ny0, nx1, ny1
-    # snap bords ecran — BAS a 6% (coherent avec EDGE 8% pinpoint3) : le torse colle
-    # souvent au bas sans que blob/motion atteignent 98% (og_i sliver chemise a 0.93) ;
-    # sous un pip il n'y a que du fond, sur-couvrir 5% de bas d'ecran = benin
-    if bx0 < 0.02*W: bx0 = 0
-    if by0 < 0.02*H: by0 = 0
-    if bx1 > 0.98*W: bx1 = W
-    if by1 > 0.85*H: by1 = H
+    # PLUS AUCUN SNAP AVEUGLE (verdict Boss : les avatars collaient presque toujours a
+    # 1-2 bords alors que le pip original garde sa marge). Extension au bord SEULEMENT
+    # sur PREUVE : bande restante (<10% ecran) contenant des pixels de personne (blob).
+    # og_i : chemise dans la bande 0.93-1.0 -> prolonge ; pip normal : marge de page
+    # vide -> respectee.
+    if m is not None:
+        if 0 < H-by1 < 0.10*H:
+            z = m[by1:H, bx0:bx1]
+            if z.size > 100 and float(z.mean()) > 0.05: by1 = H
+        if 0 < by0 < 0.10*H:
+            z = m[0:by0, bx0:bx1]
+            if z.size > 100 and float(z.mean()) > 0.05: by0 = 0
+        if 0 < W-bx1 < 0.10*W:
+            z = m[by0:by1, bx1:W]
+            if z.size > 100 and float(z.mean()) > 0.05: bx1 = W
+        if 0 < bx0 < 0.10*W:
+            z = m[by0:by1, 0:bx0]
+            if z.size > 100 and float(z.mean()) > 0.05: bx0 = 0
     return [round(bx0/W,4), round(by0/H,4), round((bx1-bx0)/W,4), round((by1-by0)/H,4)]
 
 # anneau par scene sur TOUTES les box pip finales (consensus, pkeep, legacy)

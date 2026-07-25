@@ -38,7 +38,7 @@ COS_SAME = 0.363      # seuil standard SFace meme personne
 COS_CLUST = 0.40      # assignation cluster identite
 MOTION_MIN = 0.35     # photo statique ~0.1, humain IMMOBILE ~0.5 (1.2 excluait le narrateur calme)
 FACE_MIN = 0.045      # visage < 4.5% H = vignette, pas la cam
-EDGE = 0.08           # snap-bord : box a <8% d'un bord = cam collee -> etend au bord
+EDGE = 0.03           # snap-bord reduit : les pips gardent une marge design 2-5%, 8% collait tout aux bords (verdict Boss)
 QUADS = {"top-left":(0.25,0.25),"top-right":(0.75,0.25),"bottom-left":(0.25,0.75),
          "bottom-right":(0.75,0.75),"center":(0.5,0.5)}
 
