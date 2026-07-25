@@ -399,18 +399,24 @@ def _ring_scene(box, t0, t1):
     bx1 = bx0+int(box[2]*W); by1 = by0+int(box[3]*H)
     w0 = max(1, bx1-bx0); h0 = max(1, by1-by0)
     band = max(6, int(0.025*min(W, H)))
+    # DIRECTIONS AUTORISEES : extension seulement VERS un bord d'ecran proche (<25%).
+    # Les vrais deborde-box (torse og_i/TzJC, colonne Id9G, bas eglV) vont tous vers un
+    # bord d'ecran ; une extension vers le CENTRE = grabcut/contenu qui bave (0sq :
+    # cluster n=587 parfait regonfle 2x vers le centre, verdict Boss). Jamais vers l'interieur.
+    aT = by0 < 0.25*H; aB = (H-by1) < 0.25*H
+    aL = bx0 < 0.25*W; aR = (W-bx1) < 0.25*W
     def hot(xa, xb, ya, yb):
         z = sust[max(0,ya):min(H,yb), max(0,xa):min(W,xb)]
         return z.size > 100 and float(z.mean()) > 0.12
     for _ in range(10):
         grew = False
-        if by0 > 0 and (by1-by0) < 2.5*h0 and hot(bx0, bx1, by0-band, by0):
+        if aT and by0 > 0 and (by1-by0) < 2.5*h0 and hot(bx0, bx1, by0-band, by0):
             by0 = max(0, by0-band); grew = True
-        if by1 < H and (by1-by0) < 2.5*h0 and hot(bx0, bx1, by1, by1+band):
+        if aB and by1 < H and (by1-by0) < 2.5*h0 and hot(bx0, bx1, by1, by1+band):
             by1 = min(H, by1+band); grew = True
-        if bx0 > 0 and (bx1-bx0) < 2.5*w0 and hot(bx0-band, bx0, by0, by1):
+        if aL and bx0 > 0 and (bx1-bx0) < 2.5*w0 and hot(bx0-band, bx0, by0, by1):
             bx0 = max(0, bx0-band); grew = True
-        if bx1 < W and (bx1-bx0) < 2.5*w0 and hot(bx1, bx1+band, by0, by1):
+        if aR and bx1 < W and (bx1-bx0) < 2.5*w0 and hot(bx1, bx1+band, by0, by1):
             bx1 = min(W, bx1+band); grew = True
         if not grew: break
     # UNION BLOB : un torse STATIQUE en vetement uni ne bouge pas assez pour l anneau
@@ -421,8 +427,11 @@ def _ring_scene(box, t0, t1):
     if m is not None:
         ys, xs = np.nonzero(m)
         if len(xs) > 2000:
-            nx0 = min(bx0, int(xs.min())); ny0 = min(by0, int(ys.min()))
-            nx1 = max(bx1, int(xs.max())+1); ny1 = max(by1, int(ys.max())+1)
+            # union blob CLAMPEE aux directions autorisees (vers bords d'ecran seulement)
+            nx0 = min(bx0, int(xs.min())) if aL else bx0
+            ny0 = min(by0, int(ys.min())) if aT else by0
+            nx1 = max(bx1, int(xs.max())+1) if aR else bx1
+            ny1 = max(by1, int(ys.max())+1) if aB else by1
             if (nx1-nx0) <= 2.5*w0 and (ny1-ny0) <= 2.5*h0:
                 bx0, by0, bx1, by1 = nx0, ny0, nx1, ny1
     # snap bords ecran — BAS a 6% (coherent avec EDGE 8% pinpoint3) : le torse colle
