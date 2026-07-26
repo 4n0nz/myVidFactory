@@ -323,19 +323,25 @@ for p in pips:
         if abox == p["box"] and not p["patched"]:
             _shape_cache[key]=(shp,list(abox))
 
-# UNIFICATION position+forme : le MEME pip source recoit LA MEME box finale partout.
+# UNIFICATION position : le MEME pip source recoit LA MEME box finale partout.
 # Sans ca, une scene garde la canonique et l'autre la version shrinkee -> saut de forme
 # a la frontiere + bord du pip a decouvert (0sqC 485s, invisible au QC : pas un visage).
+# Les patches GEOM (non-pident) ENTRENT dans l'union : exclus, chaque tour correctif
+# laissait sa box propre par scene -> 5 masques uniques pour 1 pip physique (4D7 :
+# w=0.225/0.26/0.213, SAUT-DE-BOX t=11). Union monotone = chaque patch reste couvert.
+# Le matching ignore la forme (un patch geom force rect, le consensus dit rect90 ->
+# le meme pip physique se splittait en 2 groupes jamais unifies) ; forme finale =
+# celle du membre consensus si present, sinon celle du membre le plus long.
 def _ctr(b): return (b[0]+b[2]/2, b[1]+b[3]/2)
 groups=[]
 for p in pips:
-    if p["patched"] or p.get("hero"): continue
+    if p.get("pident") or p.get("hero"): continue
     cx,cy=_ctr(p["abox"]); hit=None
     for g in groups:
-        if g["shape"]==p["shape"] and abs(cx-g["cx"])<0.06 and abs(cy-g["cy"])<0.06:
+        if abs(cx-g["cx"])<0.06 and abs(cy-g["cy"])<0.06:
             hit=g; break
     if hit is None:
-        groups.append({"shape":p["shape"],"cx":cx,"cy":cy,"box":list(p["abox"]),"members":[p]})
+        groups.append({"cx":cx,"cy":cy,"box":list(p["abox"]),"members":[p]})
     else:
         b=hit["box"]; nb=p["abox"]
         x0=min(b[0],nb[0]); y0=min(b[1],nb[1])
@@ -343,19 +349,23 @@ for p in pips:
         hit["box"]=[x0,y0,x1-x0,y1-y0]; hit["members"].append(p)
         hit["cx"],hit["cy"]=_ctr(hit["box"])
 for g in groups:
+    cons_m=[p for p in g["members"] if p.get("cons")]
+    ref=cons_m[0] if cons_m else max(g["members"], key=lambda p: p["t1"]-p["t0"])
+    g["shape"]=ref["shape"]
     for p in g["members"]:
         p["abox"]=[round(float(v),4) for v in g["box"]]
+        p["shape"]=g["shape"]
 
 # CAP TROP-GRAND terminal — UNE passe apres toute la chaine de croissance (percentiles
 # pinpoint + motion_extend + unions), JAMAIS en boucle donc pas d'oscillation possible.
-# Les scenes patchees qc_fix ne passent pas ici (exclues des groupes) : doctrine monotone
-# respectee. Box finale > 1.6x la presence narrateur reelle -> resserree a cette presence
-# (+4% de marge), forme re-decidee dans le nouveau referentiel (avatar 2x trop grand :
-# 0sq/eglV/ADJj, verdicts Boss 2026-07-20).
+# Groupes avec membre patche : JAMAIS de cap (le cap resserre, un patch resserre =
+# la fuite corrigee revient = oscillation). Box finale > 1.25x la presence narrateur
+# reelle -> resserree a cette presence (+4% de marge), forme re-decidee dans le nouveau
+# referentiel (avatar 2x trop grand : 0sq/eglV/ADJj, verdicts Boss 2026-07-20).
 ncap = 0
 for g in groups:
-    if any(p.get("cons") for p in g["members"]):
-        continue   # box consensus : l'anneau-juge a deja valide la taille, pas de cap
+    if any(p.get("cons") or p["patched"] for p in g["members"]):
+        continue   # consensus deja valide / patch monotone : ne jamais resserrer
     p0 = max(g["members"], key=lambda p: p["t1"]-p["t0"])
     reg = _narrator_region(g["box"], p0["t0"], p0["t1"])
     if reg is None: continue
