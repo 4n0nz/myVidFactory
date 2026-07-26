@@ -70,9 +70,46 @@ while t < DUR:
                 feat = rec.feature(rec.alignCrop(fr, f)).flatten().astype(np.float32)
             except Exception:
                 continue
-            big = f[3]/H > 0.22   # plein ecran = fuite peu importe l'identite
+            # plein ecran = fuite peu importe l'identite. Seuil 0.38 : un vrai plan
+            # serre a un visage >=0.40 (TzJC 0.40+, eglV 0.43-0.52) ; les visages de
+            # CONTENU montent a 0.31 (4D7 carte template verticale : 0.22 les flaggait
+            # sans test d'identite -> patch geant -> promotion hero -> ecran vert,
+            # verdict Boss ; l'anneau d'entourage seul ne suffit pas, l'inertie de fin
+            # de scroll [1.5-6.9] chevauche un vrai hero calme [1.67]).
+            big = f[3]/H > 0.38
             if not big and _cos(feat, narr) < 0.363: continue
             x=max(0,int(f[0])); y=max(0,int(f[1])); w=int(f[2]); h=int(f[3])
+            if big and _cos(feat, narr) < 0.363:
+                # gros visage d'identite INCONNUE : le contenu peut en montrer (4D7 :
+                # carte template verticale avec preview video, faceH=0.29 -> flaggee
+                # sans test d'identite -> patch geant qc_fix -> promotion hero
+                # pin_render = ecran vert plein, verdict Boss). Un hero rate VIT :
+                # son ENTOURAGE bouge de maniere soutenue (2 fenetres espacees d'1s,
+                # patron corps-sous-pip) ET son visage RESTE EN PLACE a t+1 (patron
+                # persistance pinpoint3 2eb3563). Mesures : preview carte = anneau
+                # 0.0-1.5 avec au moins une fenetre morte ; scroll = position instable
+                # (cy 0.50->0.33 ou visage disparu) ; vrai hero eglV = 27.9/16.3 +
+                # stable. Narrateur reconnu (cos>=0.363) ne passe jamais ici.
+                mx, my = int(w*0.6), int(h*0.6)
+                X0, Y0 = max(0, x-mx), max(0, y-my)
+                X1, Y1 = min(W, x+w+mx), min(H, y+h+my)
+                def _ring(a, c):
+                    if a is None or c is None: return 1e9   # non mesurable -> chaud
+                    d = cv2.absdiff(cv2.cvtColor(a[Y0:Y1, X0:X1], cv2.COLOR_BGR2GRAY),
+                                    cv2.cvtColor(c[Y0:Y1, X0:X1], cv2.COLOR_BGR2GRAY)
+                                    ).astype(np.float32)
+                    d[max(0, y-Y0):y-Y0+h, max(0, x-X0):x-X0+w] = 0.0
+                    return float(d.sum()/max((Y1-Y0)*(X1-X0) - h*w, 1))
+                f3 = _frame(min(t+1.0, DUR-0.6)); f4 = _frame(min(t+1.5, DUR-0.1))
+                hot = _ring(fr, fr2) > 0.5 and _ring(f3, f4) > 0.5
+                stable = False
+                if f3 is not None:
+                    _, nf = yfd.detect(f3)
+                    if nf is not None:
+                        stable = any(abs((g[0]+g[2]/2)-(x+w/2))/W < 0.08
+                                     and abs((g[1]+g[3]/2)-(y+h/2))/H < 0.08
+                                     for g in nf if g[3]/H > 0.22)
+                if not (hot and stable): continue
             if covered_by_avatar(t, [x/W, y/H, w/W, h/H], fr, fr2): continue
             if fr2 is not None:
                 a = cv2.cvtColor(fr[y:y+h, x:x+w], cv2.COLOR_BGR2GRAY)
