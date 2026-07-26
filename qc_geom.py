@@ -4,6 +4,9 @@
 # avatar trop grand, forme fausse). Mesures deterministes sur la source :
 #   - bords reels (scan fond->carte au milieu des cotes, mediane 3 frames)
 #   - couverture : le masque doit contenir la carte reelle (tolerance 1.5% par bord)
+#   - anti-fantome : un cote en echec n'est retenu que si la bande de fuite revendiquee
+#     est VIVANTE (activite temporelle inter-frames). Une carte reelle bouge ; une bande
+#     figee = structure statique du fond (vignettes, gaps) prise pour un bord de carte.
 #   - justesse : aire masque <= 1.6x aire carte reelle (sinon avatar geant)
 #   - stabilite : segments pip adjacents meme position -> meme bbox
 # Rapport JSON qc_geom.json + exit 1 si echecs. Zero VLM.
@@ -14,6 +17,7 @@ src = os.path.join(wd, "source.mp4")
 hm = json.load(open(os.path.join(wd, "host_map.json")))
 cap = cv2.VideoCapture(src)
 W = int(cap.get(3)); H = int(cap.get(4))
+ACT_MIN = 0.5  # sous ce niveau d'activite, la bande est consideree figee (fond)
 
 def scan(line):
     if len(line) < 10: return 0
@@ -41,6 +45,21 @@ def true_rect(box, t0, t1):
     if nw < 16 or nh < 16: return None
     return (x+L, y+T, nw, nh)
 
+def strip_act(b, t0, t1):
+    # activite temporelle max inter-frames d'une bande ; bande trop petite ou
+    # non mesurable -> 1e9 (= consideree vivante, le flag est garde par prudence)
+    x0 = max(0, int(b[0])); y0 = max(0, int(b[1]))
+    x1 = min(W, int(b[2])); y1 = min(H, int(b[3]))
+    if x1-x0 < 3 or y1-y0 < 3: return 1e9
+    fs = []
+    for frac in (0.3, 0.5, 0.7):
+        cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac)*1000.0)
+        ok, img = cap.read()
+        if not ok: continue
+        fs.append(cv2.cvtColor(img[y0:y1, x0:x1], cv2.COLOR_BGR2GRAY).astype('float32'))
+    if len(fs) < 2: return 1e9
+    return max(float(np.abs(a-c).mean()) for a, c in zip(fs, fs[1:]))
+
 fails = []
 pips = [s for s in hm if s["host"] == "pip" and s.get("bbox")]
 for s in pips:
@@ -53,7 +72,14 @@ for s in pips:
     if tr is None: continue
     cx, cy, cw, ch = tr
     tol = 0.015*min(W, H)
-    if (cx < mx-tol) or (cy < my-tol) or (cx+cw > mx+mw+tol) or (cy+ch > my+mh+tol):
+    iy0 = max(cy, my); iy1 = min(cy+ch, my+mh)
+    ix0 = max(cx, mx); ix1 = min(cx+cw, mx+mw)
+    sides = []
+    if cx < mx-tol: sides.append((cx, iy0, mx, iy1))
+    if cy < my-tol: sides.append((ix0, cy, ix1, my))
+    if cx+cw > mx+mw+tol: sides.append((mx+mw, iy0, cx+cw, iy1))
+    if cy+ch > my+mh+tol: sides.append((ix0, my+mh, ix1, cy+ch))
+    if sides and any(strip_act(b, s["start"], s["end"]) > ACT_MIN for b in sides):
         fails.append({"t": round((s["start"]+s["end"])/2, 1), "type": "SOUS-COUVERTURE",
                       "carte": [round(cx/W,3), round(cy/H,3), round(cw/W,3), round(ch/H,3)],
                       "masque": [round(v,3) for v in bb]})
