@@ -119,6 +119,7 @@ print("clusters identite: %d | narrateur: %d/%d visages" % (len(cents), narr["n"
 
 # ---- PASS 3 : decision par sample ----
 decisions = []   # (t, "hero"|"pip"|None, box)
+_prev_big = []   # centres des visages a carte plein cadre du sample precedent
 for s in samples:
     cands = [fc for fc in s["faces"]
              if _cos(fc["feat"], narr_feat) >= COS_SAME and fc["mo"] >= MOTION_MIN]
@@ -136,11 +137,31 @@ for s in samples:
         # rate les bords ne l'est pas (O58 cx=0.88, faceH=0.22 -> faux hero 80-286s,
         # avatar plein ecran sur la page). Mesure : pips de coin cx~0.89.
         cx = (fc["f"][0]+fc["f"][2]/2)/W
-        return ((fc["card"][2] > 0.85 and fc["card"][3] > 0.85)
-                or fc["f"][3]/H > 0.40
+        # LIBRE exige aussi que la carte MESUREE autour du visage soit grande : 4D7 a
+        # le visage du narrateur DANS le contenu (embed vertical w=0.23 a cx=0.33,
+        # faceH=0.30, bounded=False) -> 3 scenes pip classees hero. Un vrai narrateur
+        # libre n'a pas de petit panneau mesurable autour de lui ; un visage dont la
+        # carte fait <0.5 d'un cote vit dans un panneau de contenu -> pas hero.
+        return (fc["f"][3]/H > 0.40
                 or (not fc.get("bounded", True) and fc["f"][3]/H > 0.20
-                    and 0.25 < cx < 0.75))
-    bigface = any(_heroish(fc) and fc["mo"] >= MOTION_MIN for fc in s["faces"])
+                    and 0.25 < cx < 0.75
+                    and fc["card"][2] > 0.5 and fc["card"][3] > 0.5))
+    # carte plein cadre : traite A PART, avec DEUX gates (4D7 : scroll de grille de
+    # vignettes -> card_extent gonfle a [0,0,1,1] -> 3 scenes pip classees hero) :
+    #   1. visage central (vrai talking-head plein cadre est cadre central, TzJC
+    #      cx=0.51 ; pip de coin cx~0.87 exclu) ;
+    #   2. PERSISTANCE POSITIONNELLE : meme visage, meme place, 2 samples consecutifs.
+    #      Une vignette de contenu traversee par un scroll a carte plein cadre + visage
+    #      central mais SE DEPLACE puis disparait ; un talking-head reste en place.
+    def _bigcard(fc):
+        cx = (fc["f"][0]+fc["f"][2]/2)/W
+        return (fc["card"][2] > 0.85 and fc["card"][3] > 0.85 and 0.25 < cx < 0.75)
+    _cur_big = [((fc["f"][0]+fc["f"][2]/2)/W, (fc["f"][1]+fc["f"][3]/2)/H)
+                for fc in s["faces"] if _bigcard(fc) and fc["mo"] >= MOTION_MIN]
+    _stable_big = any(abs(cx-px) < 0.05 and abs(cy-py) < 0.05
+                      for cx, cy in _cur_big for px, py in _prev_big)
+    _prev_big = _cur_big
+    bigface = _stable_big or any(_heroish(fc) and fc["mo"] >= MOTION_MIN for fc in s["faces"])
     if not cands and not bigface:
         decisions.append((s["t"], None, None)); continue
     if bigface or any(_heroish(fc) for fc in cands):
