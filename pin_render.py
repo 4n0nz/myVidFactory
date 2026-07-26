@@ -313,7 +313,7 @@ for p in pips:
             shp = "rect"   # patch anti-fuite : l'ellipse ne couvre pas les coins de l'union
                            # (pLos popout : tete qui depasse du cercle -> boucle QC sterile)
         abox = _motion_extend(list(abox), p["t0"], p["t1"])
-        if abox[2]*abox[3] > 0.85:
+        if abox[2]*abox[3] > 0.85 or (p.get("pident") and abox[2]*abox[3] > 0.5):
             # l'extension revele un corps quasi plein cadre -> narrateur libre -> hero
             p["seg"]["host"] = "hero"; p["seg"]["bbox"] = None
             p["hero"] = True
