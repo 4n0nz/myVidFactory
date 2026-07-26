@@ -469,6 +469,24 @@ for p in pips:
     if p.get("hero"): continue
     p["abox"] = _ring_scene(list(p["abox"]), p["t0"], p["t1"])
 
+# RE-UNIFICATION post-anneau : l'anneau par scene etend selon le mouvement LOCAL de
+# chaque scene -> micro-divergences sur le MEME pip physique (4D7 : 0.213/0.225/0.26,
+# SAUT-DE-BOX t=11 au retour de hero) qui defont l'unification faite plus haut.
+# Petite extension (aire <=1.35x la box commune du groupe) = bruit de mesure -> union
+# appliquee a tout le groupe (monotone : chaque extension reste couverte). Grosse
+# divergence (>1.35x) = vrai layout de scene (Id9G 16-19s colonne narrateur floute,
+# ~2.5x) -> la scene garde sa box propre, on ne propage pas une colonne au groupe.
+for g in groups:
+    ga = g["box"][2]*g["box"][3]
+    small = [p for p in g["members"] if not p.get("hero")
+             and p["abox"][2]*p["abox"][3] <= 1.35*ga]
+    if len(small) < 2: continue
+    x0 = min(p["abox"][0] for p in small); y0 = min(p["abox"][1] for p in small)
+    x1 = max(p["abox"][0]+p["abox"][2] for p in small)
+    y1 = max(p["abox"][1]+p["abox"][3] for p in small)
+    ub = [round(x0,4), round(y0,4), round(x1-x0,4), round(y1-y0,4)]
+    for p in small: p["abox"] = list(ub)
+
 # dessin : UN masque par (box finale, forme)
 _mask={}; mi=0
 for p in pips:
