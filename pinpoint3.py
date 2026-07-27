@@ -34,6 +34,7 @@ yfd = cv2.FaceDetectorYN.create(VG+"/face_detection_yunet_2023mar.onnx", "", (W,
 rec = cv2.FaceRecognizerSF.create(VG+"/face_recognition_sface_2021dec.onnx", "")
 
 STEP = 1.0
+FINE = 0.25           # pas de la sonde fine (PASS 5 et PASS 6)
 COS_SAME = 0.363      # seuil standard SFace meme personne
 # Decider qu'une CARTE du narrateur existe demande bien plus que le seuil de fuite :
 # le narrateur apparait aussi DANS le contenu b-roll (photo de groupe, plan d'atelier)
@@ -270,6 +271,40 @@ def _clid(card):
     # que FANTOME) plutot que de lui inventer un layout.
     return -1
 
+def _hero_at(t):
+    """Le narrateur remplit-il le cadre a t ? (les deux criteres du hero : GROS visage
+    et identite franche). Frame illisible = oui : on sur-couvre, jamais l'inverse."""
+    fr = _frame(t)
+    if fr is None: return True
+    _, fs = yfd.detect(fr)
+    if fs is None: return False
+    for f in fs:
+        if f[3]/float(H) < 0.30: continue
+        try:
+            ft = rec.feature(rec.alignCrop(fr, f)).flatten().astype(np.float32)
+        except Exception:
+            continue
+        if _cos(ft, narr_feat) >= COS_PIP: return True
+    return False
+
+def _hero_start(t):
+    # Le debut d'un hero etait recule de 1.0s en AVEUGLE : avec STEP=1.0 la coupe tombe
+    # entre deux samples et on sur-couvrait pour ne pas laisser le narrateur LIVE a nu.
+    # Mais ce rembourrage peint le PLEIN CADRE sur le plan precedent : eglV, le narrateur
+    # live commence a 38.7 et le premier sample hero est a 39.0 -> scene des 38.0 -> 0.5s
+    # de vert sur 100% de la photo d'atelier (mesure greenscan passe 15 : scene 38.0-38.5
+    # aire 100%), alors que le verdict Boss du 27/07 07h50 exige ZERO vert sur ce b-roll.
+    # On MESURE la coupe : pas de 0.25s en arriere tant que _hero_at repond oui, jamais
+    # plus loin que l'ancien 1.0s. Mesures eglV a la coupe : t=38.75 fh 0.449 cos 0.912
+    # (live) contre t=38.5 fh 0.111/0.148 cos 0.638/0.191 (photo d'atelier) - la marche
+    # s'arrete pile sur la coupe. Si le visage du hero n'est pas detectable dans la
+    # fenetre reculee, il ne l'est pas non plus pour qc_ident, qui reste le filet.
+    lo = max(0.0, t - 1.0)
+    tb = round(t - FINE, 3)
+    while tb >= lo - 1e-6 and _hero_at(tb):
+        t = tb; tb = round(tb - FINE, 3)
+    return max(0.0, t)
+
 # ---- PASS 5 : scenes = runs de (kind, cluster) ; trous <= 4 ; hero prioritaire ----
 scenes = []; cur = None; miss = 0
 for t, kind, card in decisions:
@@ -288,7 +323,7 @@ for t, kind, card in decisions:
     if cur and cur["key"] == key:
         cur["end"] = t + STEP; miss = 0
     else:
-        start = max(0.0, t-1.0) if key[0] == "hero" else max(0.0, t-0.5)
+        start = _hero_start(t) if key[0] == "hero" else max(0.0, t-0.5)
         if cur:
             if key[0] == "hero" and cur["end"] > start: cur["end"] = start
             scenes.append(cur)
@@ -371,7 +406,6 @@ out = merged2
 #     la carte est prouvee sous lui. 4 sondes consecutives absentes = carte vraiment
 #     partie (YuNet ne rate jamais autant une carte statique : 8-10s = 100% hits).
 #     Sonde illisible (NOFRAME) = presence : on sur-couvre, jamais l'inverse.
-FINE = 0.25
 
 def _card_at(t, box, strict=False):
     fr = _frame(t)
@@ -453,7 +487,17 @@ for i, s in enumerate(out):
         ns = max(lo, trues[0] - FINE / 2.0)
     ne = min(hi, trues[-1] + FINE / 2.0)
     if prev_h and ns < out[i-1]["end"]:
-        out[i-1]["end"] = round(max(out[i-1]["start"] + 0.5, ns), 2)
+        # Pas de plancher de duree sur le hero rogne : les sondes viennent de PROUVER que
+        # la carte du pip est presente des ns, donc l'intervalle [start, ns] du hero est
+        # du rembourrage, pas un plan. Le plancher +0.5 le ressuscitait par-dessus le
+        # debut du pip, et comme la normalisation des chevauchements rogne la scene
+        # PRECEDENTE (= le pip, qui commence plus tot), le pip tombait a 0.125s et etait
+        # jete : eglV, le narrateur LIVE 38.6-42.6 disparaissait du host_map, 3.4s de
+        # visage a nu (verdict Boss 27/07 07h25 : une carte sans vert est aussi grave
+        # qu'un vert sans carte). Un hero reduit a zero est supprime par la
+        # normalisation, et c'est correct : la scene pip qui l'absorbe contient le visage
+        # par construction (la sonde exige son centre DANS la box).
+        out[i-1]["end"] = round(max(out[i-1]["start"], ns), 2)
     if next_h and ne > out[i+1]["start"]:
         out[i+1]["start"] = round(min(out[i+1]["end"] - 0.5, ne), 2)
     # scission uniquement sur trous PROUVES par sondes contigues : un trou qui
@@ -486,10 +530,17 @@ out.sort(key=lambda s: s["start"])
 # (une carte prouvee tard prime sur du padding).
 norm = []
 for s in out:
+    # Une scene trop courte pour etre gardee ne doit ROGNER PERSONNE. Sinon un fragment
+    # de 0.1s tue une scene de 4s puis se fait jeter lui-meme = trou de couverture cree
+    # de rien. eglV : le hero 38.75 rogne a duree nulle par la sonde du pip se triait
+    # APRES le debut du pip (38.62), ramenait le pip live 38.62-42.62 a 0.13s -> jete ->
+    # 3.9s du narrateur LIVE a nu (verdict Boss 27/07 07h25). On jette d'abord, on rogne
+    # ensuite.
+    if s["end"] - s["start"] < 0.3: continue
     if norm and s["start"] < norm[-1]["end"] - 1e-6:
         norm[-1]["end"] = round(max(norm[-1]["start"], s["start"]), 2)
         if norm[-1]["end"] - norm[-1]["start"] < 0.3: norm.pop()
-    if s["end"] - s["start"] >= 0.3: norm.append(s)
+    norm.append(s)
 out = norm
 
 # bords temporels : une scene qui demarre dans les 5 premieres secondes s'etend a 0
