@@ -260,19 +260,26 @@ def _clid(card):
         d = (cx-c["cx"])**2 + (cy-c["cy"])**2
         if d < best: best, bi = d, i
     if bi >= 0: return bi
-    for i, c in enumerate(pclust):
-        d = (cx-c["cx"])**2 + (cy-c["cy"])**2
-        if d < best: best, bi = d, i
-    return bi
+    # ORPHELIN : aucun cluster ne matche EN TAILLE. L'ancien repli prenait le cluster le
+    # plus proche en CENTRE en ignorant la taille, donc un sample isole heritait d'une box
+    # jusqu'a 10x la sienne : eglV 37.5-38, le visage du narrateur DANS le b-roll atelier
+    # (carte ~0.09x0.30) heritait du cluster "narrateur live plein cadre" (0.42x1.00) et
+    # peignait une colonne verte sur 69% du b-roll, que le verdict Boss du 27/07 07h50
+    # exige INTACT. Un sample que ni la position ni la taille ne rattachent a un layout
+    # stable n'est pas un pip : c'est du contenu. On le laisse tomber (meme traitement
+    # que FANTOME) plutot que de lui inventer un layout.
+    return -1
 
 # ---- PASS 5 : scenes = runs de (kind, cluster) ; trous <= 4 ; hero prioritaire ----
 scenes = []; cur = None; miss = 0
 for t, kind, card in decisions:
-    if kind == "pip" and pclust and pclust[_clid(card)]["ghost"]:
-        kind = None; card = None
-    elif kind == "pip" and pclust and pclust[_clid(card)]["hero"]:
-        kind = "hero"
-    key = ("hero", None) if kind == "hero" else (("pip", _clid(card)) if kind == "pip" else None)
+    ci = _clid(card) if (kind == "pip" and pclust) else -1
+    if kind == "pip" and pclust:
+        if ci < 0 or pclust[ci]["ghost"]:
+            kind = None; card = None
+        elif pclust[ci]["hero"]:
+            kind = "hero"
+    key = ("hero", None) if kind == "hero" else (("pip", ci) if kind == "pip" else None)
     if key is None:
         if cur:
             miss += 1
