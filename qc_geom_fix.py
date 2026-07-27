@@ -40,21 +40,23 @@ for f in fails:
         if s["region"] != "hero" and s["start"] <= t <= s["end"]:
             if f["type"] == "SOUS-COUVERTURE":
                 ub = union(s["box"], f["carte"])
-                small = ub[2]*ub[3] <= 1.15 * s["box"][2]*s["box"][3]
-                if not _cons_matched(s["box"]):
-                    s["box"] = ub; s["patched"] = True; n += 1
-                elif small:
-                    # scene consensus : SEUL un petit ajustement de bord passe (<=15%
-                    # d'aire, sliver Id9G t=17.5). Les grosses unions (true_rect qui
-                    # surestime, 4D7 +60%) restent bloquees. patched_keep = respecte
-                    # par pin_render (le consensus ne l'ecrase pas).
-                    s["box"] = ub; s["patched"] = True; s["patched_keep"] = True; n += 1
+                # patched_keep SYSTEMATIQUE : pin_render remplace toute box non-keep
+                # par le cluster consensus -> les unions des tours geom etaient
+                # ecrasees au re-render (eglV passe 7 : 33/35/37 unionnees aux tours
+                # 1-2, masque final = box pinpoint intacte, boucle sterile x3).
+                # Le flag SOUS-COUVERTURE est deja gate par strip_act (bande vivante
+                # prouvee) et true_rect est a fenetre adaptative : la mesure vaut
+                # plus que le consensus la ou une fuite est PROUVEE. (l'ancien
+                # blocage des grosses unions protegeait 4D7 des true_rect surestimes
+                # d'AVANT le gate strip_act ; regression 4D7 re-verifiee 27/07.)
+                s["box"] = ub; s["patched"] = True; s["patched_keep"] = True; n += 1
             # TROP-GRAND : PAS de resserrage automatique — les deux boucles correctives
             # s'ecrasaient mutuellement (ident elargit, geom resserre) -> oscillation
             # destructrice, gb5 LEAK_242. Corrections MONOTONES (grandir seulement) =
             # convergence garantie ; trop-grand reste au rapport, traite a la main.
             b = s["box"]
-            adjusted[(round(b[0]+b[2]/2,1), round(b[1]+b[3]/2,1))] = (list(b), bool(s.get("patched")))
+            adjusted[(round(b[0]+b[2]/2,1), round(b[1]+b[3]/2,1))] = \
+                (list(b), bool(s.get("patched")), bool(s.get("patched_keep")))
             break
 
 # harmonisation : les scenes de la meme position prennent la box ajustee (pas de saut)
@@ -62,9 +64,10 @@ for s in pin:
     if s["region"] == "hero": continue
     b = s["box"]; key = (round(b[0]+b[2]/2,1), round(b[1]+b[3]/2,1))
     if key in adjusted:
-        nb, pt = adjusted[key]
+        nb, pt, pk = adjusted[key]
         s["box"] = list(nb)
         if pt: s["patched"] = True
+        if pk: s["patched_keep"] = True
 
 # FAUX-HERO -> la scene hero redevient pip avec la box du cluster pip dominant
 # (le narrateur ne se teleporte pas ; la scene hero etait une misclassification

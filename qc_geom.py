@@ -27,23 +27,42 @@ def scan(line):
     return 0
 
 def true_rect(box, t0, t1):
-    x = int(box[0]*W); y = int(box[1]*H); w = max(8, int(box[2]*W)); h = max(8, int(box[3]*H))
-    x = max(0, min(W-w, x)); y = max(0, min(H-h, y))
-    res = []
-    for frac in (0.3, 0.5, 0.7):
-        cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac)*1000.0)
-        ok, img = cap.read()
-        if not ok: continue
-        img = img.astype('float32')
-        row = img[y+h//2, x:x+w]; col = img[y:y+h, x+w//2]
-        res.append((scan(row[:w//2]), scan(row[::-1][:w//2]),
-                    scan(col[:h//2]), scan(col[::-1][:h//2])))
-    if len(res) < 2: return None
-    med = [sorted(r[i] for r in res)[len(res)//2] for i in range(4)]
-    L, R, T, B = med
-    nw = w-L-R; nh = h-T-B
-    if nw < 16 or nh < 16: return None
-    return (x+L, y+T, nw, nh)
+    # fenetre adaptative : si la carte mesuree COLLE a un bord de fenetre (<2% cadre),
+    # la fenetre demarre DANS la carte (eglV t=33 : masque [0.3,0,0.47,1.0] mais carte
+    # reelle x=0.075 -> la reference scan() = contenu de carte, pas le fond, mesure
+    # tronquee au bord de fenetre -> SOUS-COUVERTURE sterile 3 tours, l'union ne
+    # grandit que de la fenetre). On pousse le cote colle de 0.12 et on re-mesure
+    # (<=4 fois) jusqu'a decoller ou atteindre l'ecran. Fenetres deja au bord ecran
+    # (pips de coin 4D7) : cote non poussable, comportement inchange.
+    bx = list(box)
+    rect = None
+    for _ in range(4):
+        x = int(bx[0]*W); y = int(bx[1]*H); w = max(8, int(bx[2]*W)); h = max(8, int(bx[3]*H))
+        x = max(0, min(W-w, x)); y = max(0, min(H-h, y))
+        res = []
+        for frac in (0.3, 0.5, 0.7):
+            cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac)*1000.0)
+            ok, img = cap.read()
+            if not ok: continue
+            img = img.astype('float32')
+            row = img[y+h//2, x:x+w]; col = img[y:y+h, x+w//2]
+            res.append((scan(row[:w//2]), scan(row[::-1][:w//2]),
+                        scan(col[:h//2]), scan(col[::-1][:h//2])))
+        if len(res) < 2: return None
+        med = [sorted(r[i] for r in res)[len(res)//2] for i in range(4)]
+        L, R, T, B = med
+        nw = w-L-R; nh = h-T-B
+        if nw < 16 or nh < 16: return None
+        rect = (x+L, y+T, nw, nh)
+        gl = 0.12 if (L < 0.02*W and x > 0) else 0.0
+        gr = 0.12 if (R < 0.02*W and x+w < W) else 0.0
+        gt = 0.12 if (T < 0.02*H and y > 0) else 0.0
+        gb = 0.12 if (B < 0.02*H and y+h < H) else 0.0
+        if not (gl or gr or gt or gb): return rect
+        nx = max(0.0, bx[0]-gl); ny = max(0.0, bx[1]-gt)
+        bx = [nx, ny,
+              min(1.0-nx, bx[2]+(bx[0]-nx)+gr), min(1.0-ny, bx[3]+(bx[1]-ny)+gb)]
+    return rect
 
 def strip_act(b, t0, t1):
     # activite temporelle max inter-frames d'une bande ; bande trop petite ou
