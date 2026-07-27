@@ -77,7 +77,18 @@ while t < DUR:
             # verdict Boss ; l'anneau d'entourage seul ne suffit pas, l'inertie de fin
             # de scroll [1.5-6.9] chevauche un vrai hero calme [1.67]).
             big = f[3]/H > 0.38
-            if not big and _cos(feat, narr) < 0.363: continue
+            # Le narrateur est aussi PRESENT PHYSIQUEMENT dans le b-roll (plan d'atelier,
+            # photo de groupe) : son visage y cos-matche au-dessus du seuil de fuite, qc_fix
+            # en fait un patch, pin_render le promeut hero -> ecran vert sur du contenu qui
+            # doit rester INTACT (verdict Boss 27/07 07h50 : la presence physique du
+            # narrateur dans un plan d'evenement ne declenche RIEN). Une FUITE, elle, est
+            # le narrateur LIVE (sa carte webcam ou un plan face-camera) : identite franche.
+            # Mesures eglV source : b-roll 29-38 cos 0.41-0.71 (h 0.06-0.19) contre live
+            # 39-45 cos 0.89-0.93 — les deux nuages ne se touchent pas, seuil a 0.75
+            # (= COS_PIP de pinpoint3, meme doctrine : identite exigee pour couvrir).
+            _c = _cos(feat, narr)
+            if 0.363 <= _c < 0.75: continue
+            if not big and _c < 0.363: continue
             x=max(0,int(f[0])); y=max(0,int(f[1])); w=int(f[2]); h=int(f[3])
             if big and _cos(feat, narr) < 0.363:
                 # gros visage d'identite INCONNUE : le contenu peut en montrer (4D7 :
