@@ -33,6 +33,11 @@ def _cons_box(b):
             return list(cb)
     return None
 
+SIZE_CONS = 0.70
+
+def _same_dim(a, b):
+    return min(a, b) / max(a, b, 1e-6) > SIZE_CONS
+
 def union(a, b):
     x0 = min(a[0], b[0]); y0 = min(a[1], b[1])
     x1 = max(a[0]+a[2], b[0]+b[2]); y1 = max(a[1]+a[3], b[1]+b[3])
@@ -56,7 +61,8 @@ for f in fails:
                 # (verdict Boss 27/07 00h20). Et comme le patch pose patched_keep, la
                 # box consensus ne pouvait plus jamais reprendre la main : le defaut
                 # etait fige pour toutes les passes suivantes.
-                base = _cons_box(s["box"]) or s["box"]
+                cb = _cons_box(s["box"])
+                base = cb or s["box"]
                 ub = union(base, f["carte"])
                 # patched_keep SYSTEMATIQUE : pin_render remplace toute box non-keep
                 # par le cluster consensus -> les unions des tours geom etaient
@@ -67,7 +73,22 @@ for f in fails:
                 # plus que le consensus la ou une fuite est PROUVEE. (l'ancien
                 # blocage des grosses unions protegeait 4D7 des true_rect surestimes
                 # d'AVANT le gate strip_act ; regression 4D7 re-verifiee 27/07.)
-                s["box"] = ub; s["patched"] = True; s["patched_keep"] = True; n += 1
+                # GARDE-FOU TAILLE : true_rect SURESTIME sur fond sombre (dit deja en
+                # tete de fichier) et sa fenetre adaptative peut pousser 4x0.12 par cote,
+                # si bien qu'une mesure ratee ne rate pas de peu : eglV passe 14, t=9.7
+                # renvoie carte=[0.004,0.261,0.645,0.731] alors que t=8.3 mesure la MEME
+                # carte a [0.024,0.558,0.211,0.427] et que le consensus (n=1335) dit
+                # 0.227x0.405. L'union a gonfle l'intro a 0.347 de large -> 300px de vert
+                # sur la page du navigateur, que le verdict Boss du 27/07 07h25 compte
+                # aussi grave qu'une carte a nu, et la meme scene ressortait TROP-GRAND
+                # (ratio 1.81) au tour suivant : les deux flags se contredisaient.
+                # Pire, la correction est MONOTONE et posee patched_keep : chaque tour
+                # ne pouvait que regonfler, jamais revenir. Une mesure qui contredit le
+                # consensus EN TAILLE (doctrine "un layout = position ET taille") est un
+                # artefact de mesure, pas une fuite : on ne patche pas, la scene garde sa
+                # box et pin_render lui rendra le consensus.
+                if cb is None or (_same_dim(cb[2], ub[2]) and _same_dim(cb[3], ub[3])):
+                    s["box"] = ub; s["patched"] = True; s["patched_keep"] = True; n += 1
             # TROP-GRAND : PAS de resserrage automatique — les deux boucles correctives
             # s'ecrasaient mutuellement (ident elargit, geom resserre) -> oscillation
             # destructrice, gb5 LEAK_242. Corrections MONOTONES (grandir seulement) =
