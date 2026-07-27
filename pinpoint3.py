@@ -35,6 +35,13 @@ rec = cv2.FaceRecognizerSF.create(VG+"/face_recognition_sface_2021dec.onnx", "")
 
 STEP = 1.0
 COS_SAME = 0.363      # seuil standard SFace meme personne
+# Decider qu'une CARTE du narrateur existe demande bien plus que le seuil de fuite :
+# le narrateur apparait aussi DANS le contenu b-roll (photo de groupe, plan d'atelier)
+# et y matche faiblement. Mesures eglV 1395s : pip live cos 0.80-0.93 a chaque sonde
+# (6/8.3/43.5/60/200/500/800/1000/1200/1300/1380) ; visage du narrateur DANS une photo
+# b-roll cos 0.55-0.69 (29.5-38.5). Couvrir ces derniers = vert par-dessus du contenu
+# qui doit rester INTACT (verdict Boss 27/07 07h50). Seuil a mi-chemin des deux nuages.
+COS_PIP = 0.75        # identite MEDIANE exigee d'un cluster pour etre une vraie carte
 COS_CLUST = 0.40      # assignation cluster identite
 MOTION_MIN = 0.35     # photo statique ~0.1, humain IMMOBILE ~0.5 (1.2 excluait le narrateur calme)
 FACE_MIN = 0.045      # visage < 4.5% H = vignette, pas la cam
@@ -119,6 +126,7 @@ print("clusters identite: %d | narrateur: %d/%d visages" % (len(cents), narr["n"
 
 # ---- PASS 3 : decision par sample ----
 decisions = []   # (t, "hero"|"pip"|None, box)
+pip_cos = {}     # t -> meilleur cos narrateur du sample (juge d'identite du cluster)
 _prev_big = []   # centres des visages a carte plein cadre du sample precedent
 for s in samples:
     cands = [fc for fc in s["faces"]
@@ -170,6 +178,7 @@ for s in samples:
         x0 = min(fc["card"][0] for fc in cands); y0 = min(fc["card"][1] for fc in cands)
         x1 = max(fc["card"][0]+fc["card"][2] for fc in cands)
         y1 = max(fc["card"][1]+fc["card"][3] for fc in cands)
+        pip_cos[s["t"]] = max(_cos(fc["feat"], narr_feat) for fc in cands)
         decisions.append((s["t"], "pip", [x0, y0, x1-x0, y1-y0]))
 
 # ---- PASS 4 : clusters de POSITION globaux (stabilisation) ----
@@ -181,11 +190,11 @@ for t, kind, card in decisions:
     for c in pclust:
         if abs(cx-c["cx"]) < 0.10 and abs(cy-c["cy"]) < 0.10: hit = c; break
     if hit is None:
-        pclust.append({"cx": cx, "cy": cy, "cards": [card]})
+        pclust.append({"cx": cx, "cy": cy, "cards": [card], "cos": [pip_cos.get(t, 0.0)]})
     else:
         n = len(hit["cards"])
         hit["cx"] = (hit["cx"]*n+cx)/(n+1); hit["cy"] = (hit["cy"]*n+cy)/(n+1)
-        hit["cards"].append(card)
+        hit["cards"].append(card); hit["cos"].append(pip_cos.get(t, 0.0))
 for c in pclust:
     cs = c["cards"]
     x0 = pc([a[0] for a in cs], 0.05); y0 = pc([a[1] for a in cs], 0.05)
@@ -199,7 +208,21 @@ for c in pclust:
     c["edges"] = edges
     # box quasi plein ecran = narrateur geant -> HERO propre, pas d'ellipse/rect plein ecran
     c["hero"] = (c["box"][2]*c["box"][3] > 0.85)
+    # FANTOME : le narrateur apparait aussi DANS le contenu (photo de groupe, plan
+    # d'atelier) ; son visage y matche, card_extent gonfle a la taille du visuel et on
+    # peint du vert sur des images qui doivent rester INTACTES (verdict Boss 27/07 07h50).
+    # Discriminant mesure : la carte pip vraie donne un cos MEDIAN eleve sur toute la
+    # video (eglV 0.87, 4D7 0.86) ; le narrateur noye dans un visuel donne 0.55-0.71
+    # (eglV 29.5-38.5). Median et non min : un pip legitime plonge quand il se detourne
+    # (4D7 39-45 : cos 0.48, aucun visage detecte 40-43) — le filtrer par sample
+    # fabriquerait un trou de sous-couverture.
+    _cs = sorted(c["cos"])
+    c["cosmed"] = _cs[len(_cs)//2] if _cs else 0.0
+    c["ghost"] = c["cosmed"] < COS_PIP
 print("clusters position (samples) : %d" % len(pclust))
+for i, c in enumerate(pclust):
+    print("  cluster %d : n=%d cos_median=%.3f box=[%.4f,%.4f,%.4f,%.4f]%s"
+          % (i, len(c["cards"]), c["cosmed"], *c["box"], "  FANTOME (ignore)" if c["ghost"] else ""))
 
 def _clid(card):
     cx, cy = card[0]+card[2]/2, card[1]+card[3]/2
@@ -212,7 +235,9 @@ def _clid(card):
 # ---- PASS 5 : scenes = runs de (kind, cluster) ; trous <= 4 ; hero prioritaire ----
 scenes = []; cur = None; miss = 0
 for t, kind, card in decisions:
-    if kind == "pip" and pclust and pclust[_clid(card)]["hero"]:
+    if kind == "pip" and pclust and pclust[_clid(card)]["ghost"]:
+        kind = None; card = None
+    elif kind == "pip" and pclust and pclust[_clid(card)]["hero"]:
         kind = "hero"
     key = ("hero", None) if kind == "hero" else (("pip", _clid(card)) if kind == "pip" else None)
     if key is None:
@@ -384,6 +409,21 @@ for i, s in enumerate(out):
         refined.append(ns2)
 out = refined
 out.sort(key=lambda s: s["start"])
+
+# NON-CHEVAUCHEMENT : build_seg concatene les scenes bout a bout. Deux scenes qui se
+# recouvrent dupliquent donc leur intersection dans le montage : la piste video s'allonge
+# et TOUT ce qui suit est decale (eglV passe 8 : scenes 36-40.5 / 37.5-42.6 / 39.5-40 ->
+# DESYNC(1401.6) sur une source de 1395s, et le vert se retrouve peint sur les mauvaises
+# frames). Le padding de debut de PASS 5 (t-0.5 / t-1.0) et les scissions de PASS 6 peuvent
+# reculer un debut sous la fin precedente : on rogne la scene precedente, jamais la suivante
+# (une carte prouvee tard prime sur du padding).
+norm = []
+for s in out:
+    if norm and s["start"] < norm[-1]["end"] - 1e-6:
+        norm[-1]["end"] = round(max(norm[-1]["start"], s["start"]), 2)
+        if norm[-1]["end"] - norm[-1]["start"] < 0.3: norm.pop()
+    if s["end"] - s["start"] >= 0.3: norm.append(s)
+out = norm
 
 # bords temporels : une scene qui demarre dans les 5 premieres secondes s'etend a 0
 # (fade-in = YuNet rate les 1res frames -> narrateur a decouvert des la seconde 0, SdMp) ;
