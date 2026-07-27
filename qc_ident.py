@@ -116,6 +116,26 @@ while t < DUR:
                 b = cv2.cvtColor(fr2[y:y+h, x:x+w], cv2.COLOR_BGR2GRAY)
                 if b.shape == a.shape and float(cv2.absdiff(a, b).mean()) < 0.3:
                     continue
+            if not big:
+                # persistance : un visage cos-matche dans le CONTENU (thumbnail de
+                # player, avatars de sidebar) se DEPLACE ou disparait pendant un
+                # scroll (eglV 1366 : non re-detecte a t+0.5) -> le check statique a
+                # position fixe le croit vivant, qc_fix l'unionne avec la box pip et
+                # cree un patch geant (eglV 1365-85, 0.68x0.77). Le narrateur LIVE
+                # persiste a ~la meme position (patron pinpoint3 2eb3563, deja
+                # applique aux big ci-dessus ; backstage camera epaule derive
+                # ~0.06/s < 0.08, mesure 27/07). La taille du visage NE separe PAS
+                # (thumbnail 0.131 > b-roll legitime 0.099-0.108).
+                fpers = _frame(min(t + 1.0, DUR - 0.1))
+                persist = False
+                if fpers is not None:
+                    _, pf = yfd.detect(fpers)
+                    if pf is not None:
+                        persist = any(abs((g[0]+g[2]/2)-(x+w/2))/W < 0.08
+                                      and abs((g[1]+g[3]/2)-(y+h/2))/H < 0.08
+                                      and 0.7 < g[3]/max(float(f[3]), 1e-6) < 1.43
+                                      for g in pf)
+                if not persist: continue
             leaks.append({"t": round(t,2), "box": [round(x/W,4), round(y/H,4),
                           round(w/W,4), round(h/H,4)]})
     t += 1.0
