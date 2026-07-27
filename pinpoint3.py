@@ -373,11 +373,12 @@ out = merged2
 #     Sonde illisible (NOFRAME) = presence : on sur-couvre, jamais l'inverse.
 FINE = 0.25
 
-def _card_at(t, box):
+def _card_at(t, box, strict=False):
     fr = _frame(t)
     if fr is None: return True
     _, fs = yfd.detect(fr)
     if fs is None: return False
+    thr = COS_PIP if strict else COS_SAME
     x0 = (box[0]-0.06)*W; y0 = (box[1]-0.06)*H
     x1 = (box[0]+box[2]+0.06)*W; y1 = (box[1]+box[3]+0.06)*H
     for f in fs:
@@ -387,14 +388,40 @@ def _card_at(t, box):
             ft = rec.feature(rec.alignCrop(fr, f)).flatten().astype(np.float32)
         except Exception:
             continue
-        if _cos(ft, narr_feat) >= COS_SAME: return True
+        if _cos(ft, narr_feat) >= thr: return True
     return False
 
 def _probe_zone(s, lo, hi):
+    # Sonde HORS de la portee propre de la scene = on cherche a MORDRE dans un hero
+    # voisin (extension +/-2.5s). Le seuil d'identite COS_SAME (0.363) y est trop
+    # laxiste : il ne distingue pas la CARTE du narrateur de son visage present comme
+    # CONTENU dans un plan b-roll. eglV, atelier 35-38.5 : le narrateur y figure parmi
+    # 4 personnes, YuNet le trouve centre dans la box de la scene voisine a cos
+    # 0.576-0.707. La sonde repondait PRESENT, la scene pip du narrateur live (39.5-43)
+    # etait donc etendue 2.5s en ARRIERE par-dessus le b-roll et rognait le hero
+    # legitime -> colonne verte sur 67% d'une photo qui doit rester INTACTE (verdict
+    # Boss 27/07 07h50). On exige donc COS_PIP (0.75) sur ces sondes-la : c'est
+    # exactement la mesure documentee en tete de fichier (pip live 0.80-0.93 vs
+    # narrateur dans une photo b-roll 0.55-0.69). Verifie sur les 4 zones d'extension
+    # d'eglV : les vraies cartes restent >= 0.765 (intro c1 9.0-10.25 : 0.868-0.927 ;
+    # outro c8 1384.25-1388.0 : 0.834-0.929 ; c0 904.0-906.5 : 0.765-0.912 ; c0
+    # 917.9-918.9 : 0.896-0.927), le contenu b-roll plafonne a 0.707. Deux nuages
+    # disjoints, 0.75 tombe dans le trou.
+    # Pourquoi PAS une garde de TAILLE (deux tentatives rejetees) : la sonde compare une
+    # carte ancree au visage de la frame a la box du CLUSTER, qui peut elle-meme etre
+    # aberrante. Outro c8 (box 0.6702 de large pour une carte de 0.35) : ratio 0.51-0.55,
+    # sous SIZE_SAME -> la vraie carte du narrateur declaree ABSENTE, 1.9s a nu. Le cos
+    # ne depend, lui, d'aucune box.
+    # Pourquoi seulement HORS portee : appliquee partout, la contrainte rend "absente"
+    # une scene entiere dont la box de cluster est mauvaise ; les pieces < 0.5s sont
+    # jetees et la scene disparait (teste : intro eglV 9.0-10.4 evaporee, 1.4s de carte
+    # a nu, aussi grave qu'un vert sans carte - verdict Boss 27/07 07h25).
     out_ = []
     t = lo
     while t <= hi + 1e-6:
-        out_.append((round(t, 3), _card_at(round(t, 3), s["box"])))
+        tt = round(t, 3)
+        out_.append((tt, _card_at(tt, s["box"],
+                                  tt < s["start"] - 1e-6 or tt > s["end"] + 1e-6)))
         t += FINE
     return out_
 
