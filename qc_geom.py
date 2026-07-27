@@ -101,6 +101,36 @@ for i in range(1, len(pips)):
         fails.append({"t": round(b["start"], 1), "type": "SAUT-DE-BOX",
                       "avant": [round(v,3) for v in ab], "apres": [round(v,3) for v in bbx]})
 
+# FAUX-HERO : les scenes hero n'avaient AUCUN controle (trou de juge — verdict Boss
+# 4D7 : 5 scenes hero alors que la source montre contenu + pip normal). Un vrai
+# talking-head plein cadre est VIVANT au centre ; une page + pip de coin n'a
+# d'activite que dans 1-2 cellules de bord. Grille 4x4 sur diff inter-frames.
+# mediane par cellule sur 5 paires rapprochees : le scroll de contenu est PONCTUEL
+# (il allume tout l'ecran sur 1-2 paires), le pip est vivant en continu — la mediane
+# tue le scroll, sinon le juge rate exactement les scenes que le scroll a fait
+# classer hero (4D7 : 3 rates sur 5 avec 3 frames espacees).
+for s in [s for s in hm if s["host"] == "hero"]:
+    acts = []
+    for frac in (0.15, 0.3, 0.5, 0.7, 0.85):
+        t = s["start"]+(s["end"]-s["start"])*frac
+        pair = []
+        for dt in (0.0, 0.3):
+            cap.set(cv2.CAP_PROP_POS_MSEC, (t+dt)*1000.0)
+            ok, img = cap.read()
+            if not ok: break
+            pair.append(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype('float32'))
+        if len(pair) < 2: continue
+        d = np.abs(pair[0]-pair[1])
+        gh, gw = d.shape[0]//4, d.shape[1]//4
+        acts.append([[float(d[r*gh:(r+1)*gh, c*gw:(c+1)*gw].mean()) for c in range(4)]
+                     for r in range(4)])
+    if len(acts) < 3: continue
+    med = [[sorted(a[r][c] for a in acts)[len(acts)//2] for c in range(4)] for r in range(4)]
+    cells = [(r, c) for r in range(4) for c in range(4) if med[r][c] > 1.0]
+    if len(cells) <= 2 and not any(r in (1, 2) and c in (1, 2) for r, c in cells):
+        fails.append({"t": round((s["start"]+s["end"])/2, 1), "type": "FAUX-HERO",
+                      "actives": len(cells)})
+
 cap.release()
 json.dump(fails, open(os.path.join(wd, "qc_geom.json"), "w"), indent=2)
 if fails:

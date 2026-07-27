@@ -66,5 +66,23 @@ for s in pin:
         s["box"] = list(nb)
         if pt: s["patched"] = True
 
+# FAUX-HERO -> la scene hero redevient pip avec la box du cluster pip dominant
+# (le narrateur ne se teleporte pas ; la scene hero etait une misclassification
+# scroll/contenu ou une promotion par patch identite fantome)
+_fh = [f for f in fails if f["type"] == "FAUX-HERO"]
+if _fh:
+    from collections import Counter
+    _bc = Counter(tuple(s["box"]) for s in pin if s["region"] != "hero")
+    if _bc:
+        _db = list(_bc.most_common(1)[0][0])
+        _ref = next(s for s in pin if s["region"] != "hero" and list(s["box"]) == _db)
+        for f in _fh:
+            for s in pin:
+                if s["region"] == "hero" and s["start"] <= f["t"] <= s["end"]:
+                    s["region"] = _ref["region"]; s["box"] = list(_db)
+                    s["edges"] = list(_ref.get("edges", [])); s["n"] = _ref.get("n", 0)
+                    s["patched"] = True; s["patched_faux_hero"] = True; n += 1
+                    break
+
 json.dump(pin, open(pinf, "w"), indent=2)
 print("qc_geom_fix: %d scenes ajustees" % n)
