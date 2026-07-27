@@ -20,12 +20,18 @@ if os.path.exists(_cp):
     try: _cons = json.load(open(_cp))
     except Exception: _cons = []
 def _cons_matched(b):
+    return _cons_box(b) is not None
+
+def _cons_box(b):
+    # box consensus du cluster qui correspond a cette scene, ou None.
     cx = b[0]+b[2]/2; cy = b[1]+b[3]/2
     for c in _cons:
         cb = c["box"]
+        if cb[2]*cb[3] > 0.85 or c.get("kind") == "hero":
+            continue   # cluster geant : pin_render ne l'applique pas non plus
         if abs(cx-(cb[0]+cb[2]/2)) < 0.15 and abs(cy-(cb[1]+cb[3]/2)) < 0.15:
-            return True
-    return False
+            return list(cb)
+    return None
 
 def union(a, b):
     x0 = min(a[0], b[0]); y0 = min(a[1], b[1])
@@ -39,7 +45,19 @@ for f in fails:
     for s in pin:
         if s["region"] != "hero" and s["start"] <= t <= s["end"]:
             if f["type"] == "SOUS-COUVERTURE":
-                ub = union(s["box"], f["carte"])
+                # REFERENTIEL : la carte a ete mesuree sur le RENDU, et le rendu d'une
+                # scene qui matche un cluster suit la box CONSENSUS, pas la box pinpoint.
+                # Unir dans le mauvais referentiel additionne les defauts de la box
+                # pinpoint a la correction : la carte-fallback de pinpoint3 (visage x3.0
+                # en hauteur, card_extent absent) descend jusqu'au bord bas du cadre, si
+                # bien que eglV rendait [0.016,0.4989,0.251,0.5011] la ou consensus U
+                # carte donne [0.015,0.5463,0.241,0.4297] -> vert colle au bas du cadre
+                # et marge gauche mangee alors que la carte source, elle, a ses marges
+                # (verdict Boss 27/07 00h20). Et comme le patch pose patched_keep, la
+                # box consensus ne pouvait plus jamais reprendre la main : le defaut
+                # etait fige pour toutes les passes suivantes.
+                base = _cons_box(s["box"]) or s["box"]
+                ub = union(base, f["carte"])
                 # patched_keep SYSTEMATIQUE : pin_render remplace toute box non-keep
                 # par le cluster consensus -> les unions des tours geom etaient
                 # ecrasees au re-render (eglV passe 7 : 33/35/37 unionnees aux tours
