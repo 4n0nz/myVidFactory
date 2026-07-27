@@ -395,11 +395,12 @@ def _ring_scene(box, t0, t1):
     Attrape les layouts de scene qui divergent du cluster (Id9G 16-19s : narrateur
     FLOUTE en fond de colonne droite, tete au-dessus de la box cluster — aucun visage
     detectable, ident aveugle, seule l'activite le voit). Monotone, cap 2.5x/dim."""
-    acc = np.zeros((H, W), np.uint8); n = 0
+    acc = np.zeros((H, W), np.uint8); n = 0; fs = []
     for frac in (0.15, 0.3, 0.5, 0.7, 0.85):
         cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac)*1000.0); ok1, a = cap.read()
         cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac+0.4)*1000.0); ok2, b = cap.read()
         if not (ok1 and ok2): continue
+        fs.append(a)
         acc += (cv2.absdiff(cv2.cvtColor(a, cv2.COLOR_BGR2GRAY),
                             cv2.cvtColor(b, cv2.COLOR_BGR2GRAY)) > 5).astype(np.uint8)
         n += 1
@@ -445,23 +446,46 @@ def _ring_scene(box, t0, t1):
             if (nx1-nx0) <= 2.5*w0 and (ny1-ny0) <= 2.5*h0:
                 bx0, by0, bx1, by1 = nx0, ny0, nx1, ny1
     # PLUS AUCUN SNAP AVEUGLE (verdict Boss : les avatars collaient presque toujours a
-    # 1-2 bords alors que le pip original garde sa marge). Extension au bord SEULEMENT
-    # sur PREUVE : bande restante (<10% ecran) contenant des pixels de personne (blob).
-    # og_i : chemise dans la bande 0.93-1.0 -> prolonge ; pip normal : marge de page
-    # vide -> respectee.
-    if m is not None:
-        if 0 < H-by1 < 0.10*H:
-            z = m[by1:H, bx0:bx1]
-            if z.size > 100 and float(z.mean()) > 0.05: by1 = H
-        if 0 < by0 < 0.10*H:
-            z = m[0:by0, bx0:bx1]
-            if z.size > 100 and float(z.mean()) > 0.05: by0 = 0
-        if 0 < W-bx1 < 0.10*W:
-            z = m[by0:by1, bx1:W]
-            if z.size > 100 and float(z.mean()) > 0.05: bx1 = W
-        if 0 < bx0 < 0.10*W:
-            z = m[by0:by1, 0:bx0]
-            if z.size > 100 and float(z.mean()) > 0.05: bx0 = 0
+    # 1-2 bords alors que le pip original garde sa marge). Extension au bord sur
+    # PREUVE, bande restante <10% ecran : (a) pixels de personne (blob — og_i chemise
+    # dans la bande 0.93-1.0) OU (b) CARTE-CONTINUE (verdict Boss 21h09 : le blob ne
+    # voit que la PERSONNE — un coin de carte sans personne dedans restait un sliver,
+    # 4D7 bande droite 0.955-1.0 = fauteuil/mur du narrateur, blob 0). Carte-continue
+    # = continuite couleur a travers le bord de box (diff moyenne par rangee/colonne,
+    # max canal : sliver mesure 22-26 vs vraie frontiere/marge 40-65 -> seuil 32) ET
+    # aucune ligne franche au bord ni dans la bande (frac de pixels a gradient
+    # transversal >20 par colonne/rangee : sliver <=0.40 vs bord de carte 0.51-0.77
+    # -> seuil 0.45), mediane sur les frames de la scene. Un pip a marge design garde
+    # sa marge (eglV gauche 2.8% : dc 57-64 -> bloque), une carte qui touche s'etend.
+    gs = [cv2.cvtColor(f, cv2.COLOR_BGR2GRAY).astype(np.float32) for f in fs]
+    def _med(v): return sorted(v)[len(v)//2]
+    def _cont_v(xe, lo, hi):
+        dcs, vfs = [], []
+        for f, g in zip(fs, gs):
+            a = f[by0:by1, max(0, xe-8):xe-2].astype(np.float32)
+            b = f[by0:by1, xe+2:min(W, xe+8)].astype(np.float32)
+            if not a.size or not b.size: continue
+            dcs.append(float(np.abs(a.mean(axis=1)-b.mean(axis=1)).mean(axis=0).max()))
+            x0, x1 = max(1, lo), min(W-1, hi)
+            d = np.abs(g[by0:by1, x0+1:x1+1]-g[by0:by1, x0-1:x1-1])
+            vfs.append(float((d > 20).mean(axis=0).max()) if d.size else 1.0)
+        return len(dcs) >= 3 and _med(dcs) < 32 and _med(vfs) < 0.45
+    def _cont_h(ye, lo, hi):
+        dcs, vfs = [], []
+        for f, g in zip(fs, gs):
+            a = f[max(0, ye-8):ye-2, bx0:bx1].astype(np.float32)
+            b = f[ye+2:min(H, ye+8), bx0:bx1].astype(np.float32)
+            if not a.size or not b.size: continue
+            dcs.append(float(np.abs(a.mean(axis=0)-b.mean(axis=0)).mean(axis=0).max()))
+            y0, y1 = max(1, lo), min(H-1, hi)
+            d = np.abs(g[y0+1:y1+1, bx0:bx1]-g[y0-1:y1-1, bx0:bx1])
+            vfs.append(float((d > 20).mean(axis=1).max()) if d.size else 1.0)
+        return len(dcs) >= 3 and _med(dcs) < 32 and _med(vfs) < 0.45
+    def _blob(z): return z.size > 100 and float(z.mean()) > 0.05
+    if 0 < H-by1 < 0.10*H and ((m is not None and _blob(m[by1:H, bx0:bx1])) or _cont_h(by1, by1-5, H-2)): by1 = H
+    if 0 < by0 < 0.10*H and ((m is not None and _blob(m[0:by0, bx0:bx1])) or _cont_h(by0, 2, by0+5)): by0 = 0
+    if 0 < W-bx1 < 0.10*W and ((m is not None and _blob(m[by0:by1, bx1:W])) or _cont_v(bx1, bx1-5, W-2)): bx1 = W
+    if 0 < bx0 < 0.10*W and ((m is not None and _blob(m[by0:by1, 0:bx0])) or _cont_v(bx0, 2, bx0+5)): bx0 = 0
     return [round(bx0/W,4), round(by0/H,4), round((bx1-bx0)/W,4), round((by1-by0)/H,4)]
 
 # anneau par scene sur TOUTES les box pip finales (consensus, pkeep, legacy)
