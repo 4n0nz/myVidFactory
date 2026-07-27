@@ -149,11 +149,10 @@ def _motion_extend(box, t0, t1):
         if x1 < 0.999 and _hot(y0, y1, x1, x1+0.08): x1 = min(1.0, x1+0.08); grown = True
         if x0 > 0.001 and _hot(y0, y1, x0-0.08, x0): x0 = max(0.0, x0-0.08); grown = True
         if not grown: break
-    # colle aux bords si proche (coherent avec le snap pinpoint)
-    if x0 < 0.08: x0 = 0.0
-    if y0 < 0.08: y0 = 0.0
-    if x1 > 0.92: x1 = 1.0
-    if y1 > 0.92: y1 = 1.0
+    # PLUS DE SNAP AVEUGLE ici (verdict Boss 2026-07-27 : la carte source flotte avec
+    # marge gauche+bas, le vert collait aux bords — eglV marge 0.0281 < 0.08 mangee).
+    # Toucher un bord = decision de _ring_scene SUR PREUVE (blob personne OU carte-
+    # continue), jamais de proximite seule. _motion_extend reste monotone sans snap.
     return [round(x0,4), round(y0,4), round(x1-x0,4), round(y1-y0,4)]
 
 def _pmean(img, px, py):
@@ -198,7 +197,19 @@ def _shape_src(box, t0, t1):
     return "rect90"
 
 def draw(box, shape, idx, mg=MG):
-    cx0=box[0]-box[2]*mg; cy0=box[1]-box[3]*mg; cw=box[2]*(1+2*mg); ch=box[3]*(1+2*mg)
+    # MARGE FIDELE (verdict Boss 2026-07-27 : la carte source flotte, le vert collait aux
+    # bords et depassait la carte). L'expansion mg par cote est CAPPEE a la moitie de
+    # l'ecart au bord d'ecran : une carte a marge design garde une marge visible ; flush
+    # seulement si la box touche deja (<=0.5% = touche, clamp plein autorise).
+    bx0, by0 = box[0], box[1]; bx1, by1 = box[0]+box[2], box[1]+box[3]
+    def _exp(amt, gap):
+        if gap <= 0.005: return amt          # touche deja -> expansion libre (clamp ecran)
+        return min(amt, gap*0.5)             # marge design -> on n'en mange que la moitie max
+    cx0 = bx0 - _exp(box[2]*mg, bx0)
+    cy0 = by0 - _exp(box[3]*mg, by0)
+    cx1 = bx1 + _exp(box[2]*mg, 1.0-bx1)
+    cy1 = by1 + _exp(box[3]*mg, 1.0-by1)
+    cw = cx1-cx0; ch = cy1-cy0
     x=int(cx0*W);y=int(cy0*H);w=max(4,int(cw*W));h=max(4,int(ch*H))
     x=max(0,min(W-w,x));y=max(0,min(H-h,y));  w=min(w,W-x); h=min(h,H-y)
     out=np.zeros((h,w),np.uint8)
@@ -243,7 +254,9 @@ for sc in pin:
     if sc["start"]>prev+0.3:
         segs.append({"host":"off","start":round(prev,2),"end":round(sc["start"],2),"bbox":None})
     if sc.get("region") == "hero" or sc["box"][2]*sc["box"][3] > 0.85 \
-            or (sc.get("src") != "ident" and is_hero(sc["start"], sc["end"], sc["box"])):
+            or ((sc.get("src") != "ident"
+                 or (sc["box"][3] > 0.9 and sc["box"][2] > 0.35))
+                and is_hero(sc["start"], sc["end"], sc["box"])):
         segs.append({"host":"hero","start":round(sc["start"],2),"end":round(sc["end"],2),"bbox":None})
         nhero+=1
     else:
@@ -395,17 +408,36 @@ def _ring_scene(box, t0, t1):
     Attrape les layouts de scene qui divergent du cluster (Id9G 16-19s : narrateur
     FLOUTE en fond de colonne droite, tete au-dessus de la box cluster — aucun visage
     detectable, ident aveugle, seule l'activite le voit). Monotone, cap 2.5x/dim."""
-    acc = np.zeros((H, W), np.uint8); n = 0; fs = []
+    acc = np.zeros((H, W), np.uint8); n = 0; fs = []; dms = []
     for frac in (0.15, 0.3, 0.5, 0.7, 0.85):
         cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac)*1000.0); ok1, a = cap.read()
         cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*frac+0.4)*1000.0); ok2, b = cap.read()
         if not (ok1 and ok2): continue
         fs.append(a)
-        acc += (cv2.absdiff(cv2.cvtColor(a, cv2.COLOR_BGR2GRAY),
-                            cv2.cvtColor(b, cv2.COLOR_BGR2GRAY)) > 5).astype(np.uint8)
+        _d = cv2.absdiff(cv2.cvtColor(a, cv2.COLOR_BGR2GRAY),
+                         cv2.cvtColor(b, cv2.COLOR_BGR2GRAY))
+        dms.append(_d.astype(np.float32))
+        acc += (_d > 5).astype(np.uint8)
         n += 1
     if n < 4: return box
+    # GARDE-SCROLL : si la frame bouge GLOBALEMENT (mediane >10% de pixels vifs =
+    # scroll/animation/b-roll), aucune bande n est mesurable -> pas d extension.
+    # (eglV intro 5.5-9 : 18% global, bandes a 25-34 d activite pure animation ;
+    # scene stable 43-906 : 4%. Verdict Boss 27/07, marge mangee par l intro.)
+    _ga = sorted(float((d > 5).mean()) for d in dms)[len(dms)//2] if dms else 0.0
+    if _ga > 0.10: return box
     sust = acc >= 3
+    def _alive(ya, yb, xa, xb):
+        # bande VIVANTE = contenu video (carte) ; statique = marge design (2ef79aa :
+        # fantomes 0.0, pire vrai bord 1.56 -> seuil 0.5). Sans vie, carte-continue
+        # est aveugle au cas carte-blanche-sur-marge-creme (eglV, verdict Boss 27/07).
+        vals = []
+        for d in dms:
+            z = d[max(0,ya):min(H,yb), max(0,xa):min(W,xb)]
+            if z.size: vals.append(float(z.mean()))
+        # seuil 1.0 : ombres/bruit sous la carte mesures 0.3-0.88 (eglV bande bas),
+        # vraie personne calme 1.67 (4D7), torse og_i >5. 0.5 laissait passer l ombre.
+        return len(vals) >= 3 and sorted(vals)[len(vals)//2] > 1.0
     bx0 = int(box[0]*W); by0 = int(box[1]*H)
     bx1 = bx0+int(box[2]*W); by1 = by0+int(box[3]*H)
     w0 = max(1, bx1-bx0); h0 = max(1, by1-by0)
@@ -417,8 +449,11 @@ def _ring_scene(box, t0, t1):
     aT = by0 < 0.25*H; aB = (H-by1) < 0.25*H
     aL = bx0 < 0.25*W; aR = (W-bx1) < 0.25*W
     def hot(xa, xb, ya, yb):
+        # frac de pixels vifs (>0.12) ET amplitude vivante (_alive) : le flicker
+        # d ombre sous une carte est ETENDU mais FAIBLE (0.45) -> bloque ; un torse/
+        # narrateur bouge fort (>1.67). (eglV bas de carte tire a 1.0, Boss 27/07)
         z = sust[max(0,ya):min(H,yb), max(0,xa):min(W,xb)]
-        return z.size > 100 and float(z.mean()) > 0.12
+        return z.size > 100 and float(z.mean()) > 0.12 and _alive(ya, yb, xa, xb)
     for _ in range(10):
         grew = False
         if aT and by0 > 0 and (by1-by0) < 2.5*h0 and hot(bx0, bx1, by0-band, by0):
@@ -434,29 +469,6 @@ def _ring_scene(box, t0, t1):
     # (og_i chemise blanche visible sous le vert, tous les juges aveugles : tete couverte
     # = pas de visage, presence=motion = contain OK). Le grabcut segmente le statique.
     # Union bornee par le meme cap 2.5x.
-    m, _ = webcam_mask.seg_mask(cap, W, H, t0, t1, [bx0/W, by0/H, (bx1-bx0)/W, (by1-by0)/H], yfd)
-    if m is not None:
-        ys, xs = np.nonzero(m)
-        if len(xs) > 2000:
-            # union blob CLAMPEE aux directions autorisees (vers bords d'ecran seulement)
-            nx0 = min(bx0, int(xs.min())) if aL else bx0
-            ny0 = min(by0, int(ys.min())) if aT else by0
-            nx1 = max(bx1, int(xs.max())+1) if aR else bx1
-            ny1 = max(by1, int(ys.max())+1) if aB else by1
-            if (nx1-nx0) <= 2.5*w0 and (ny1-ny0) <= 2.5*h0:
-                bx0, by0, bx1, by1 = nx0, ny0, nx1, ny1
-    # PLUS AUCUN SNAP AVEUGLE (verdict Boss : les avatars collaient presque toujours a
-    # 1-2 bords alors que le pip original garde sa marge). Extension au bord sur
-    # PREUVE, bande restante <10% ecran : (a) pixels de personne (blob — og_i chemise
-    # dans la bande 0.93-1.0) OU (b) CARTE-CONTINUE (verdict Boss 21h09 : le blob ne
-    # voit que la PERSONNE — un coin de carte sans personne dedans restait un sliver,
-    # 4D7 bande droite 0.955-1.0 = fauteuil/mur du narrateur, blob 0). Carte-continue
-    # = continuite couleur a travers le bord de box (diff moyenne par rangee/colonne,
-    # max canal : sliver mesure 22-26 vs vraie frontiere/marge 40-65 -> seuil 32) ET
-    # aucune ligne franche au bord ni dans la bande (frac de pixels a gradient
-    # transversal >20 par colonne/rangee : sliver <=0.40 vs bord de carte 0.51-0.77
-    # -> seuil 0.45), mediane sur les frames de la scene. Un pip a marge design garde
-    # sa marge (eglV gauche 2.8% : dc 57-64 -> bloque), une carte qui touche s'etend.
     gs = [cv2.cvtColor(f, cv2.COLOR_BGR2GRAY).astype(np.float32) for f in fs]
     def _med(v): return sorted(v)[len(v)//2]
     def _cont_v(xe, lo, hi):
@@ -481,11 +493,41 @@ def _ring_scene(box, t0, t1):
             d = np.abs(g[y0+1:y1+1, bx0:bx1]-g[y0-1:y1-1, bx0:bx1])
             vfs.append(float((d > 20).mean(axis=1).max()) if d.size else 1.0)
         return len(dcs) >= 3 and _med(dcs) < 32 and _med(vfs) < 0.45
+    m, _ = webcam_mask.seg_mask(cap, W, H, t0, t1, [bx0/W, by0/H, (bx1-bx0)/W, (by1-by0)/H], yfd)
+    if m is not None:
+        ys, xs = np.nonzero(m)
+        if len(xs) > 2000:
+            # union blob CLAMPEE aux directions autorisees (vers bords d'ecran seulement)
+            # chaque cote franchi exige CARTE-CONTINUE au bord de box : un blob
+            # statique DANS la carte (og_i chemise) traverse un faux bord (video des
+            # deux cotes -> continue) ; une bave grabcut sur la marge design traverse
+            # le VRAI bord de carte (video->creme, dc enorme) -> bloquee. Boss 27/07.
+            nx0 = min(bx0, int(xs.min())) if (aL and int(xs.min()) < bx0 and _cont_v(bx0, 2, bx0+5)) else bx0
+            ny0 = min(by0, int(ys.min())) if (aT and int(ys.min()) < by0 and _cont_h(by0, 2, by0+5)) else by0
+            nx1 = max(bx1, int(xs.max())+1) if (aR and int(xs.max())+1 > bx1 and _cont_v(bx1, bx1-5, W-2)) else bx1
+            ny1 = max(by1, int(ys.max())+1) if (aB and int(ys.max())+1 > by1 and _cont_h(by1, by1-5, H-2)) else by1
+            if (nx1-nx0) <= 2.5*w0 and (ny1-ny0) <= 2.5*h0:
+                bx0, by0, bx1, by1 = nx0, ny0, nx1, ny1
+    # PLUS AUCUN SNAP AVEUGLE (verdict Boss : les avatars collaient presque toujours a
+    # 1-2 bords alors que le pip original garde sa marge). Extension au bord sur
+    # PREUVE, bande restante <10% ecran : (a) pixels de personne (blob — og_i chemise
+    # dans la bande 0.93-1.0) OU (b) CARTE-CONTINUE (verdict Boss 21h09 : le blob ne
+    # voit que la PERSONNE — un coin de carte sans personne dedans restait un sliver,
+    # 4D7 bande droite 0.955-1.0 = fauteuil/mur du narrateur, blob 0). Carte-continue
+    # = continuite couleur a travers le bord de box (diff moyenne par rangee/colonne,
+    # max canal : sliver mesure 22-26 vs vraie frontiere/marge 40-65 -> seuil 32) ET
+    # aucune ligne franche au bord ni dans la bande (frac de pixels a gradient
+    # transversal >20 par colonne/rangee : sliver <=0.40 vs bord de carte 0.51-0.77
+    # -> seuil 0.45), mediane sur les frames de la scene. Un pip a marge design garde
+    # sa marge (eglV gauche 2.8% : dc 57-64 -> bloque), une carte qui touche s'etend.
     def _blob(z): return z.size > 100 and float(z.mean()) > 0.05
-    if 0 < H-by1 < 0.10*H and ((m is not None and _blob(m[by1:H, bx0:bx1])) or _cont_h(by1, by1-5, H-2)): by1 = H
-    if 0 < by0 < 0.10*H and ((m is not None and _blob(m[0:by0, bx0:bx1])) or _cont_h(by0, 2, by0+5)): by0 = 0
-    if 0 < W-bx1 < 0.10*W and ((m is not None and _blob(m[by0:by1, bx1:W])) or _cont_v(bx1, bx1-5, W-2)): bx1 = W
-    if 0 < bx0 < 0.10*W and ((m is not None and _blob(m[by0:by1, 0:bx0])) or _cont_v(bx0, 2, bx0+5)): bx0 = 0
+    # les DEUX preuves (blob personne, carte-continue) exigent une bande VIVANTE :
+    # grabcut bave sur une marge design statique et la declare personne (eglV creme,
+    # verdict Boss 27/07) ; une vraie personne/carte video bouge (og_i chemise, 4D7 mur).
+    if 0 < H-by1 < 0.10*H and _alive(by1, H, bx0, bx1) and ((m is not None and _blob(m[by1:H, bx0:bx1])) or _cont_h(by1, by1-5, H-2)): by1 = H
+    if 0 < by0 < 0.10*H and _alive(0, by0, bx0, bx1) and ((m is not None and _blob(m[0:by0, bx0:bx1])) or _cont_h(by0, 2, by0+5)): by0 = 0
+    if 0 < W-bx1 < 0.10*W and _alive(by0, by1, bx1, W) and ((m is not None and _blob(m[by0:by1, bx1:W])) or _cont_v(bx1, bx1-5, W-2)): bx1 = W
+    if 0 < bx0 < 0.10*W and _alive(by0, by1, 0, bx0) and ((m is not None and _blob(m[by0:by1, 0:bx0])) or _cont_v(bx0, 2, bx0+5)): bx0 = 0
     return [round(bx0/W,4), round(by0/H,4), round((bx1-bx0)/W,4), round((by1-by0)/H,4)]
 
 # anneau par scene sur TOUTES les box pip finales (consensus, pkeep, legacy)
@@ -505,9 +547,14 @@ for g in groups:
     small = [p for p in g["members"] if not p.get("hero")
              and p["abox"][2]*p["abox"][3] <= 1.35*ga]
     if len(small) < 2: continue
-    x0 = min(p["abox"][0] for p in small); y0 = min(p["abox"][1] for p in small)
-    x1 = max(p["abox"][0]+p["abox"][2] for p in small)
-    y1 = max(p["abox"][1]+p["abox"][3] for p in small)
+    # les scenes COURTES (<3 s = transitions/scrolls) ne VOTENT pas dans l union :
+    # pendant un scroll tout est vivant, leur anneau s etend jusqu aux bords et
+    # propageait x=0 aux 900 s stables du groupe (eglV marge mangee, verdict Boss
+    # 27/07). Elles RECOIVENT la box du groupe (couvertes), sans la dicter.
+    voters = [p for p in small if p["t1"] - p["t0"] >= 3.0] or small
+    x0 = min(p["abox"][0] for p in voters); y0 = min(p["abox"][1] for p in voters)
+    x1 = max(p["abox"][0]+p["abox"][2] for p in voters)
+    y1 = max(p["abox"][1]+p["abox"][3] for p in voters)
     ub = [round(x0,4), round(y0,4), round(x1-x0,4), round(y1-y0,4)]
     for p in small: p["abox"] = list(ub)
 
