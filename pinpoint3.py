@@ -43,6 +43,16 @@ COS_SAME = 0.363      # seuil standard SFace meme personne
 # qui doit rester INTACT (verdict Boss 27/07 07h50). Seuil a mi-chemin des deux nuages.
 COS_PIP = 0.75        # identite MEDIANE exigee d'un cluster pour etre une vraie carte
 COS_CLUST = 0.40      # assignation cluster identite
+SIZE_SAME = 0.55      # rapport de taille min pour que deux cartes soient le MEME layout
+# Un LAYOUT, c'est une position ET une taille. Regrouper sur le seul centre laisse un
+# sample parasite fonder un cluster qu'un vrai layout adopte ensuite : eglV t=33 (visage
+# du narrateur dans une photo de groupe, carte 0.108x0.296, cos 0.687) a cree le cluster
+# de centre (0.47,0.53), que les 21 samples du narrateur LIVE plein cadre (carte
+# 0.35x1.00, cos 0.90) ont rejoint. Le parasite heritait alors du cos MEDIAN 0.901 du
+# cluster, echappait au filtre FANTOME et devenait une scene pip -> promue hero plein
+# cadre -> vert sur la photo de groupe, qui doit rester INTACTE (verdict Boss 27/07
+# 07h50). Tolerance large (+/-45%) : le bruit de taille d'un vrai pip est de quelques %,
+# l'ecart parasite/layout est d'un facteur 3.
 MOTION_MIN = 0.35     # photo statique ~0.1, humain IMMOBILE ~0.5 (1.2 excluait le narrateur calme)
 FACE_MIN = 0.045      # visage < 4.5% H = vignette, pas la cam
 EDGE = 0.03           # snap-bord reduit : les pips gardent une marge design 2-5%, 8% collait tout aux bords (verdict Boss)
@@ -190,19 +200,26 @@ for s in samples:
         pip_cos[s["t"]] = max(_cos(fc["feat"], narr_feat) for fc in cands)
         decisions.append((s["t"], "pip", [x0, y0, x1-x0, y1-y0]))
 
-# ---- PASS 4 : clusters de POSITION globaux (stabilisation) ----
+# ---- PASS 4 : clusters de POSITION + TAILLE globaux (stabilisation) ----
+def _same_size(a, b):
+    return min(a, b) / max(a, b, 1e-6) > SIZE_SAME
+
 pclust = []
 for t, kind, card in decisions:
     if kind != "pip": continue
     cx, cy = card[0]+card[2]/2, card[1]+card[3]/2
     hit = None
     for c in pclust:
-        if abs(cx-c["cx"]) < 0.10 and abs(cy-c["cy"]) < 0.10: hit = c; break
+        if (abs(cx-c["cx"]) < 0.10 and abs(cy-c["cy"]) < 0.10
+                and _same_size(card[2], c["cw"]) and _same_size(card[3], c["ch"])):
+            hit = c; break
     if hit is None:
-        pclust.append({"cx": cx, "cy": cy, "cards": [card], "cos": [pip_cos.get(t, 0.0)]})
+        pclust.append({"cx": cx, "cy": cy, "cw": card[2], "ch": card[3],
+                       "cards": [card], "cos": [pip_cos.get(t, 0.0)]})
     else:
         n = len(hit["cards"])
         hit["cx"] = (hit["cx"]*n+cx)/(n+1); hit["cy"] = (hit["cy"]*n+cy)/(n+1)
+        hit["cw"] = (hit["cw"]*n+card[2])/(n+1); hit["ch"] = (hit["ch"]*n+card[3])/(n+1)
         hit["cards"].append(card); hit["cos"].append(pip_cos.get(t, 0.0))
 for c in pclust:
     cs = c["cards"]
@@ -234,8 +251,15 @@ for i, c in enumerate(pclust):
           % (i, len(c["cards"]), c["cosmed"], *c["box"], "  FANTOME (ignore)" if c["ghost"] else ""))
 
 def _clid(card):
+    # meme critere qu'a la construction, sinon un sample bati dans le cluster A serait
+    # relu dans le cluster B (plus proche en centre) et recupererait son verdict FANTOME.
     cx, cy = card[0]+card[2]/2, card[1]+card[3]/2
     best, bi = 1e9, -1
+    for i, c in enumerate(pclust):
+        if not (_same_size(card[2], c["cw"]) and _same_size(card[3], c["ch"])): continue
+        d = (cx-c["cx"])**2 + (cy-c["cy"])**2
+        if d < best: best, bi = d, i
+    if bi >= 0: return bi
     for i, c in enumerate(pclust):
         d = (cx-c["cx"])**2 + (cy-c["cy"])**2
         if d < best: best, bi = d, i
