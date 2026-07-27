@@ -283,6 +283,13 @@ def _cons_match(b):
     cx = b[0]+b[2]/2; cy = b[1]+b[3]/2
     best = None; bd = 9.0
     for c in _cons:
+        # cluster FAIBLE (votes nuls = jamais confirme par le vote multi-mesures,
+        # ex eglV cluster 2 [0.24,0,0.55,1.0] votes [0,0,0] n=31) : PAS d autorite —
+        # la scene retombe sur la mesure de carte reelle (b-roll 32-38 coupe par la
+        # colonne du faux cluster, verdict Boss 27/07). Les vrais clusters votent
+        # (eglV [80,0.97,0.68], 4D7 stable).
+        _v = c.get("votes") or [0, 0.0, 0.0]
+        if len(_v) > 1 and _v[1] < 0.3: continue
         cb = c["box"]; ccx = cb[0]+cb[2]/2; ccy = cb[1]+cb[3]/2
         near = abs(cx-ccx) < 0.15 and abs(cy-ccy) < 0.15
         inside = (b[0]-0.02 <= ccx <= b[0]+b[2]+0.02
