@@ -45,6 +45,35 @@ def covered_by_avatar(t, fb, fr=None, fr2=None):
                                     return False   # corps qui bouge sous le pip = hero rate
                     return True
     return False
+def _off_layout(t, fb):
+    """Le visage tombe-t-il LOIN de la carte que l'avatar couvre a t ?
+
+    Une FUITE est la carte du narrateur mal recouverte. Un visage qui matche son
+    identite AILLEURS dans le cadre est du CONTENU : eglV 1365-1369, la page filmee
+    montre sa PROPRE video (cx=0.580, cos 0.805-0.833, fh 0.127-0.131) pendant que sa
+    vraie carte est en bas a gauche (cx=0.135, cos 0.906-0.936). La garde de persistance
+    ne separe pas les deux (la video de la page garde le visage en place : cx 0.580 /
+    0.580 / 0.581 a 1366 / 1367 / 1368) et le cos non plus. qc_fix unissait donc les
+    deux fuites en UNE box [0.0089,0.1157,0.7724,0.8833] : 68% de l'ecran peint
+    par-dessus le site (mesure greenscan passe 15, bord BAS touche), alors que la source
+    a un pip rond avec ses marges. Meme doctrine que partout ailleurs dans la chaine :
+    un layout = une position ET une taille.
+
+    Tolerance 0.10 autour de la box : un popout deplace le centre de la carte de ~0.1 au
+    plus. Aucune scene a t (carte ratee de bout en bout par pinpoint3) -> on ne filtre
+    pas, la fuite reste. Les GROS visages (plein cadre) ne passent pas ici : un hero
+    rate se juge sur la taille, pas sur la position.
+    """
+    cx, cy = fb[0]+fb[2]/2.0, fb[1]+fb[3]/2.0
+    seen = False
+    for s in hmap:
+        if s["start"]-0.6 <= t <= s["end"]+0.6:
+            if s["host"] != "pip" or not s.get("bbox"): return False
+            b = s["bbox"]; seen = True
+            if (b[0]-0.10 <= cx <= b[0]+b[2]+0.10
+                    and b[1]-0.10 <= cy <= b[1]+b[3]+0.10): return False
+    return seen
+
 cap = cv2.VideoCapture(rend)
 W = int(cap.get(3)); H = int(cap.get(4)); DUR = cap.get(7)/(cap.get(5) or 30)
 yfd = cv2.FaceDetectorYN.create(VG+"/face_detection_yunet_2023mar.onnx", "", (W, H), score_threshold=0.6)
@@ -90,6 +119,7 @@ while t < DUR:
             if 0.363 <= _c < 0.75: continue
             if not big and _c < 0.363: continue
             x=max(0,int(f[0])); y=max(0,int(f[1])); w=int(f[2]); h=int(f[3])
+            if not big and _off_layout(t, [x/W, y/H, w/W, h/H]): continue
             if big and _cos(feat, narr) < 0.363:
                 # gros visage d'identite INCONNUE : le contenu peut en montrer (4D7 :
                 # carte template verticale avec preview video, faceH=0.29 -> flaggee
