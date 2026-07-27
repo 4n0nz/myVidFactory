@@ -304,11 +304,17 @@ pips=[]
 for sc in pin:
     if sc["start"]>prev+0.3:
         segs.append({"host":"off","start":round(prev,2),"end":round(sc["start"],2),"bbox":None})
+    # src=ident : promotion hero DETERMINISTE par _narr_live (SFace calibre, cos>=0.363
+    # et visage >=0.30 H). Le verdict VLM fullface est stochastique : (40,43)/(1391,95)
+    # flippaient hero<->pip d une passe a l autre (A/B 27/07 05h). VLM reste pour les
+    # sources sans narrator_feat.
     if sc.get("region") == "hero" or sc["box"][2]*sc["box"][3] > 0.85 \
-            or ((sc.get("src") != "ident"
-                 or (sc["box"][3] > 0.9 and sc["box"][2] > 0.35))
-                and is_hero(sc["start"], sc["end"], sc["box"],
-                            need_ident=(sc.get("src") == "ident"))):
+            or (sc.get("src") == "ident"
+                and ((sc["box"][3] > 0.9 and sc["box"][2] > 0.35)
+                     or sc["box"][2]*sc["box"][3] > 0.5)
+                and _narr_live(sc["start"], sc["end"])) \
+            or (sc.get("src") != "ident"
+                and is_hero(sc["start"], sc["end"], sc["box"])):
         segs.append({"host":"hero","start":round(sc["start"],2),"end":round(sc["end"],2),"bbox":None})
         nhero+=1
     else:
@@ -368,17 +374,22 @@ for p in pips:
     if not p.get("pident"):
         c = _cons_match(p["box"])
         if c is not None:
-            if (c.get("kind") == "hero" or c["box"][2]*c["box"][3] > 0.85)                     and (p.get("src") != "ident" or _narr_live(p["t0"], p["t1"])):
+            _big = c.get("kind") == "hero" or c["box"][2]*c["box"][3] > 0.85
+            if _big and (p.get("src") != "ident" or _narr_live(p["t0"], p["t1"])):
                 # cluster narrateur plein ecran (aucun bord de carte, visage central)
                 # -> HERO complet, jamais une box sur la tete (ADJj 0:08, verdict Boss).
                 # Scenes ident : narrateur LIVE exige (une carte de contenu peut couvrir
                 # l'ecran aussi — la couvrir en pip, pas la remplacer par l'avatar).
                 p["seg"]["host"] = "hero"; p["seg"]["bbox"] = None; p["hero"] = True
                 p["shape"], p["abox"] = "rect90", list(c["box"])
-            else:
+                continue
+            if not _big:
                 p["shape"], p["abox"] = c["shape"], list(c["box"])
                 p["cons"] = True
-            continue
+                continue
+            # cluster geant BLOQUE (scene ident, narrateur pas live) : appliquer sa box
+            # mangerait le contenu (verts geants photos 32-38 / screencasts 1365-78 eglV,
+    # frames 27/07 05h) — retomber sur la mesure locale de la scene
     key=tuple(p["box"])
     if key in _shape_cache and not p["patched"]:
         p["shape"],p["abox"]=_shape_cache[key]
@@ -387,16 +398,19 @@ for p in pips:
         if p["patched"] and shp == "ellipse":
             shp = "rect"   # patch anti-fuite : l'ellipse ne couvre pas les coins de l'union
                            # (pLos popout : tete qui depasse du cercle -> boucle QC sterile)
-        abox = _motion_extend(list(abox), p["t0"], p["t1"])
-        if (abox[2]*abox[3] > 0.85 or (p.get("pident") and abox[2]*abox[3] > 0.5))                 and (p.get("src") != "ident" or _narr_live(p["t0"], p["t1"])):
-            # l'extension revele un corps quasi plein cadre -> narrateur libre -> hero.
-            # Scenes ident sans narrateur live : PAS de promotion — l'extension venait
-            # de la carte elle-meme (photo de groupe eglV 32-34) ; la scene reste pip
-            # et sa box etendue la couvre (jamais moins couvrant qu'avant).
-            p["seg"]["host"] = "hero"; p["seg"]["bbox"] = None
-            p["hero"] = True
-            p["shape"], p["abox"] = "rect90", abox
-            continue
+        abox2 = _motion_extend(list(abox), p["t0"], p["t1"])
+        if abox2[2]*abox2[3] > 0.85 or (p.get("pident") and abox2[2]*abox2[3] > 0.5):
+            if p.get("src") != "ident" or _narr_live(p["t0"], p["t1"]):
+                # l'extension revele un corps quasi plein cadre -> narrateur libre -> hero.
+                p["seg"]["host"] = "hero"; p["seg"]["bbox"] = None
+                p["hero"] = True
+                p["shape"], p["abox"] = "rect90", abox2
+                continue
+            # extension geante SANS narrateur live : le motion venait du CONTENU
+            # (transitions photos, scroll screencast — verts geants eglV, frames 27/07
+            # 05h). Garder la mesure locale ; qc_ident rattrape toute fuite reelle.
+        else:
+            abox = abox2
         p["shape"],p["abox"]=shp,list(abox)
         if abox == p["box"] and not p["patched"]:
             _shape_cache[key]=(shp,list(abox))
