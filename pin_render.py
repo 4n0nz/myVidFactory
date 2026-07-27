@@ -233,19 +233,70 @@ def draw(box, shape, idx, mg=MG):
     p=os.path.join(mdir,"seg_%04d.png"%idx); cv2.imwrite(p,out)
     return p,[round(x/W,4),round(y/H,4),round(w/W,4),round(h/H,4)]
 
-def is_hero(t0, t1, box):
+_narr_ref = None
+_sface = None
+def _narr_match(fr):
+    """Vrai si un visage de la frame EST le narrateur (SFace cos >= 0.363, meme seuil
+    que qc_ident). Sert de gate identite a la promotion hero des scenes src=ident."""
+    global _narr_ref, _sface
+    if fr is None: return False
+    p = os.path.join(wd, 'narrator_feat.npy')
+    if _narr_ref is None:
+        if not os.path.exists(p): return True  # pas de reference narrateur -> pas de gate
+        _narr_ref = np.load(p)
+        _sface = cv2.FaceRecognizerSF.create('/home/boss/videogen/face_recognition_sface_2021dec.onnx', '')
+    _, faces = yfd.detect(fr)
+    if faces is None: return False
+    for f in faces:
+        if f[3]/H < 0.045: continue
+        try:
+            feat = _sface.feature(_sface.alignCrop(fr, f)).flatten().astype(np.float32)
+        except Exception:
+            continue
+        c = float(np.dot(feat, _narr_ref)/(np.linalg.norm(feat)*np.linalg.norm(_narr_ref)+1e-9))
+        # narrateur reconnu ET visage PLEIN CADRE. Le cos seul ne suffit pas : une PHOTO
+        # du narrateur dans une carte de contenu matche aussi (photo de groupe eglV t=33 :
+        # cos 0.58-0.69 mais visage 0.099-0.11 H). Un vrai hero live a un visage 0.368-0.415 H
+        # (mesures eglV 39/41/908/1388/1393 ; meme echelle que qc_ident : plans serres >=0.40,
+        # contenu <=0.31). Seuil 0.30 = marge des deux cotes.
+        if c >= 0.363 and float(f[3])/H >= 0.30: return True
+    return False
+
+def is_hero(t0, t1, box, need_ident=False):
     """HERO = grosse cam qui remplit le cadre -> avatar plein ecran. VLM fullface x2 + garde
-    geometrique (la box couvre une grande part de l'ecran : large ET haute)."""
+    geometrique (la box couvre une grande part de l'ecran : large ET haute).
+    need_ident (scenes src=ident, colonnes h>0.9) : exige EN PLUS le narrateur reconnu
+    SFace sur la frame — un fullface VLM sur un visage de CONTENU (photo de groupe en
+    gros plan, eglV t=33) promouvait la scene hero = vert plein cadre par-dessus une
+    carte a marges creme, sur-couverture invisible aux juges (doctrine monotone)."""
     bw, bh = box[2], box[3]
     big = bw > 0.5 and bh > 0.7           # box deja quasi plein cadre
     mid = (t0+t1)/2
     cap.set(cv2.CAP_PROP_POS_MSEC, mid*1000.0); ok, fr = cap.read()
+    fr_mid = fr if ok else None
     ff1 = vlm_probe.fullface(fr) if ok else None
     if ff1 is not True:
-        return big and ff1 is not False
-    cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*0.25)*1000.0); ok, fr = cap.read()
-    ff2 = vlm_probe.fullface(fr) if ok else None
-    return ff2 is True
+        hero = big and ff1 is not False
+        fr_alt = None
+    else:
+        cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*0.25)*1000.0); ok, fr = cap.read()
+        fr_alt = fr if ok else None
+        hero = vlm_probe.fullface(fr_alt) is True if fr_alt is not None else False
+    if hero and need_ident:
+        hero = _narr_match(fr_mid) or (fr_alt is not None and _narr_match(fr_alt))
+    return hero
+
+def _narr_live(t0, t1):
+    """Vrai si le narrateur LIVE plein cadre est visible dans la scene (3 sondes).
+    Gate des promotions pip->hero tardives : _motion_extend gonflait une CARTE de
+    contenu quasi pleine frame (photo de groupe eglV 32-34, marges creme) a area>0.85
+    -> promotion 'narrateur libre' sans aucun test d'identite -> vert plein cadre.
+    Meme regle que le gate is_hero : reconnu SFace ET visage >=0.30 H."""
+    for f in (0.5, 0.25, 0.75):
+        cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*f)*1000.0)
+        ok, fr = cap.read()
+        if ok and _narr_match(fr): return True
+    return False
 
 segs=[]; prev=0.0
 nhero=0
@@ -256,13 +307,15 @@ for sc in pin:
     if sc.get("region") == "hero" or sc["box"][2]*sc["box"][3] > 0.85 \
             or ((sc.get("src") != "ident"
                  or (sc["box"][3] > 0.9 and sc["box"][2] > 0.35))
-                and is_hero(sc["start"], sc["end"], sc["box"])):
+                and is_hero(sc["start"], sc["end"], sc["box"],
+                            need_ident=(sc.get("src") == "ident"))):
         segs.append({"host":"hero","start":round(sc["start"],2),"end":round(sc["end"],2),"bbox":None})
         nhero+=1
     else:
         seg={"host":"pip","start":round(sc["start"],2),"end":round(sc["end"],2)}
         segs.append(seg)
         pips.append({"seg":seg,"t0":sc["start"],"t1":sc["end"],"box":sc["box"],
+                     "src":sc.get("src"),
                      "patched":bool(sc.get("patched")) or sc.get("region")=="patch",
                      "pident":bool(sc.get("patched_ident")) or sc.get("region")=="patch",
                      "pkeep":bool(sc.get("patched_keep"))})
@@ -315,9 +368,11 @@ for p in pips:
     if not p.get("pident"):
         c = _cons_match(p["box"])
         if c is not None:
-            if c.get("kind") == "hero" or c["box"][2]*c["box"][3] > 0.85:
+            if (c.get("kind") == "hero" or c["box"][2]*c["box"][3] > 0.85)                     and (p.get("src") != "ident" or _narr_live(p["t0"], p["t1"])):
                 # cluster narrateur plein ecran (aucun bord de carte, visage central)
-                # -> HERO complet, jamais une box sur la tete (ADJj 0:08, verdict Boss)
+                # -> HERO complet, jamais une box sur la tete (ADJj 0:08, verdict Boss).
+                # Scenes ident : narrateur LIVE exige (une carte de contenu peut couvrir
+                # l'ecran aussi — la couvrir en pip, pas la remplacer par l'avatar).
                 p["seg"]["host"] = "hero"; p["seg"]["bbox"] = None; p["hero"] = True
                 p["shape"], p["abox"] = "rect90", list(c["box"])
             else:
@@ -333,8 +388,11 @@ for p in pips:
             shp = "rect"   # patch anti-fuite : l'ellipse ne couvre pas les coins de l'union
                            # (pLos popout : tete qui depasse du cercle -> boucle QC sterile)
         abox = _motion_extend(list(abox), p["t0"], p["t1"])
-        if abox[2]*abox[3] > 0.85 or (p.get("pident") and abox[2]*abox[3] > 0.5):
-            # l'extension revele un corps quasi plein cadre -> narrateur libre -> hero
+        if (abox[2]*abox[3] > 0.85 or (p.get("pident") and abox[2]*abox[3] > 0.5))                 and (p.get("src") != "ident" or _narr_live(p["t0"], p["t1"])):
+            # l'extension revele un corps quasi plein cadre -> narrateur libre -> hero.
+            # Scenes ident sans narrateur live : PAS de promotion — l'extension venait
+            # de la carte elle-meme (photo de groupe eglV 32-34) ; la scene reste pip
+            # et sa box etendue la couvre (jamais moins couvrant qu'avant).
             p["seg"]["host"] = "hero"; p["seg"]["bbox"] = None
             p["hero"] = True
             p["shape"], p["abox"] = "rect90", abox
