@@ -293,6 +293,98 @@ for s in out:
         merged2.append(s)
 out = merged2
 
+# ---- PASS 6 : verite-carte aux frontieres de scene (verdict Boss 27/07 07h25) ----
+# un vert sans carte dessous = meme gravite qu'une carte sans vert. Deux trous :
+# (1) les runs STEP=1.0 pontent <=4 samples manques : la carte eglV disparait
+#     ~6.3-7.7 (contenu seul, sonde 27/07) mais la scene 5.5-9 reste verte a 7.2 ;
+# (2) le clip "au precedent" des chevauchements colle le start pip a la fin du
+#     hero alors que la carte source est DEJA revenue sous lui (eglV : carte des
+#     42.75, hero jusqu'a 43). Sonde fine 0.25s aux bords (3s) de chaque scene pip,
+#     + 2.5s dans le voisin hero : presence = visage cos>=COS_SAME dans la box
+#     (marge 6%). Trim start a la premiere presence / end a la derniere ; absence
+#     >=~1s ENCADREE de presences -> scission de la scene ; hero voisin rogne quand
+#     la carte est prouvee sous lui. 4 sondes consecutives absentes = carte vraiment
+#     partie (YuNet ne rate jamais autant une carte statique : 8-10s = 100% hits).
+#     Sonde illisible (NOFRAME) = presence : on sur-couvre, jamais l'inverse.
+FINE = 0.25
+
+def _card_at(t, box):
+    fr = _frame(t)
+    if fr is None: return True
+    _, fs = yfd.detect(fr)
+    if fs is None: return False
+    x0 = (box[0]-0.06)*W; y0 = (box[1]-0.06)*H
+    x1 = (box[0]+box[2]+0.06)*W; y1 = (box[1]+box[3]+0.06)*H
+    for f in fs:
+        cx, cy = f[0]+f[2]/2.0, f[1]+f[3]/2.0
+        if not (x0 <= cx <= x1 and y0 <= cy <= y1): continue
+        try:
+            ft = rec.feature(rec.alignCrop(fr, f)).flatten().astype(np.float32)
+        except Exception:
+            continue
+        if _cos(ft, narr_feat) >= COS_SAME: return True
+    return False
+
+def _probe_zone(s, lo, hi):
+    out_ = []
+    t = lo
+    while t <= hi + 1e-6:
+        out_.append((round(t, 3), _card_at(round(t, 3), s["box"])))
+        t += FINE
+    return out_
+
+refined = []
+for i, s in enumerate(out):
+    if s["region"] == "hero" or s["end"] - s["start"] < 1.0:
+        refined.append(s); continue
+    prev_h = i > 0 and out[i-1]["region"] == "hero"
+    next_h = i + 1 < len(out) and out[i+1]["region"] == "hero"
+    lo = max(0.0, s["start"] - (2.5 if prev_h else 0.0))
+    hi = min(DUR - 0.1, s["end"] + (2.5 if next_h else 0.0))
+    if s["end"] - s["start"] <= 8.0:
+        seq = _probe_zone(s, lo, hi)
+    else:
+        head = _probe_zone(s, lo, s["start"] + 3.0)
+        while (not head[-1][1]) and head[-1][0] + FINE < s["end"] - 3.0:
+            nt = round(head[-1][0] + FINE, 3)
+            head.append((nt, _card_at(nt, s["box"])))
+        tail = _probe_zone(s, s["end"] - 3.0, hi)
+        while (not tail[0][1]) and tail[0][0] - FINE > head[-1][0]:
+            nt = round(tail[0][0] - FINE, 3)
+            tail.insert(0, (nt, _card_at(nt, s["box"])))
+        seq = list(head) + list(tail)
+    trues = [t for t, p in seq if p]
+    if not trues:
+        refined.append(s); continue
+    ns = s["start"]; ne = s["end"]
+    if not (i == 0 and s["start"] <= 5.0):  # fade-in : bord temporel gere plus bas
+        ns = max(lo, trues[0] - FINE / 2.0)
+    ne = min(hi, trues[-1] + FINE / 2.0)
+    if prev_h and ns < out[i-1]["end"]:
+        out[i-1]["end"] = round(max(out[i-1]["start"] + 0.5, ns), 2)
+    if next_h and ne > out[i+1]["start"]:
+        out[i+1]["start"] = round(min(out[i+1]["end"] - 0.5, ne), 2)
+    # scission uniquement sur trous PROUVES par sondes contigues : un trou qui
+    # chevauche le coeur non sonde (scenes > 8s) n'est pas une absence de carte,
+    # c'est une absence de SONDES (bug 27/07 09h40 : le point synthetique
+    # fragmentait 4D7 0-86 en 0-3.1 + 82.9-85.1).
+    if s["end"] - s["start"] <= 8.0:
+        head_hi = seq[-1][0]; tail_lo = seq[0][0]
+    else:
+        head_hi = head[-1][0]; tail_lo = tail[0][0]
+    pieces = []; cur = ns
+    for a, b in zip(trues, trues[1:]):
+        if b - a >= 0.9 + FINE and (b <= head_hi + 1e-6 or a >= tail_lo - 1e-6):
+            pieces.append((cur, a + FINE / 2.0)); cur = b - FINE / 2.0
+    pieces.append((cur, ne))
+    for p0, p1 in pieces:
+        if p1 - p0 < 0.5: continue
+        ns2 = dict(s)
+        ns2["start"] = round(float(p0), 2); ns2["end"] = round(float(p1), 2)
+        refined.append(ns2)
+out = refined
+out.sort(key=lambda s: s["start"])
+
 # bords temporels : une scene qui demarre dans les 5 premieres secondes s'etend a 0
 # (fade-in = YuNet rate les 1res frames -> narrateur a decouvert des la seconde 0, SdMp) ;
 # idem fin de video
