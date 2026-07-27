@@ -161,9 +161,18 @@ for s in samples:
     #   2. PERSISTANCE POSITIONNELLE : meme visage, meme place, 2 samples consecutifs.
     #      Une vignette de contenu traversee par un scroll a carte plein cadre + visage
     #      central mais SE DEPLACE puis disparait ; un talking-head reste en place.
+    #   3. VISAGE DOMINANT : un talking-head plein cadre REMPLIT le cadre. Un plan
+    #      d'evenement (atelier filme, photo de groupe) a lui aussi une carte plein
+    #      cadre, un visage central et stable pendant le panoramique — sans plancher
+    #      de taille il devenait hero et on peignait du vert plein ecran sur du
+    #      contenu qui doit rester INTACT (verdict Boss 27/07 07h50, eglV 31.5-34 et
+    #      38-38.5). Mesures eglV : vrais heros h=0.376-0.491 (0-3, 17-28, 906-918,
+    #      1387, live 39-42) contre b-roll d'evenement h=0.058-0.192 — seuil 0.25
+    #      entre les deux nuages, aucun ne s'en approche.
     def _bigcard(fc):
         cx = (fc["f"][0]+fc["f"][2]/2)/W
-        return (fc["card"][2] > 0.85 and fc["card"][3] > 0.85 and 0.25 < cx < 0.75)
+        return (fc["card"][2] > 0.85 and fc["card"][3] > 0.85 and 0.25 < cx < 0.75
+                and fc["f"][3]/H > 0.25)
     _cur_big = [((fc["f"][0]+fc["f"][2]/2)/W, (fc["f"][1]+fc["f"][3]/2)/H)
                 for fc in s["faces"] if _bigcard(fc) and fc["mo"] >= MOTION_MIN]
     _stable_big = any(abs(cx-px) < 0.05 and abs(cy-py) < 0.05
