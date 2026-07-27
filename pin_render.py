@@ -205,13 +205,16 @@ def draw(box, shape, idx, mg=MG):
     def _exp(amt, gap):
         if gap <= 0.005: return amt          # touche deja -> expansion libre (clamp ecran)
         return min(amt, gap*0.5)             # marge design -> on n'en mange que la moitie max
-    cx0 = bx0 - _exp(box[2]*mg, bx0)
-    cy0 = by0 - _exp(box[3]*mg, by0)
-    cx1 = bx1 + _exp(box[2]*mg, 1.0-bx1)
-    cy1 = by1 + _exp(box[3]*mg, 1.0-by1)
+    # clip ecran AVANT pixels : l'ancien x=max(0,min(W-w,x)) DECALAIT le masque,
+    # l'expansion libre du cote flush ressortait en debord du cote marge design
+    # (eglV 1365 : cy0 0.1661 repousse a 0.1056 — "vert plus grand que la carte").
+    cx0 = max(0.0, bx0 - _exp(box[2]*mg, bx0))
+    cy0 = max(0.0, by0 - _exp(box[3]*mg, by0))
+    cx1 = min(1.0, bx1 + _exp(box[2]*mg, 1.0-bx1))
+    cy1 = min(1.0, by1 + _exp(box[3]*mg, 1.0-by1))
     cw = cx1-cx0; ch = cy1-cy0
     x=int(cx0*W);y=int(cy0*H);w=max(4,int(cw*W));h=max(4,int(ch*H))
-    x=max(0,min(W-w,x));y=max(0,min(H-h,y));  w=min(w,W-x); h=min(h,H-y)
+    w=min(w,W-x); h=min(h,H-y)
     out=np.zeros((h,w),np.uint8)
     if shape=="ellipse":
         cv2.ellipse(out,(w//2,h//2),(w//2-1,h//2-1),0,0,360,255,-1)
@@ -409,8 +412,11 @@ for p in pips:
             # extension geante SANS narrateur live : le motion venait du CONTENU
             # (transitions photos, scroll screencast — verts geants eglV, frames 27/07
             # 05h). Garder la mesure locale ; qc_ident rattrape toute fuite reelle.
-        else:
+        elif abox2[2]*abox2[3] <= 2.0*max(abox[2]*abox[3], 1e-6):
             abox = abox2
+        # extension >2x l aire locale : le motion vient du CONTENU (transitions
+        # photos, scroll — eglV 34-36 : 0.035->0.726 = 20x), pas d un narrateur qui
+        # deborde (pLos tete, 4D7 mur : ~1.5x). La mesure locale fait foi.
         p["shape"],p["abox"]=shp,list(abox)
         if abox == p["box"] and not p["patched"]:
             _shape_cache[key]=(shp,list(abox))
@@ -609,9 +615,13 @@ def _ring_scene(box, t0, t1):
     if 0 < bx0 < 0.10*W and _alive(by0, by1, 0, bx0) and ((m is not None and _blob(m[by0:by1, 0:bx0])) or _cont_v(bx0, 2, bx0+5)): bx0 = 0
     return [round(bx0/W,4), round(by0/H,4), round((bx1-bx0)/W,4), round((by1-by0)/H,4)]
 
-# anneau par scene sur TOUTES les box pip finales (consensus, pkeep, legacy)
+# anneau par scene sur les box pip finales SAUF patched : une box patched est une
+# CARTE mesuree par qc (rond dans un site, photo cadree) — la preuve carte-continue
+# y prouve la continuite du CONTENU, pas du narrateur, et la marge design sautait
+# (eglV 1365 : x0 0.0601 -> 0). Les autres gardent l anneau (4D7 bande droite
+# fauteuil/mur -> flush bord droit, etalon Boss run_22h00).
 for p in pips:
-    if p.get("hero"): continue
+    if p.get("hero") or p.get("patched"): continue
     p["abox"] = _ring_scene(list(p["abox"]), p["t0"], p["t1"])
 
 # RE-UNIFICATION post-anneau : l'anneau par scene etend selon le mouvement LOCAL de
