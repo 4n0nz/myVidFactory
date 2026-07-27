@@ -430,22 +430,44 @@ for p in pips:
 # Le matching ignore la forme (un patch geom force rect, le consensus dit rect90 ->
 # le meme pip physique se splittait en 2 groupes jamais unifies) ; forme finale =
 # celle du membre consensus si present, sinon celle du membre le plus long.
+# Un layout = une position ET une TAILLE (meme doctrine que pinpoint3 db6c3d4 et
+# qc_fix 4a67d8f). Sans ce gate l'union monotone propage la box la plus large du
+# groupe a TOUTES les scenes du meme coin : eglV, la scene 1369-1384 (elargie par
+# la fuite reelle "fenetre navigateur", w=0.372) rejoignait le pip bas-gauche
+# (consensus w=0.2271, centres a 0.058 < 0.06) et lui imposait sa largeur sur les
+# 23 MINUTES de video -> vert de 0.386 sur une carte mesuree a 0.227, marge gauche
+# de design mangee (verdict Boss 27/07 00h20 : "l'original touche pas le bord mais
+# l'avatar oui"). Le CAP TROP-GRAND ne rattrape pas : il s'abstient des qu'un membre
+# est cons/patched, donc qc_geom signalait TROP-GRAND 1.92 passe apres passe.
+# Seuil 0.70 (et non 0.55 comme en amont) : ici les box sont deja consolidees
+# (consensus + patches), plus les cartes brutes bruitees du detecteur ; 4D7 unifie
+# des w=0.213/0.26 (ratio 0.82), eglV doit separer 0.227 de 0.372 (ratio 0.61).
+SIZE_UNI = 0.70
+
+def _same_dim(a, b): return min(a, b) / max(a, b, 1e-6) > SIZE_UNI
+
 def _ctr(b): return (b[0]+b[2]/2, b[1]+b[3]/2)
 groups=[]
 for p in pips:
     if p.get("pident") or p.get("hero"): continue
     cx,cy=_ctr(p["abox"]); hit=None
     for g in groups:
-        if abs(cx-g["cx"])<0.06 and abs(cy-g["cy"])<0.06:
+        if (abs(cx-g["cx"])<0.06 and abs(cy-g["cy"])<0.06
+                and _same_dim(p["abox"][2],g["cw"]) and _same_dim(p["abox"][3],g["ch"])):
             hit=g; break
     if hit is None:
-        groups.append({"cx":cx,"cy":cy,"box":list(p["abox"]),"members":[p]})
+        groups.append({"cx":cx,"cy":cy,"cw":p["abox"][2],"ch":p["abox"][3],
+                       "box":list(p["abox"]),"members":[p],"n":1})
     else:
-        b=hit["box"]; nb=p["abox"]
+        b=hit["box"]; nb=p["abox"]; n=hit["n"]
         x0=min(b[0],nb[0]); y0=min(b[1],nb[1])
         x1=max(b[0]+b[2],nb[0]+nb[2]); y1=max(b[1]+b[3],nb[1]+nb[3])
         hit["box"]=[x0,y0,x1-x0,y1-y0]; hit["members"].append(p)
-        hit["cx"],hit["cy"]=_ctr(hit["box"])
+        # centre et taille de reference = MOYENNE des membres, pas la box unie :
+        # recalcules sur l'union ils DERIVENT et finissent par avaler le layout voisin.
+        hit["cx"]=(hit["cx"]*n+cx)/(n+1); hit["cy"]=(hit["cy"]*n+cy)/(n+1)
+        hit["cw"]=(hit["cw"]*n+nb[2])/(n+1); hit["ch"]=(hit["ch"]*n+nb[3])/(n+1)
+        hit["n"]=n+1
 for g in groups:
     cons_m=[p for p in g["members"] if p.get("cons")]
     ref=cons_m[0] if cons_m else max(g["members"], key=lambda p: p["t1"]-p["t0"])
