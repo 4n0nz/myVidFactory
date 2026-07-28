@@ -25,6 +25,7 @@ COS_SAME = 0.363
 ACT_DIFF = 5        # seuil de changement pixel (attrape le bruit video, pas le rendu statique)
 ACT_MIN = 0.55      # pixel "carte" = change dans >55% des paires
 NPAIRS = 60
+BG_LIVE_MAX = 0.40  # part de l ecran HORS box qui bouge : au-dela, page animee = anneau aveugle
 
 def _frame(t):
     cap.set(cv2.CAP_PROP_POS_MSEC, t*1000.0); ok, fr = cap.read()
@@ -185,7 +186,24 @@ def consensus(c):
     def _hotband(xa, xb, ya, yb):
         z = actF[max(0,ya):min(H,yb), max(0,xa):min(W,xb)]
         return z.size > 100 and float(np.mean(z >= 0.30)) > 0.10
-    for _ in range(10):
+    # L anneau suppose la page STATIQUE derriere le pip (voir en-tete). Mesure du 28/07
+    # 06h30 : sur un fond ANIME cette hypothese s inverse — XzEg 315-356 (gameplay) a
+    # 75.7% de l ecran hors carte qui bouge, PLUS que la carte elle-meme (31.7%). Chaque
+    # bande est donc chaude, la box grandit a tous les tours et ne s arrete que sur le cap
+    # 2.5x : 314.79-346.46 sortait a 0.165x0.678 alors que la carte mesure 0.062x0.199,
+    # soit x3.4 en hauteur, vert sur le gameplay et sur le HUD (frames run_05h00).
+    # Fond anime = l anneau n a AUCUN signal, il ne mesure que le bruit du fond. On
+    # ABSTIENT : la box reste la carte mesuree — jamais plus grande que la carte.
+    # Neutre sur les etalons PAR MESURE, pas par chance : bg_live vaut 0.000 sur 4D7 et
+    # 0.000 sur le cluster principal d eglV (21 des 23 min), et sur ces deux-la la boucle
+    # ne bougeait deja rien (pre == post). Le seul cluster d etalon au-dessus de 0.25 est
+    # eglV n2 (0.285, b-roll atelier) : c est le defaut (B) deja ouvert, une scene SANS
+    # carte — probleme de classement, pas de geometrie. Seuil place a 0.40 pour le laisser
+    # hors de portee et garder les deux etalons a l identique ; il pourra descendre quand
+    # eglV sera reprise, la mesure est deja faite.
+    bgm = np.ones((H, W), bool); bgm[by0:by1, bx0:bx1] = False
+    bg_live = float(np.mean(actF[bgm] >= 0.30))
+    for _ in range(0 if bg_live > BG_LIVE_MAX else 10):
         grew = False
         if by0 > 0 and (by1-by0) < 2.5*h0 and _hotband(bx0, bx1, by0-band, by0):
             by0 = max(0, by0-band); grew = True
