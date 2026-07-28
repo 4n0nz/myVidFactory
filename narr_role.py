@@ -74,3 +74,24 @@ class NarrRole(object):
         if not pres: return (False, False, 0.0)
         med = lambda v: sorted(v)[len(v) // 2]
         return (med(pres) == 1, med(dom) == 1, med(hs))
+
+
+    def other_subject(self, cap, t0, t1, n=3):
+        """hauteur du plus grand visage NON-narrateur, s il domine le plan (>=0.18 H).
+        Sert a ne convertir un hero que quand quelqu un d AUTRE est clairement le sujet :
+        un hero ou le narrateur est simplement de dos ou hors champ reste intact."""
+        vals = []
+        for frac in np.linspace(0.25, 0.75, n):
+            cap.set(cv2.CAP_PROP_POS_MSEC, (t0 + (t1 - t0) * float(frac)) * 1000.0)
+            ok, fr = cap.read()
+            if not ok: continue
+            best = 0.0
+            for f in self._faces(fr):
+                fh = float(f[3]) / self.H
+                if fh < 0.18: continue
+                if self._is_narr(fr, f): return 0.0     # le narrateur est la : pas un faux hero
+                if fh > best: best = fh
+            vals.append(best)
+        if len(vals) < 2: return 0.0
+        med = sorted(vals)[len(vals) // 2]
+        return med if med >= 0.18 else 0.0

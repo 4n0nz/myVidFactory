@@ -34,7 +34,7 @@ for f in fails:
                 s['region'] = 'hero'
                 s['fid'] = True
                 n_hero += 1
-            elif f['type'] in ('FAUX-PIP', 'PAS-NARRATEUR'):
+            elif f['type'] in ('FAUX-PIP', 'PAS-NARRATEUR', 'FAUX-HERO'):
                 drop.append(i)
             break
 

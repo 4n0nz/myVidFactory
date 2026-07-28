@@ -110,6 +110,22 @@ def nb(r):
 
 
 fails = []
+# --- controle des scenes HERO : un hero couvre TOUT l ecran, c est l action la plus
+# destructrice du pipeline. Angle mort constate le 28/07 : le juge ne regardait que les
+# pips, donc une video entierement mal classee en hero sortait « fid=OK ».
+# On ne convertit que le cas CERTAIN : le narrateur est absent des 3 sondes ET
+# quelqu un d AUTRE est le sujet du plan (visage dominant non-narrateur). Un hero ou le
+# narrateur est de dos / hors champ reste intact (doute -> on ne touche pas).
+for e in hm:
+    if e['host'] != 'hero': continue
+    t0, t1 = e['start'], e['end']
+    pres, dom, fh = NR.probe(cs, t0, t1)
+    if pres or dom: continue
+    other = NR.other_subject(cs, t0, t1)
+    if other:
+        fails.append({'t0': t0, 't1': t1, 'type': 'FAUX-HERO', 'green': None,
+                      'card': None, 'faceH': round(other, 3)})
+
 for e in hm:
     if e['host'] != 'pip' or not e.get('bbox'): continue
     t0, t1 = e['start'], e['end']
@@ -121,7 +137,17 @@ for e in hm:
     if not ok_card:
         # aucune carte sous le vert : soit narrateur LIVE plein cadre (hero rate),
         # soit du contenu qu on n aurait jamais du toucher.
+        # GARDE (28/07) : un HERO couvre TOUT l ecran. Si le vert est petit, ce n est
+        # pas un hero rate — c est un pip dont cardness a rate les bords parce qu il
+        # teste le VERT et non la carte. Sans cette garde, eglV 42.6-906.6 (15 minutes
+        # de pip correct, vert 15% de l ecran) partait en hero plein ecran.
+        ga = (gb[2] - gb[0]) * (gb[3] - gb[1]) / float(W * H)
         pres, dom, fh = NR.probe(cs, t0, t1)
+        if ga < 0.25:
+            if not pres: 
+                fails.append({'t0': t0, 't1': t1, 'type': 'FAUX-PIP', 'green': nb(gb),
+                              'card': None, 'faceH': round(fh, 3), 'dominant': bool(dom)})
+            continue
         typ = 'HERO-RATE' if dom else 'FAUX-PIP'
         fails.append({'t0': t0, 't1': t1, 'type': typ, 'green': nb(gb),
                       'card': None, 'faceH': round(fh, 3), 'dominant': bool(dom)})
@@ -143,7 +169,11 @@ for e in hm:
     if cm is not None:
         ca = (card[2] - card[0]) * (card[3] - card[1]) / float(W * H)
         ka = cm['box'][2] * cm['box'][3]
-        if ka > 0 and (ca / ka > 2.2 or ka / ca > 2.2): continue
+        # garde resserree a 1.8 : une carte mesuree qui contredit le consensus en aire
+        # d un facteur >1.8 est un artefact de scan (eglV t=7.6 mesurait 0.432 de large
+        # contre 0.227 au consensus). Sous 1.8 on laisse passer les vraies variations
+        # de layout (intro eglV, carte collee aux bords : 1.6).
+        if ka > 0 and (ca / ka > 1.8 or ka / ca > 1.8): continue
     over = [(card[0] - gb[0]) / W, (card[1] - gb[1]) / H,
             (gb[2] - card[2]) / W, (gb[3] - card[3]) / H]
     big = max(over); small = max(-v for v in over)
