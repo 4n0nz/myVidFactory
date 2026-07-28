@@ -156,23 +156,6 @@ for e in hm:
     card = card_rect(gb, t0, t1)
     if card is None: continue
 
-    # PREUVE BORD PAR BORD (28/07). qc_fid_fix pose la carte mesuree en AUTORITE
-    # (patched_keep, non monotone : elle peut AGRANDIR le vert). Une mesure fausse est
-    # donc gravee et devient invisible a tous les juges. Mesure du 28/07 sur
-    # mCE 13.0-20.12 : card_rect annonce 0.236 de large la ou le bord reel de la carte
-    # est a 0.180 (+31%), et cardness sur cette meme carte donne hit=0.30 a droite —
-    # le juge pouvait s invalider lui-meme. On exige donc que chaque cote NON colle au
-    # bord de l ecran soit une VRAIE DROITE avant d emettre le moindre verdict.
-    # Conservateur par construction : un cote non prouve = aucun verdict = image inchangee.
-    _, cdet = cardness.card_score(cs, card, t0, t1, W, H)
-    bad = [s for s, v in cdet.items()
-           if v is not None and (v[1] is None or v[1] > cardness.STD_MAX
-                                 or v[0] < cardness.HIT_STRAIGHT)]
-    if bad:
-        print('  t=%.1f-%.1f carte %s REJETEE : cote(s) %s pas une droite (%s)'
-              % (t0, t1, nb(card), ','.join(sorted(bad)),
-                 ' '.join('%s=%s' % (s, cdet[s]) for s in sorted(bad))))
-        continue
 
     # le narrateur est-il le SUJET de cette carte ? (pip webcam 0.38-0.47 de la hauteur
     # de carte ; photo/b-roll ou il apparait 0.00-0.11)
@@ -181,6 +164,28 @@ for e in hm:
     if ch > 0 and (fh / ch) < SUJET_MIN:
         fails.append({'t0': t0, 't1': t1, 'type': 'PAS-NARRATEUR', 'green': nb(gb),
                       'card': nb(card), 'faceH': round(fh, 3), 'ratio': round(fh / ch, 2)})
+        continue
+
+    # PREUVE BORD PAR BORD (28/07) — placee ICI, apres PAS-NARRATEUR, et pas avant.
+    # Elle ne protege que les deux verdicts qui posent la carte en AUTORITE
+    # (patched_keep, non monotone : ils peuvent AGRANDIR le vert), car une mesure fausse
+    # y est gravee et redevient invisible a tous les juges. Mesures du 28/07 :
+    # mCE 13.0-20.12 card_rect annonce 0.236 de large contre 0.180 reels (+31%,
+    # cardness sur cette meme carte : hit=0.30 a droite) ; eglV 7.6-9.0 annonce 0.4323
+    # contre 0.232 (+88%, R hit=0.28, T std=3.7). Le juge pouvait s invalider lui-meme.
+    # PAS-NARRATEUR, lui, ne pose AUCUNE geometrie : il RETIRE la scene et l image reste
+    # intacte. Mesure du 28/07 03h25 : garde place trop haut = les 10 PAS-NARRATEUR de
+    # XzEg (cartes de contenu, 3 cotes non droits sur 10/10) sautaient, et ces scenes
+    # restaient PIP donc peintes en vert sur du contenu — l inverse du but.
+    # Conservateur par construction : un cote non prouve = aucun verdict de geometrie.
+    _, cdet = cardness.card_score(cs, card, t0, t1, W, H)
+    bad = [s for s, v in cdet.items()
+           if v is not None and (v[1] is None or v[1] > cardness.STD_MAX
+                                 or v[0] < cardness.HIT_STRAIGHT)]
+    if bad:
+        print('  t=%.1f-%.1f carte %s REJETEE : cote(s) %s pas une droite (%s)'
+              % (t0, t1, nb(card), ','.join(sorted(bad)),
+                 ' '.join('%s=%s' % (s, cdet[s]) for s in sorted(bad))))
         continue
 
     cm = cons_match(card)
