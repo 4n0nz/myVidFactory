@@ -1,26 +1,27 @@
 #!/usr/bin/env python3
-# qc_fid.py <workdir> <rendu.mp4> — JUGE DE FIDELITE (le juge qui manquait).
+# qc_fid.py <workdir> <rendu.mp4> — JUGE DE FIDELITE + CLASSIFICATION.
 #
-# Pourquoi (Boss, 2026-07-28 « arrete de tourner en rond, corrige l auto correction ») :
-#   - qc_ident ne voit que les fuites d IDENTITE (un visage a decouvert).
-#   - qc_geom ne corrige QUE la sous-couverture (doctrine monotone anti-oscillation).
-#   => la SUR-couverture et les faux pips n avaient AUCUN juge : Boss devait les voir a
-#      l oeil, passe apres passe. C est cette boucle qu on casse.
+# Boss 2026-07-28 : « arrete de tourner en rond, corrige l auto correction », puis
+# « il le corrige pas encore ? alors arrange pour qu il le corrige ».
 #
-# Non-oscillant par construction : la cible est mesuree dans la SOURCE, qui ne change
-# jamais d un tour a l autre. L oscillation historique (gb5 LEAK_242) venait de mesurer
-# sur le RENDU, qui bouge a chaque tour. Cible fixe => convergence.
+# Ni qc_ident (fuites d identite) ni qc_geom (sous-couverture seule, doctrine monotone)
+# ne voyaient la SUR-couverture, les faux pips ni les heros rates. Ce juge les voit ET
+# les rend corrigibles, en repondant a deux questions mesurables :
+#   1. cardness  : le vert repose-t-il sur une VRAIE CARTE ? (un bord de carte est une DROITE)
+#   2. narr_role : le narrateur est-il le SUJET de ce plan / de cette carte ?
 #
-# Trois verdicts :
-#   TROP-GRAND      le vert deborde la carte           -> corrigible (box = carte)
-#   SOUS-COUVERTURE la carte deborde le vert           -> corrigible (box = carte)
-#   PAS-DE-CARTE    aucun bord de carte sous le vert   -> NON corrigible ici, mais
-#                   signale : c est un faux pip (contenu) ou un hero rate (XzEg).
+# Les 4 cas de la doctrine Boss en decoulent, sans seuil de taille de visage fragile :
+#   carte + narrateur sujet          -> PIP    : box = la carte mesuree  (TROP-GRAND/SOUS-COUV)
+#   carte + narrateur non sujet      -> OFF    : contenu (photo, b-roll) -> image intacte
+#   pas de carte + narrateur dominant-> HERO   : narrateur live plein cadre (XzEg)
+#   pas de carte + sinon             -> OFF    : image intacte
+#
+# Non-oscillant : la cible est mesuree dans la SOURCE, invariante d un tour a l autre.
 import json, os, sys
 import cv2
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import cardness
+import cardness, narr_role
 
 wd = sys.argv[1]
 rendu = sys.argv[2]
@@ -34,9 +35,11 @@ if os.path.exists(cp):
 cr = cv2.VideoCapture(rendu)
 cs = cv2.VideoCapture(os.path.join(wd, 'source.mp4'))
 W = int(cs.get(cv2.CAP_PROP_FRAME_WIDTH)); H = int(cs.get(cv2.CAP_PROP_FRAME_HEIGHT))
+NR = narr_role.NarrRole(wd, W, H)
 
-TOL_BIG = 0.020
-TOL_SMALL = 0.015
+TOL_BIG = 0.020     # le vert deborde la carte de >2.0% de l ecran -> TROP-GRAND
+TOL_SMALL = 0.015   # la carte deborde le vert de >1.5% -> SOUS-COUVERTURE
+SUJET_MIN = 0.25    # faceH / hauteur de carte : pip webcam 0.38-0.47, contenu 0.00-0.11
 
 
 def green_box(t):
@@ -62,8 +65,6 @@ def _scan(line):
 
 
 def card_rect(gb, t0, t1):
-    """bords REELS de la carte dans la SOURCE. Un cote colle au bord de l ecran n est
-    pas scannable : la carte y touche (eglV intro). None si non reproductible."""
     gw = gb[2] - gb[0]; gh = gb[3] - gb[1]
     fx0 = max(0, gb[0] - int(gw * 0.30)); fy0 = max(0, gb[1] - int(gh * 0.30))
     fx1 = min(W, gb[2] + int(gw * 0.30)); fy1 = min(H, gb[3] + int(gh * 0.30))
@@ -103,26 +104,41 @@ def cons_match(card):
     return best if bd < 0.20 else None
 
 
+def nb(r):
+    return [round(r[0] / W, 4), round(r[1] / H, 4),
+            round((r[2] - r[0]) / W, 4), round((r[3] - r[1]) / H, 4)]
+
+
 fails = []
 for e in hm:
     if e['host'] != 'pip' or not e.get('bbox'): continue
-    t = (e['start'] + e['end']) / 2.0
-    gb = green_box(t)
+    t0, t1 = e['start'], e['end']
+    gb = green_box((t0 + t1) / 2.0)
     if gb is None: continue
 
-    # 1) le vert repose-t-il sur une VRAIE carte ? (cardness : un bord de carte est
-    #    une DROITE ; un corps/contenu n en a aucune)
-    ok_card, det = cardness.card_score(cs, gb, e['start'], e['end'], W, H)
+    ok_card, det = cardness.card_score(cs, gb, t0, t1, W, H)
+
     if not ok_card:
-        fails.append({'t0': e['start'], 't1': e['end'], 'type': 'PAS-DE-CARTE',
-                      'green': [round(gb[0] / W, 4), round(gb[1] / H, 4),
-                                round((gb[2] - gb[0]) / W, 4), round((gb[3] - gb[1]) / H, 4)],
-                      'card': None, 'ecart_pct': None, 'bords': str(det)})
+        # aucune carte sous le vert : soit narrateur LIVE plein cadre (hero rate),
+        # soit du contenu qu on n aurait jamais du toucher.
+        pres, dom, fh = NR.probe(cs, t0, t1)
+        typ = 'HERO-RATE' if dom else 'FAUX-PIP'
+        fails.append({'t0': t0, 't1': t1, 'type': typ, 'green': nb(gb),
+                      'card': None, 'faceH': round(fh, 3), 'dominant': bool(dom)})
         continue
 
-    # 2) le vert coincide-t-il avec la carte ?
-    card = card_rect(gb, e['start'], e['end'])
+    card = card_rect(gb, t0, t1)
     if card is None: continue
+
+    # le narrateur est-il le SUJET de cette carte ? (pip webcam 0.38-0.47 de la hauteur
+    # de carte ; photo/b-roll ou il apparait 0.00-0.11)
+    pres, dom, fh = NR.probe(cs, t0, t1, rect=card)
+    ch = (card[3] - card[1]) / float(H)
+    if ch > 0 and (fh / ch) < SUJET_MIN:
+        fails.append({'t0': t0, 't1': t1, 'type': 'PAS-NARRATEUR', 'green': nb(gb),
+                      'card': nb(card), 'faceH': round(fh, 3), 'ratio': round(fh / ch, 2)})
+        continue
+
     cm = cons_match(card)
     if cm is not None:
         ca = (card[2] - card[0]) * (card[3] - card[1]) / float(W * H)
@@ -133,20 +149,15 @@ for e in hm:
     big = max(over); small = max(-v for v in over)
     typ = 'TROP-GRAND' if big > TOL_BIG else ('SOUS-COUVERTURE' if small > TOL_SMALL else None)
     if typ:
-        fails.append({'t0': e['start'], 't1': e['end'], 'type': typ,
-                      'green': [round(gb[0] / W, 4), round(gb[1] / H, 4),
-                                round((gb[2] - gb[0]) / W, 4), round((gb[3] - gb[1]) / H, 4)],
-                      'card': [round(card[0] / W, 4), round(card[1] / H, 4),
-                               round((card[2] - card[0]) / W, 4), round((card[3] - card[1]) / H, 4)],
+        fails.append({'t0': t0, 't1': t1, 'type': typ, 'green': nb(gb), 'card': nb(card),
                       'ecart_pct': [round(v * 100, 1) for v in over]})
 
 json.dump(fails, open(os.path.join(wd, 'qc_fid.json'), 'w'), indent=1)
-nc = sum(1 for f in fails if f['type'] == 'PAS-DE-CARTE')
-print('QC-FID ECHECS : %d  (dont PAS-DE-CARTE : %d)' % (len(fails), nc))
-for f in fails:
-    if f['type'] == 'PAS-DE-CARTE':
-        print('  t=%.1f-%.1f PAS-DE-CARTE vert=%s bords=%s' % (f['t0'], f['t1'], f['green'], f['bords']))
-    else:
-        print('  t=%.1f-%.1f %s vert=%s carte=%s ecart%%(L,T,R,B)=%s'
-              % (f['t0'], f['t1'], f['type'], f['green'], f['card'], f['ecart_pct']))
+from collections import Counter
+c = Counter(f['type'] for f in fails)
+print('QC-FID ECHECS : %d  %s' % (len(fails), dict(c)))
+for f in fails[:40]:
+    print('  t=%.1f-%.1f %-15s vert=%s carte=%s %s'
+          % (f['t0'], f['t1'], f['type'], f['green'], f.get('card'),
+             f.get('ecart_pct') or ('faceH=%s dom=%s' % (f.get('faceH'), f.get('dominant')))))
 sys.exit(1 if fails else 0)
