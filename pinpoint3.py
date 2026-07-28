@@ -407,6 +407,16 @@ out = merged2
 #     partie (YuNet ne rate jamais autant une carte statique : 8-10s = 100% hits).
 #     Sonde illisible (NOFRAME) = presence : on sur-couvre, jamais l'inverse.
 
+def _full_frame(sc):
+    """Plan ou le narrateur occupe TOUTE la hauteur du cadre : soit un hero, soit un
+    cluster plein hauteur (type "center"). Aucune carte pip ne coexiste avec un tel plan,
+    donc la sonde de frontiere a le droit d'y mordre et de le rogner. Tester le seul label
+    "hero" ratait eglV 38.62-42.62 : narrateur LIVE plein cadre classe "center" (box
+    0.42x1.00) -> le pip suivant (43.00) n'avait jamais sa frontiere mesuree et laissait
+    0.38s de carte a nu a la coupe reelle 42.75, alors que le commentaire de PASS 6
+    documente exactement ce cas (verdict Boss 27/07 07h25)."""
+    return sc["region"] == "hero" or sc["box"][3] >= 0.9
+
 def _card_at(t, box, strict=False):
     fr = _frame(t)
     if fr is None: return True
@@ -463,8 +473,8 @@ refined = []
 for i, s in enumerate(out):
     if s["region"] == "hero" or s["end"] - s["start"] < 1.0:
         refined.append(s); continue
-    prev_h = i > 0 and out[i-1]["region"] == "hero"
-    next_h = i + 1 < len(out) and out[i+1]["region"] == "hero"
+    prev_h = i > 0 and _full_frame(out[i-1])
+    next_h = i + 1 < len(out) and _full_frame(out[i+1])
     lo = max(0.0, s["start"] - (2.5 if prev_h else 0.0))
     hi = min(DUR - 0.1, s["end"] + (2.5 if next_h else 0.0))
     if s["end"] - s["start"] <= 8.0:
