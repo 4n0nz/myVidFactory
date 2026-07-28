@@ -31,7 +31,21 @@ for f in fails:
                 s['fid'] = True
                 n_box += 1
             elif f['type'] == 'HERO-RATE':
+                # CONTRADICTION (28/07) : deux verdicts peuvent tomber dans la meme scene
+                # pin. Sur mCE 13.0-20.12 une carte avait ete mesuree (TROP-GRAND, flag
+                # fid) PUIS HERO-RATE est passe derriere : hero l emporte en silence, le
+                # plein cadre est efface et la slide des 20 logos disparait. Doute ->
+                # on ne touche pas (doctrine Boss du 27/07).
+                if s.get('fid'):
+                    print('   HERO-RATE refuse sur %.2f-%.2f : une carte y a deja ete '
+                          'mesuree (contradiction)' % (s['start'], s['end']))
+                    break
+                # coherence : pinpoint3 n ecrit JAMAIS un hero autrement que plein cadre
+                # (pinpoint3.py:338/377). Laisser une petite box sur un region=hero est un
+                # etat incoherent que pin_render resout en effacant tout le plan.
                 s['region'] = 'hero'
+                s['box'] = [0.0, 0.0, 1.0, 1.0]
+                s['edges'] = ['L', 'T', 'R', 'B']
                 s['fid'] = True
                 n_hero += 1
             elif f['type'] in ('FAUX-PIP', 'PAS-NARRATEUR', 'FAUX-HERO'):

@@ -156,6 +156,24 @@ for e in hm:
     card = card_rect(gb, t0, t1)
     if card is None: continue
 
+    # PREUVE BORD PAR BORD (28/07). qc_fid_fix pose la carte mesuree en AUTORITE
+    # (patched_keep, non monotone : elle peut AGRANDIR le vert). Une mesure fausse est
+    # donc gravee et devient invisible a tous les juges. Mesure du 28/07 sur
+    # mCE 13.0-20.12 : card_rect annonce 0.236 de large la ou le bord reel de la carte
+    # est a 0.180 (+31%), et cardness sur cette meme carte donne hit=0.30 a droite —
+    # le juge pouvait s invalider lui-meme. On exige donc que chaque cote NON colle au
+    # bord de l ecran soit une VRAIE DROITE avant d emettre le moindre verdict.
+    # Conservateur par construction : un cote non prouve = aucun verdict = image inchangee.
+    _, cdet = cardness.card_score(cs, card, t0, t1, W, H)
+    bad = [s for s, v in cdet.items()
+           if v is not None and (v[1] is None or v[1] > cardness.STD_MAX
+                                 or v[0] < cardness.HIT_STRAIGHT)]
+    if bad:
+        print('  t=%.1f-%.1f carte %s REJETEE : cote(s) %s pas une droite (%s)'
+              % (t0, t1, nb(card), ','.join(sorted(bad)),
+                 ' '.join('%s=%s' % (s, cdet[s]) for s in sorted(bad))))
+        continue
+
     # le narrateur est-il le SUJET de cette carte ? (pip webcam 0.38-0.47 de la hauteur
     # de carte ; photo/b-roll ou il apparait 0.00-0.11)
     pres, dom, fh = NR.probe(cs, t0, t1, rect=card)
