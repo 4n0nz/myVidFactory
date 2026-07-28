@@ -742,6 +742,77 @@ def _snap_cuts(segs, cap, fps):
 
 _snap_cuts(segs, cap, cap.get(cv2.CAP_PROP_FPS))
 
+# Une scene HERO ne doit pas ENJAMBER une coupe. pinpoint3 sonde a 1.0 s puis affine a
+# 0.25 s : quand deux plans du MEME narrateur se suivent (XzEg : gros plan visage 0.41-0.47 H
+# puis plan large bureau 0.22-0.24 H), la scene couvre les DEUX et l avatar plein cadre
+# efface le decor du second. Mesure XzEg : 155 coupes reelles pour 107 bornes, 8 des 27
+# scenes hero contiennent une coupe. Preuve a l oeil coupe t=66.08 : le rendu peint 100%
+# vert sur le plan large et efface bureau, micro et l overlay "$" a t=70 -> vert sans
+# carte dessous, aussi grave qu une carte sans vert.
+# On coupe la scene hero sur ses coupes INTERNES et on rejuge chaque morceau avec
+# _narr_live, le MEME gate que la promotion (SFace cos>=0.363 ET visage >=0.30 H) : aucun
+# seuil nouveau. Morceau qui ne tient pas le gate = pas de narrateur plein cadre dessous
+# -> off (pas pip : aucune carte mesuree la).
+# Ne touche QUE les hero. Les pip restent entieres : eglV a une scene pip de 864 s qui
+# contient 37 coupes, la carte ne bouge pas d une coupe a l autre, la decouper en 38
+# morceaux ne corrigerait rien et casserait le consensus.
+# Les morceaux voisins de meme host sont refusionnes et une scene dont AUCUN morceau ne
+# tombe est laissee telle quelle -> sortie identique a avant le fix partout ou il n y a
+# rien a corriger (neutralite par construction).
+def _cuts_in(cap, fps, t0, t1, maxn=8):
+    """Coupes reelles STRICTEMENT internes a [t0,t1] : pics de difference image >= CUT_V
+    qui sont maxima locaux sur +-0.25 s. Rend [] si plus de maxn (plan a forte motion :
+    le detecteur sur-declenche, mesure XzEg 22 pics entre 138 et 149 s de gameplay)."""
+    k0 = int(round(t0 * fps)); k1 = int(round(t1 * fps))
+    if k1 - k0 < 3: return []
+    cap.set(cv2.CAP_PROP_POS_FRAMES, k0)
+    prev = None; d = []
+    for i in range(k0, k1 + 1):
+        ok, f = cap.read()
+        if not ok: break
+        sm = cv2.resize(f, (160, 90)).astype(np.float32)
+        if prev is not None: d.append((i, float(np.abs(sm - prev).mean())))
+        prev = sm
+    w = max(1, int(round(0.25 * fps)))
+    peaks = []
+    for j, (i, v) in enumerate(d):
+        if v < CUT_V: continue
+        if any(v < u for _, u in d[max(0, j - w):j + w + 1]): continue
+        peaks.append(round(i / fps, 4))
+    return peaks if len(peaks) <= maxn else []
+
+def _split_hero_cuts(segs, cap, fps):
+    if not fps or fps <= 1: return 0
+    out = []; nsplit = 0; ndem = 0
+    for s in segs:
+        dur = s["end"] - s["start"]
+        if s["host"] != "hero" or dur < 1.0 or dur > 180.0:
+            out.append(s); continue
+        cuts = _cuts_in(cap, fps, s["start"] + 0.4, s["end"] - 0.4)
+        if not cuts:
+            out.append(s); continue
+        edges = [s["start"]] + cuts + [s["end"]]
+        pieces = []
+        for a, z in zip(edges, edges[1:]):
+            if z - a < 1.5 / fps: continue
+            keep = _narr_live(a, z)
+            pieces.append({"host": "hero" if keep else "off",
+                           "start": round(a, 2), "end": round(z, 2), "bbox": None})
+        if not pieces or all(p["host"] == "hero" for p in pieces):
+            out.append(s); continue
+        nsplit += 1
+        for p in pieces:
+            if out and out[-1]["host"] == p["host"] and abs(out[-1]["end"] - p["start"]) < 1e-6:
+                out[-1]["end"] = p["end"]; continue
+            if p["host"] == "off": ndem += 1
+            print("  hero coupe %.2f-%.2f -> %s" % (p["start"], p["end"], p["host"]))
+            out.append(p)
+    if nsplit: print("  hero/coupes : %d scenes decoupees, %d morceaux off" % (nsplit, ndem))
+    segs[:] = out
+    return nsplit
+
+_split_hero_cuts(segs, cap, cap.get(cv2.CAP_PROP_FPS))
+
 json.dump(segs,open(os.path.join(wd,"host_map.json"),"w"),indent=2)
 print("host_map: %d segs (%d pip) genere depuis pinpoint"%(len(segs),sum(1 for s in segs if s["host"]=="pip")))
 cap.release()
