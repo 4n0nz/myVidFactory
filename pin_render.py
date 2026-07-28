@@ -656,6 +656,62 @@ for p in pips:
     if p.get("hero") or p.get("patched"): continue
     p["abox"] = _ring_scene(list(p["abox"]), p["t0"], p["t1"])
 
+def _card_at(box, t):
+    global _narr_ref, _sface
+    cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
+    ok, fr = cap.read()
+    if not ok: return None
+    x = max(0, int(box[0]*W)); y = max(0, int(box[1]*H))
+    w = max(8, int(box[2]*W)); h = max(8, int(box[3]*H))
+    crop = fr[y:y+h, x:x+w]
+    if crop.size == 0: return None
+    sd = float(crop.std())
+    pth = os.path.join(wd, "narrator_feat.npy")
+    if _narr_ref is None and os.path.exists(pth):
+        _narr_ref = np.load(pth)
+        _sface = cv2.FaceRecognizerSF.create(
+            "/home/boss/videogen/face_recognition_sface_2021dec.onnx", "")
+    if _narr_ref is None: return True, sd     # pas de reference : jamais de demontage
+    _, faces = yfd.detect(fr)
+    if faces is not None:
+        for f in faces:
+            fx = float(f[0]) + float(f[2])/2.0; fy = float(f[1]) + float(f[3])/2.0
+            if not (x <= fx <= x+w and y <= fy <= y+h): continue
+            try:
+                ft = _sface.feature(_sface.alignCrop(fr, f)).flatten().astype(np.float32)
+            except Exception:
+                continue
+            c = float(np.dot(ft, _narr_ref)/(np.linalg.norm(ft)*np.linalg.norm(_narr_ref)+1e-9))
+            if c >= 0.363: return True, sd
+    return False, sd
+
+
+def _gap_voter(p):
+    """La scene contient-elle un plan SANS carte ? True = elle ne VOTE pas dans l union.
+
+    Racine mesuree le 28/07 sur TzJCly4YgDQ : les 27 membres du groupe portent tous
+    abox=[0.8,0.0667,0.2,0.7935] (aire/ga=1.00) sauf 532.50-542.12 a [0.8,0.0667,0.2,0.9185]
+    (aire/ga=1.16), qui VOTE — donc l union impose +16 % de HAUTEUR aux 27 scenes. Et cette
+    scene est precisement celle qui contient un trou de carte : la slide vide laisse l anneau
+    descendre. L union prend le MAX des votants, donc une seule scene polluee par du contenu
+    dicte la geometrie de tout le groupe. Ce n est pas du bruit de mesure, c est une erreur
+    de mesure, et l unioner la propage.
+
+    Meme DOUBLE PREUVE que _split_pip_gaps (pas de visage narrateur dans la box ET box plate
+    par rapport au reste de la MEME scene, rapport auto-calibre au tiers) mais sans _cuts_in :
+    5 sondes suffisent pour retirer un droit de vote, la ou demonter un morceau exige de
+    vraies coupes. Echec CONSERVATEUR par construction : un veto ne retire que le droit de
+    dicter, la scene RECOIT quand meme la box du groupe, donc jamais de perte de couverture.
+    """
+    a, z = p["t0"], p["t1"]
+    if z - a < 2.0: return False
+    pr = [_card_at(p["abox"], a + (z - a) * f) for f in (0.1, 0.3, 0.5, 0.7, 0.9)]
+    pr = [q for q in pr if q is not None]
+    if len(pr) < 3: return False
+    sdmax = max(q[1] for q in pr)
+    if sdmax <= 0: return False
+    return any((not q[0]) and q[1] < sdmax / 3.0 for q in pr)
+
 # RE-UNIFICATION post-anneau : l'anneau par scene etend selon le mouvement LOCAL de
 # chaque scene -> micro-divergences sur le MEME pip physique (4D7 : 0.213/0.225/0.26,
 # SAUT-DE-BOX t=11 au retour de hero) qui defont l'unification faite plus haut.
@@ -673,6 +729,14 @@ for g in groups:
     # propageait x=0 aux 900 s stables du groupe (eglV marge mangee, verdict Boss
     # 27/07). Elles RECOIVENT la box du groupe (couvertes), sans la dicter.
     voters = [p for p in small if p["t1"] - p["t0"] >= 3.0] or small
+    # une scene qui enjambe un plan SANS carte ne dicte pas la geometrie du groupe
+    _vok = [p for p in voters if not _gap_voter(p)]
+    if _vok and len(_vok) < len(voters):
+        for p in voters:
+            if p not in _vok:
+                print("  vote refuse %.2f-%.2f (trou de carte) abox=%s"
+                      % (p["t0"], p["t1"], p["abox"]))
+        voters = _vok
     x0 = min(p["abox"][0] for p in voters); y0 = min(p["abox"][1] for p in voters)
     x1 = max(p["abox"][0]+p["abox"][2] for p in voters)
     y1 = max(p["abox"][1]+p["abox"][3] for p in voters)
@@ -839,35 +903,8 @@ def _split_hero_cuts(segs, cap, fps):
 # de 8 pics (plan a forte motion), morceaux voisins de meme host refusionnes, et une
 # scene dont aucun morceau ne tombe est laissee telle quelle. La scene pip de 864 s
 # d eglV (37 coupes) est donc intouchee par les deux gardes.
-def _card_at(box, t):
-    global _narr_ref, _sface
-    cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
-    ok, fr = cap.read()
-    if not ok: return None
-    x = max(0, int(box[0]*W)); y = max(0, int(box[1]*H))
-    w = max(8, int(box[2]*W)); h = max(8, int(box[3]*H))
-    crop = fr[y:y+h, x:x+w]
-    if crop.size == 0: return None
-    sd = float(crop.std())
-    pth = os.path.join(wd, "narrator_feat.npy")
-    if _narr_ref is None and os.path.exists(pth):
-        _narr_ref = np.load(pth)
-        _sface = cv2.FaceRecognizerSF.create(
-            "/home/boss/videogen/face_recognition_sface_2021dec.onnx", "")
-    if _narr_ref is None: return True, sd     # pas de reference : jamais de demontage
-    _, faces = yfd.detect(fr)
-    if faces is not None:
-        for f in faces:
-            fx = float(f[0]) + float(f[2])/2.0; fy = float(f[1]) + float(f[3])/2.0
-            if not (x <= fx <= x+w and y <= fy <= y+h): continue
-            try:
-                ft = _sface.feature(_sface.alignCrop(fr, f)).flatten().astype(np.float32)
-            except Exception:
-                continue
-            c = float(np.dot(ft, _narr_ref)/(np.linalg.norm(ft)*np.linalg.norm(_narr_ref)+1e-9))
-            if c >= 0.363: return True, sd
-    return False, sd
-
+# _card_at est defini PLUS HAUT (juste avant la re-unification) : le veto de vote en a
+# besoin des le bloc des groupes, et un def python doit exister avant son appel.
 def _split_pip_gaps(segs, cap, fps):
     if not fps or fps <= 1: return 0
     out = []; nsplit = 0; ndem = 0
