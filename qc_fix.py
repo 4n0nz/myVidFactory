@@ -5,7 +5,9 @@
 # - fuites groupees (temps proche + zone proche) -> un patch englobant, pas 40 micro-scenes
 # - patch sur scene existante -> la box devient l'UNION (jamais retrecir, sous-couvrir interdit)
 # - patch sur trou "off" -> scene pip inseree
-import sys, os, json
+import sys, os, json, cv2
+sys.path.insert(0, "/home/boss/videogen")
+import narr_role
 
 wd = sys.argv[1]
 leaks = json.load(open(os.path.join(wd, "qc_leaks.json")))
@@ -61,6 +63,37 @@ for L in sorted(leaks, key=lambda z: z["t"]):
         groups.append({"t0": L["t"], "t1": L["t"], "box": card, "cx": cx, "cy": cy,
                        "cw": card[2], "ch": card[3], "n": 1})
 
+_cap = None; _nr = None; _W = 0; _H = 0
+def _preuve(pbox, a, b):
+    """PREUVE avant de peindre du vert sur un trou 'off'. Le patch pur est le seul endroit
+    du pipeline qui CREE du vert la ou il n y en avait aucun : c est donc le seul qui peut
+    violer "un vert sans carte dessous est aussi grave qu une carte sans vert". La fuite
+    vient du RENDU (qc_ident), qui peut se tromper ; la SOURCE tranche.
+    Mesure du 28/07 08h10, XzEg 508.00-508.88 : capture du site BLOCKFIELD, AUCUN narrateur
+    nulle part (probe plein cadre ET dans la box : present=False faceH=0.000) — pourtant un
+    pip de 0.269x0.810 y etait insere et peint en plein milieu de page.
+    Recensement des 41 scenes patchees du corpus (4D7 0, mCE 0, eglV 5, XzEg 34) : 40 ont le
+    narrateur present dans leur box, une seule ne l a pas et c est 508. Les quatre
+    qc_leaks.json du corpus sont vides a l etat final (qc_fix y sort en no-op), le garde est
+    donc inerte sur les etalons par construction en plus de l etre par mesure.
+    La preuve porte sur le NARRATEUR SEUL et pas sur cardness, pour une raison mesuree :
+    sur une capture de site cardness est une passoire. Rejoue du trou 508.0-508.88 avec une
+    box reconstruite : cardness=True sur le seul bord bas (hit 0.68 std 4.9) — un filet
+    horizontal de page, pas une carte — alors qu il n y a aucun narrateur. Une page web est
+    pleine de lignes droites ; un bord franc n y prouve rien. Et cardness n aurait rien
+    sauve : les 40 patches legitimes du corpus passent tous par le narrateur.
+    Echec ouvert : narr_role.FACE_MIN=0.10 jette les petits visages, donc une carte legitime
+    dont le visage est minuscule dans la box serait refusee. Aucun cas dans le corpus."""
+    global _cap, _nr, _W, _H
+    if _cap is None:
+        _cap = cv2.VideoCapture(os.path.join(wd, "source.mp4"))
+        if not _cap.isOpened(): return True      # source illisible : on ne juge pas a l aveugle
+        _W = int(_cap.get(3)); _H = int(_cap.get(4))
+        _nr = narr_role.NarrRole(wd, _W, _H)
+    if not _cap.isOpened(): return True
+    r = [int(pbox[0]*_W), int(pbox[1]*_H), int((pbox[0]+pbox[2])*_W), int((pbox[1]+pbox[3])*_H)]
+    return bool(_nr.probe(_cap, a, b, rect=r, n=3)[0])
+
 def insert_patch(pin, t0, t1, pbox, raw0=None, raw1=None):
     # [t0,t1] est la fuite ELARGIE de PAD_T. Une scene d'un AUTRE layout que la fuite,
     # touchee par ce seul rembourrage, ne doit pas etre unie : eglV, la fuite narrateur
@@ -100,6 +133,9 @@ def insert_patch(pin, t0, t1, pbox, raw0=None, raw1=None):
         if cur >= t1: break
     if cur < t1 - 0.05: holes.append((cur, t1))
     for a, b in holes:
+        if not _preuve(pbox, a, b):
+            print("REFUS patch pur %.2f-%.2f : aucun narrateur dans la box a la SOURCE" % (a, b))
+            continue
         out.append({"start": round(a,2), "end": round(b,2), "region": "patch",
                     "box": [round(v,4) for v in pbox], "edges": [], "n": 0, "src": "ident"})
     out.sort(key=lambda s: s["start"])
