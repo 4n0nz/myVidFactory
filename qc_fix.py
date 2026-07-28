@@ -94,6 +94,31 @@ def _preuve(pbox, a, b):
     r = [int(pbox[0]*_W), int(pbox[1]*_H), int((pbox[0]+pbox[2])*_W), int((pbox[1]+pbox[3])*_H)]
     return bool(_nr.probe(_cap, a, b, rect=r, n=3)[0])
 
+def _borde_hero(base, a, b):
+    """Un trou encadre par du hero des DEUX cotes est le meme plan, pas un pip.
+    Defaut du 28/07 08h20 (XzEg 182-185, 215-218, 698-700.5) : face_to_card() fabrique
+    une geometrie de carte par simple expansion du visage. Sur un plan narrateur live
+    plein cadre il en sort une bande verticale 0.215x0.682 posee SUR le narrateur, sans
+    aucune carte dessous dans la source - alors que le meme plan est rendu hero 100%
+    a 154 s, 173-181 s et 188-192 s (frames xz_pip.jpg). Les trois trous sont chacun
+    bordes de hero avant ET apres (698-700.5 est meme contigu aux deux).
+    Le critere ecarte : "narrateur dominant plein cadre" - mesure du 28/07 08h18, c est
+    une passoire, des pips legitimes montent a faceH 0.384 (eglV 1384-1387 center) et
+    0.355 (mCE 9.9-12.6 center) avec dom=True. Aucun seuil de taille de visage ne
+    separe hero et pip ; la CONTINUITE, si. pinpoint3 applique deja exactement cette
+    regle a ses propres trous (PASS 5, prev_h and next_h -> hero).
+    Voisin IMMEDIAT uniquement, sans limite d ecart : le trou vient d une fuite qc_ident
+    et _preuve a deja exige le narrateur dans la box a la source, donc un long trou de
+    b-roll entre deux heros n arrive pas jusqu ici."""
+    prev = None; nxt = None
+    for s in base:
+        if s["end"] <= a + 0.05:
+            if prev is None or s["end"] > prev["end"]: prev = s
+        elif s["start"] >= b - 0.05:
+            if nxt is None or s["start"] < nxt["start"]: nxt = s
+    return (prev is not None and nxt is not None
+            and prev.get("region") == "hero" and nxt.get("region") == "hero")
+
 def insert_patch(pin, t0, t1, pbox, raw0=None, raw1=None):
     # [t0,t1] est la fuite ELARGIE de PAD_T. Une scene d'un AUTRE layout que la fuite,
     # touchee par ce seul rembourrage, ne doit pas etre unie : eglV, la fuite narrateur
@@ -132,9 +157,15 @@ def insert_patch(pin, t0, t1, pbox, raw0=None, raw1=None):
         cur = max(cur, b)
         if cur >= t1: break
     if cur < t1 - 0.05: holes.append((cur, t1))
+    base = list(out)
     for a, b in holes:
         if not _preuve(pbox, a, b):
             print("REFUS patch pur %.2f-%.2f : aucun narrateur dans la box a la SOURCE" % (a, b))
+            continue
+        if _borde_hero(base, a, b):
+            print("HERO trou %.2f-%.2f : encadre par du hero des deux cotes" % (a, b))
+            out.append({"start": round(a,2), "end": round(b,2), "region": "hero",
+                        "box": [0.0,0.0,1.0,1.0], "edges": ["L","T","R","B"], "n": 0, "src": "ident"})
             continue
         out.append({"start": round(a,2), "end": round(b,2), "region": "patch",
                     "box": [round(v,4) for v in pbox], "edges": [], "n": 0, "src": "ident"})
