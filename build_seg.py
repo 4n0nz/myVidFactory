@@ -19,10 +19,14 @@ for f in os.listdir(segdir):
     if f.endswith(('.png', '.mp4', '.txt')): os.remove(segdir + '/' + f)
 
 r = subprocess.check_output(
-    'ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate -of csv=p=0 ' + source,
+    'ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,nb_frames -of csv=p=0 ' + source,
     shell=True).decode().strip().split(',')
 W, H = int(r[0]), int(r[1])
 num, den = r[2].split('/'); FPS = round(float(num) / float(den), 4)
+RATE = '%s/%s' % (num, den)     # cadence EXACTE pour -r : 29.97 != 30000/1001
+FPSX = float(num) / float(den)  # grille de frames de la source
+try: NF = int(r[3])
+except Exception: NF = 0
 
 NV = "-c:v h264_nvenc -preset p4 -rc vbr -cq 23 -b:v 0"
 # VF_ENC=cpu : fallback libx264 quand NVENC est mort (driver upgrade sous module charge,
@@ -36,7 +40,7 @@ if not _enc:
         "-c:v h264_nvenc /tmp/nvenc_probe.mp4 2>/dev/null") == 0 else 'cpu'
 if _enc == 'cpu':
     NV = "-c:v libx264 -preset fast -crf 23"
-AVIN = ('-f lavfi -i color=c=0x00FF00:s=%dx%d:r=%s' % (W, H, FPS)) if os.environ.get('GREEN_PIP','0').strip()=='1' else None
+AVIN = ('-f lavfi -i color=c=0x00FF00:s=%dx%d:r=%s' % (W, H, RATE)) if os.environ.get('GREEN_PIP','0').strip()=='1' else None
 
 # Mode FIXE si PIP_RECT fourni (env "x,y,w,h"), sinon mode PAR-SEGMENT (bbox detectee).
 _env = os.environ.get('PIP_RECT', '').strip()
@@ -169,20 +173,36 @@ def cover_auto(w, h):
         return cover_col(w, h)
     return cover(w, h)
 
+# PAVAGE SUR LA GRILLE DE FRAMES (2026-07-27). Les bornes etaient passees telles quelles
+# a -t <duree arrondie au centieme> : ffmpeg sort ceil(d*fps) frames, donc le concat gagnait
+# jusqu'a 1 frame par segment et le rendu DERIVAIT de la source. eglV passe 16 : 41821
+# frames rendues pour 41817 dans la source, et le vert arrivait deja +0.21s trop tard a
+# t=43 (sonde verte : carte a nu 42.9-43.2, verdict Boss 27/07 07h25) ; la video se
+# desynchronisait aussi de l'audio, muxe sur l'horloge source. Chaque scene devient un
+# INDEX de frame, la fin de chaque segment est le DEBUT du suivant (jamais sa propre borne
+# arrondie) et la longueur est imposee en frames : les segments pavent la timeline sans
+# trou ni recouvrement, derive nulle par construction, meme si une scene est trop courte
+# pour survivre a l'arrondi.
+_i0 = [int(round(s['start'] * FPSX)) for s in hmap]
+_last = NF if NF > _i0[-1] else int(round(hmap[-1]['end'] * FPSX))
+_i1 = _i0[1:] + [_last]
+
 lines = ["#!/bin/bash", "set -e", "exec > %s/seg.log 2>&1" % workdir, "echo '=== START SEG RENDER ==='",
          "date", 'T0=$(date +%s)']
 concat = []
 for si, s in enumerate(hmap):
-    d = round(s['end'] - s['start'], 3)
-    if d <= 0: continue
+    n = _i1[si] - _i0[si]
+    if n <= 0: continue
+    d = n / FPSX
+    din = d + 2.0 / FPSX        # lecture un peu plus longue : -frames:v tranche net
     sf = "%s/seg%04d.mp4" % (segdir, si)
-    ss = s['start']; host = s['host']
+    ss = _i0[si] / FPSX; host = s['host']
 
     if host == 'hero':
         fc = av_in()+"%s[av];[0:v][av]overlay=0:0:shortest=1[vo]" % cover(W, H)
         cmd = ('ffmpeg -y -ss %s -t %s -i %s %s '
-               '-filter_complex "%s" -map "[vo]" -an -r %s -t %s %s "%s"'
-               % (ss, d, source, AVIN or ('-stream_loop -1 -i ' + avatar), fc, FPS, d, NV, sf))
+               '-filter_complex "%s" -map "[vo]" -an -r %s -frames:v %s %s "%s"'
+               % (ss, din, source, AVIN or ('-stream_loop -1 -i ' + avatar), fc, RATE, n, NV, sf))
     elif host == 'pip' and s.get('mask') and not FIXED:
         # COMPOSITE MASQUE (pixel-exact) : avatar passe a travers le masque de la fenetre webcam
         # (grabCut) -> forme exacte (rond/arrondi), zero fuite. bbox = bbox du masque.
@@ -193,8 +213,8 @@ for si, s in enumerate(hmap):
               "[2:v]scale=%d:%d,format=gray[mk];[av0][mk]alphamerge[av];"
               "[0:v][av]overlay=%d:%d:shortest=1[vo]" % (w, h, w, h, w, h, x, y))
         cmd = ('ffmpeg -y -ss %s -t %s -i %s %s -stream_loop -1 -i %s '
-               '-filter_complex "%s" -map "[vo]" -an -r %s -t %s %s "%s"'
-               % (ss, d, source, AVIN or ('-stream_loop -1 -i ' + avatar), mp, fc, FPS, d, NV, sf))
+               '-filter_complex "%s" -map "[vo]" -an -r %s -frames:v %s %s "%s"'
+               % (ss, din, source, AVIN or ('-stream_loop -1 -i ' + avatar), mp, fc, RATE, n, NV, sf))
     elif host == 'pip':
         rect = FIXED if FIXED else (seg_rect(s['bbox']) if s.get('bbox') else None)
         if rect:
@@ -204,14 +224,14 @@ for si, s in enumerate(hmap):
             else: rnd = detect_round(x, y, w, h, ss, d)
             fc = pip_fc(w, h, x, y, rnd)
             cmd = ('ffmpeg -y -ss %s -t %s -i %s %s '
-                   '-filter_complex "%s" -map "[vo]" -an -r %s -t %s %s "%s"'
-                   % (ss, d, source, AVIN or ('-stream_loop -1 -i ' + avatar), fc, FPS, d, NV, sf))
+                   '-filter_complex "%s" -map "[vo]" -an -r %s -frames:v %s %s "%s"'
+                   % (ss, din, source, AVIN or ('-stream_loop -1 -i ' + avatar), fc, RATE, n, NV, sf))
         else:  # pip sans bbox exploitable -> source brute
-            cmd = ('ffmpeg -y -ss %s -t %s -i %s -an -r %s -t %s %s "%s"'
-                   % (ss, d, source, FPS, d, NV, sf))
+            cmd = ('ffmpeg -y -ss %s -t %s -i %s -an -r %s -frames:v %s %s "%s"'
+                   % (ss, din, source, RATE, n, NV, sf))
     else:  # off -> source brut
-        cmd = ('ffmpeg -y -ss %s -t %s -i %s -an -r %s -t %s %s "%s"'
-               % (ss, d, source, FPS, d, NV, sf))
+        cmd = ('ffmpeg -y -ss %s -t %s -i %s -an -r %s -frames:v %s %s "%s"'
+               % (ss, din, source, RATE, n, NV, sf))
 
     concat.append("file '%s'" % sf)
     lines.append("echo '--- seg %d/%d  %s  %.1f-%.1fs ---'" % (si + 1, len(hmap), host, s['start'], s['end']))
