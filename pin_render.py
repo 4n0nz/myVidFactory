@@ -369,6 +369,16 @@ for p in pips:
     # motion_extend (Id9G 16-19s : bord ajuste -> colonne pleine hauteur)
     if p.get("pkeep") and not p.get("pident"):
         c = _cons_match(p["box"])
+        # ... mais un patch geom ajuste un BORD de pip, il ne peut pas decreter que la
+        # scene EST un pip. La promotion hero du consensus est plus bas dans la boucle :
+        # le continu du pkeep l'avalait. TzJ 12-22 s (patched_keep) = narrateur live
+        # plein cadre, consensus kind=hero, _narr_live vrai (visage 0.31 H, cos 0.846),
+        # et le rendu peint quand meme une box verte sur son visage = defaut ADJj 0:08.
+        # Meme gate que la promotion normale, aucun seuil nouveau.
+        if c is not None and (c.get("kind") == "hero" or c["box"][2]*c["box"][3] > 0.85)            and (p.get("src") != "ident" or _narr_live(p["t0"], p["t1"])):
+            p["seg"]["host"] = "hero"; p["seg"]["bbox"] = None; p["hero"] = True
+            p["shape"], p["abox"] = "rect90", list(c["box"])
+            continue
         p["shape"] = (c["shape"] if c is not None else "rect")
         p["abox"] = list(p["box"]); p["cons"] = True
         continue
