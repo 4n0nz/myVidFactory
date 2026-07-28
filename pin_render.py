@@ -682,6 +682,66 @@ print("heros: %d / masques uniques: %d / groupes position: %d" % (nhero, len(_ma
 if prev<DUR-0.3:
     segs.append({"host":"off","start":round(prev,2),"end":round(DUR,2),"bbox":None})
 
+
+# ---- CALAGE des frontieres sur la VRAIE coupe du montage source ----
+# Les bornes sortent de sondes a pas fini (STEP=1.0 / FINE=0.25 de pinpoint3) : elles
+# tombent a cote de la coupe reelle. Le rendu etant devenu frame-exact (calage grille
+# de build_seg), l ecart se voit a l oeil. Mesure eglV passe 17 : 7 bornes sur 10
+# fausses, de -1 a +8 frames. Borne trop tot = vert peint avant que la carte arrive
+# (vert sans carte dessous) ; trop tard = carte a nu apres la coupe. Les deux violent
+# la couverture. On recale chaque borne sur le pic de difference image de la SOURCE
+# dans une fenetre de +-0.5 s, et seulement si ce pic a l amplitude d une VRAIE coupe.
+# Seuil mesure sur les deux etalons : les 12 coupes franches donnent v>=33, les 6 bornes
+# qui ne sont pas des coupes donnent v<=17.5 (eglV t=9.0 : le pip continue, la borne
+# divise un plan) -> CUT_V=25 tombe dans le trou. Un test en ratio (pic / mediane de la
+# fenetre) ne separe PAS : t=9.0 sort a 9.7x sur un fond calme et passait quand meme.
+# L amplitude absolue est la seule qui discrimine.
+CUT_V = 25.0   # profil mesure sur les 2 etalons : vraies coupes >=33, non-coupes <=17.5
+def _snap_cuts(segs, cap, fps):
+    if not fps or fps <= 1: return 0
+    win = max(2, int(round(0.5 * fps)))
+    bounds = sorted({round(s["start"], 3) for s in segs if s["start"] > 0.2})
+    newb = {}
+    for b in bounds:
+        k = int(round(b * fps))
+        lo = max(0, k - win)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, lo)
+        prev = None; d = []
+        for i in range(lo, k + win + 1):
+            ok, f = cap.read()
+            if not ok: break
+            sm = cv2.resize(f, (160, 90)).astype(np.float32)
+            if prev is not None: d.append((i, float(np.abs(sm - prev).mean())))
+            prev = sm
+        if len(d) < 5: continue
+        imax, vmax = max(d, key=lambda t: t[1])
+        if vmax < CUT_V: continue
+        nb = round(imax / fps, 4)
+        if abs(nb - b) > 0.5 / fps: newb[b] = nb
+    if not newb: return 0
+    # une borne ne bouge que si AUCUN segment ne devient vide/inverse
+    for old, new in sorted(newb.items()):
+        trial = []
+        for s in segs:
+            a = new if abs(round(s["start"], 3) - old) < 1e-9 else s["start"]
+            z = new if abs(round(s["end"], 3) - old) < 1e-9 else s["end"]
+            trial.append((a, z))
+        if any(z - a < 1.5 / fps for a, z in trial):
+            print("  snap %.3f -> %.4f REFUSE (segment vide)" % (old, new)); continue
+        for s, (a, z) in zip(segs, trial): s["start"], s["end"] = a, z
+        print("  snap %.3f -> %.4f (%+d frames)" % (old, new, int(round((new - old) * fps))))
+    # host_map porte deja des "end" qui ne collent pas au "start" suivant (eglV : seg pip
+    # finit 906.62, le hero suivant demarre 906.75). build_seg ne lit que les starts, donc
+    # c est inoffensif au rendu — mais reculer un start peut le faire passer AVANT le end
+    # precedent. On borne le chevauchement qu on vient de creer, sans toucher aux trous
+    # preexistants (greenscan sonde au milieu de [start,end] : un end incoherent decalerait
+    # sa sonde).
+    for i in range(len(segs) - 1):
+        if segs[i]["end"] > segs[i+1]["start"]: segs[i]["end"] = segs[i+1]["start"]
+    return len(newb)
+
+_snap_cuts(segs, cap, cap.get(cv2.CAP_PROP_FPS))
+
 json.dump(segs,open(os.path.join(wd,"host_map.json"),"w"),indent=2)
 print("host_map: %d segs (%d pip) genere depuis pinpoint"%(len(segs),sum(1 for s in segs if s["host"]=="pip")))
 cap.release()
