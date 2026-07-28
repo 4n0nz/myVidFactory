@@ -9,6 +9,21 @@ sys.path.insert(0, "/home/boss/yolo/scripts")
 import webcam_mask, vlm_probe
 YUNET = "/home/boss/videogen/face_detection_yunet_2023mar.onnx"
 MG = 0.08
+# La marge de couverture est une quantite PHYSIQUE : elle sert a cacher le flou 5x5 du
+# masque et le trait de bord de la carte. En PROPORTION elle explose sur les grandes
+# cartes. Mesure du 28/07 07h15 (mCE 13.0-20.1) : carte reelle x 0-0.1818 y 0-0.4259
+# (bord franc contre une page BLANCHE, mesure independante a 3 instants, et _true_rect
+# la trouvait deja au pixel) ; le vert sortait a x 0-0.1958 y 0-0.4583, soit +27 px a
+# droite et +35 px en bas de vert peint sur la page blanche. Le cap existant ne regarde
+# que l ecart au bord d ECRAN (0.80 ici) : il ne mord jamais quand la carte est loin du
+# bord, c est-a-dire justement quand le debord se voit.
+# Cap absolu neutre sur les etalons PAR MESURE : les deux etalons passent par la branche
+# cons (mg=0.020) et leur expansion maximale vaut 12.6 px (eglV droite 12.6 / haut 9.8 ;
+# 4D7 gauche 9.6 / haut 5.4). 13 px les laisse donc bit-identiques, et c est la plus
+# grande marge que Boss ait validee a l oeil — au-dela, c est de la sur-couverture jamais
+# jugee. Etape suivante nommee : le cap devrait porter sur l ecart carte->contenu de page,
+# pas sur une constante, mais cela demande une mesure du voisinage qui n existe pas encore.
+MG_PX = 13.0
 
 wd = sys.argv[1]
 pin = json.load(open(os.path.join(wd, "host_map_pin.json")))
@@ -202,16 +217,17 @@ def draw(box, shape, idx, mg=MG):
     # l'ecart au bord d'ecran : une carte a marge design garde une marge visible ; flush
     # seulement si la box touche deja (<=0.5% = touche, clamp plein autorise).
     bx0, by0 = box[0], box[1]; bx1, by1 = box[0]+box[2], box[1]+box[3]
-    def _exp(amt, gap):
+    def _exp(amt, gap, dim):
+        amt = min(amt, MG_PX/dim)            # marge PHYSIQUE : jamais plus de MG_PX pixels
         if gap <= 0.005: return amt          # touche deja -> expansion libre (clamp ecran)
         return min(amt, gap*0.5)             # marge design -> on n'en mange que la moitie max
     # clip ecran AVANT pixels : l'ancien x=max(0,min(W-w,x)) DECALAIT le masque,
     # l'expansion libre du cote flush ressortait en debord du cote marge design
     # (eglV 1365 : cy0 0.1661 repousse a 0.1056 — "vert plus grand que la carte").
-    cx0 = max(0.0, bx0 - _exp(box[2]*mg, bx0))
-    cy0 = max(0.0, by0 - _exp(box[3]*mg, by0))
-    cx1 = min(1.0, bx1 + _exp(box[2]*mg, 1.0-bx1))
-    cy1 = min(1.0, by1 + _exp(box[3]*mg, 1.0-by1))
+    cx0 = max(0.0, bx0 - _exp(box[2]*mg, bx0, W))
+    cy0 = max(0.0, by0 - _exp(box[3]*mg, by0, H))
+    cx1 = min(1.0, bx1 + _exp(box[2]*mg, 1.0-bx1, W))
+    cy1 = min(1.0, by1 + _exp(box[3]*mg, 1.0-by1, H))
     cw = cx1-cx0; ch = cy1-cy0
     x=int(cx0*W);y=int(cy0*H);w=max(4,int(cw*W));h=max(4,int(ch*H))
     w=min(w,W-x); h=min(h,H-y)
