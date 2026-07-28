@@ -11,6 +11,7 @@
 #   - stabilite : segments pip adjacents meme position -> meme bbox
 # Rapport JSON qc_geom.json + exit 1 si echecs. Zero VLM.
 import sys, os, json, cv2, numpy as np
+import cardness
 
 wd = sys.argv[1]
 src = os.path.join(wd, "source.mp4")
@@ -90,6 +91,24 @@ for s in pips:
     tr = true_rect(ex, s["start"], s["end"])
     if tr is None: continue
     cx, cy, cw, ch = tr
+    # PREUVE BORD PAR BORD (28/07) — meme doctrine que qc_fid : une carte posee en
+    # AUTORITE doit d abord etre prouvee. true_rect ne mesure qu UNE ligne et UNE
+    # colonne au centre du masque (l.48), donc le contenu de page lui sert de bord.
+    # ON N ETOUFFE PAS LE VERDICT, on le TAGUE : mesure du 28/07 03h21, supprimer
+    # le verdict fait aussi disparaitre l harmonisation de qc_geom_fix (l.96-109),
+    # qui est declenchee par la PRESENCE d un fail et ramenait 4 scenes d eglV a la
+    # taille consensus — l aval passait de 0.2474 (marge a gauche, consensus n=1335
+    # = 0.227) a 0.3354 colle a x=0.0, soit PLUS de vert. Seule l union destructrice
+    # doit tomber : qc_geom_fix ne patche que si prouvee.
+    _, _cdet = cardness.card_score(cap, [cx, cy, cx + cw, cy + ch],
+                                   s["start"], s["end"], W, H)
+    _bad = [k for k, v in _cdet.items()
+            if v is not None and (v[1] is None or v[1] > cardness.STD_MAX
+                                  or v[0] < cardness.HIT_STRAIGHT)]
+    if _bad:
+        print("  t=%.1f-%.1f carte NON PROUVEE : cote(s) %s pas une droite (%s)"
+              % (s["start"], s["end"], ",".join(sorted(_bad)),
+                 " ".join("%s=%s" % (k, _cdet[k]) for k in sorted(_bad))))
     tol = 0.015*min(W, H)
     iy0 = max(cy, my); iy1 = min(cy+ch, my+mh)
     ix0 = max(cx, mx); ix1 = min(cx+cw, mx+mw)
@@ -101,13 +120,15 @@ for s in pips:
     if sides and any(strip_act(b, s["start"], s["end"]) > ACT_MIN for b in sides):
         fails.append({"t": round((s["start"]+s["end"])/2, 1), "type": "SOUS-COUVERTURE",
                       "carte": [round(cx/W,3), round(cy/H,3), round(cw/W,3), round(ch/H,3)],
-                      "masque": [round(v,3) for v in bb]})
+                      "masque": [round(v,3) for v in bb],
+                      "prouvee": not _bad})
         continue
     if mw*mh > 1.6*cw*ch:
         fails.append({"t": round((s["start"]+s["end"])/2, 1), "type": "TROP-GRAND",
                       "ratio": round((mw*mh)/(cw*ch), 2),
                       "carte": [round(cx/W,3), round(cy/H,3), round(cw/W,3), round(ch/H,3)],
-                      "masque": [round(v,3) for v in bb]})
+                      "masque": [round(v,3) for v in bb],
+                      "prouvee": not _bad})
 
 # stabilite : pips adjacents (<3s d'ecart) de centres proches -> meme bbox exigee
 for i in range(1, len(pips)):

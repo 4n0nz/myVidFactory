@@ -87,7 +87,16 @@ for f in fails:
                 # consensus EN TAILLE (doctrine "un layout = position ET taille") est un
                 # artefact de mesure, pas une fuite : on ne patche pas, la scene garde sa
                 # box et pin_render lui rendra le consensus.
-                if cb is None or (_same_dim(cb[2], ub[2]) and _same_dim(cb[3], ub[3])):
+                # PREUVE (28/07) : la carte doit etre une CARTE (cotes droits, tag
+                # pose par qc_geom). Sans cluster consensus, cb is None -> l union
+                # etait appliquee SANS aucun controle de taille, MONOTONE et
+                # patched_keep, donc figee pour toutes les passes suivantes. Mesure
+                # du 28/07 03h20 sur XzEg : 27 cartes posees en autorite, 22 sans
+                # AUCUN cote droit. Le verdict reste au rapport (et alimente encore
+                # l harmonisation) ; seule l union tombe.
+                if not f.get("prouvee", True):
+                    pass
+                elif cb is None or (_same_dim(cb[2], ub[2]) and _same_dim(cb[3], ub[3])):
                     s["box"] = ub; s["patched"] = True; s["patched_keep"] = True; n += 1
             # TROP-GRAND : PAS de resserrage automatique — les deux boucles correctives
             # s'ecrasaient mutuellement (ident elargit, geom resserre) -> oscillation
