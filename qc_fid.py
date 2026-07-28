@@ -39,7 +39,7 @@ NR = narr_role.NarrRole(wd, W, H)
 
 TOL_BIG = 0.020     # le vert deborde la carte de >2.0% de l ecran -> TROP-GRAND
 TOL_SMALL = 0.015   # la carte deborde le vert de >1.5% -> SOUS-COUVERTURE
-SUJET_MIN = 0.25    # faceH / hauteur de carte : pip webcam 0.38-0.47, contenu 0.00-0.11
+SUJET_MIN = 0.25    # faceH / hauteur du VERT : pip webcam 0.33-0.47, contenu 0.00-0.22
 
 
 def green_box(t):
@@ -153,20 +153,34 @@ for e in hm:
                       'card': None, 'faceH': round(fh, 3), 'dominant': bool(dom)})
         continue
 
+    # LE NARRATEUR EST-IL LE SUJET ? — place ICI, AVANT card_rect, et mesure sur le VERT.
+    # Trou du 28/07 (Boss) : ce test etait APRES `card = card_rect(...)` derriere un
+    # `if card is None: continue`, donc une scene dont la carte n est pas mesurable
+    # QUITTAIT le juge sans etre classee du tout. Mesure du 28/07 04h06 : card_rect
+    # renvoie None sur 10/10 des scenes pip mesurees des 4 etalons (4D7 2, eglV 2,
+    # XzEg 6) — le test ne tournait JAMAIS. C est par ce trou que XzEg 152.5-156.0
+    # gardait un vert sur 72% de l ecran et sortait quand meme fid=OK.
+    # Le vert est toujours disponible, et c est d ailleurs la bonne reference : on juge
+    # ce qu on a PEINT, pas ce qu on croit avoir mesure.
+    # GARDE MESUREE : faceH == 0 = le narrateur n a pas ete TROUVE, pas qu il est absent.
+    # narr_role ignore tout visage < FACE_MIN (0.10 H), donc un petit pip legitime sort
+    # a 0.000. Vu a l oeil le 28/07 04h10 (xz_zoom_faceH0.jpg) : XzEg 131.9 / 138.7 /
+    # 314.8 / 346.5 sont 4 VRAIS pips du narrateur a faceH=0.000 — le verdict les aurait
+    # effaces. Carte presente + narrateur non trouve = ambigu -> on ne touche pas.
+    pres, dom, fh = NR.probe(cs, t0, t1, rect=gb)
+    gh = (gb[3] - gb[1]) / float(H)
+    if fh > 0 and gh > 0 and (fh / gh) < SUJET_MIN:
+        fails.append({'t0': t0, 't1': t1, 'type': 'PAS-NARRATEUR', 'green': nb(gb),
+                      'card': None, 'faceH': round(fh, 3), 'dominant': bool(dom),
+                      'ratio': round(fh / gh, 2)})
+        continue
+
     card = card_rect(gb, t0, t1)
     if card is None: continue
 
-
-    # le narrateur est-il le SUJET de cette carte ? (pip webcam 0.38-0.47 de la hauteur
-    # de carte ; photo/b-roll ou il apparait 0.00-0.11)
-    pres, dom, fh = NR.probe(cs, t0, t1, rect=card)
-    ch = (card[3] - card[1]) / float(H)
-    if ch > 0 and (fh / ch) < SUJET_MIN:
-        fails.append({'t0': t0, 't1': t1, 'type': 'PAS-NARRATEUR', 'green': nb(gb),
-                      'card': nb(card), 'faceH': round(fh, 3), 'ratio': round(fh / ch, 2)})
-        continue
-
     # PREUVE BORD PAR BORD (28/07) — placee ICI, apres PAS-NARRATEUR, et pas avant.
+    # (PAS-NARRATEUR est remonte au-dessus de card_rect le 28/07 04h15 ; cet ordre-la
+    # tient toujours : la preuve ne gate que les verdicts de geometrie.)
     # Elle ne protege que les deux verdicts qui posent la carte en AUTORITE
     # (patched_keep, non monotone : ils peuvent AGRANDIR le vert), car une mesure fausse
     # y est gravee et redevient invisible a tous les juges. Mesures du 28/07 :
