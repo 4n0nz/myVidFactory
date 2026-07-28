@@ -201,6 +201,17 @@ def consensus(c):
     # carte — probleme de classement, pas de geometrie. Seuil place a 0.40 pour le laisser
     # hors de portee et garder les deux etalons a l identique ; il pourra descendre quand
     # eglV sera reprise, la mesure est deja faite.
+    # CORRECTION mesuree A LA FRAME le 28/07 07h00 (le chiffre seul m avait trompe) :
+    # sur XzEg 315-356 la carte REELLE vaut x 0.052-0.238 y 0.587-0.863, soit 0.186x0.276.
+    # L anneau n est donc pas uniformement faux sur fond anime : il porte la LARGEUR de
+    # 0.060 a 0.158 (32% -> 85% de la carte, du bon travail) et la HAUTEUR de 0.264 a
+    # 0.665 (96% -> 241%, 58% du vert peint hors carte). L abstention garde la hauteur
+    # juste au pixel et laisse la largeur SOUS-COUVERTE a 32%. Erreur totale mesuree en
+    # aire d ecran : 0.069 avant, 0.035 apres — moitie moins, et plus jamais de vert hors
+    # carte. Ce n est pas la fin : la vraie reponse est que l anneau doit avoir le droit
+    # de grandir mais PAS de traverser un bord de carte, c est-a-dire une ligne de gradient
+    # persistante (gper est deja calcule juste au-dessus, et cardness sait la prouver).
+    # Defaut restant a ouvrir : sous-couverture horizontale sur fond anime.
     bgm = np.ones((H, W), bool); bgm[by0:by1, bx0:bx1] = False
     bg_live = float(np.mean(actF[bgm] >= 0.30))
     for _ in range(0 if bg_live > BG_LIVE_MAX else 10):
