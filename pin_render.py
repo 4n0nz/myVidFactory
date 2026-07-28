@@ -821,7 +821,94 @@ def _split_hero_cuts(segs, cap, fps):
     segs[:] = out
     return nsplit
 
+# ---- TROU DE CARTE A L INTERIEUR D UNE SCENE PIP ----
+# Une scene pip de pinpoint3 couvre parfois plusieurs plans, et la carte n est pas la
+# sur tous. Mesure TzJCly4YgDQ scene 532.5-542.1 : carte presente 532.5-536.1 (visage
+# narrateur cos 0.87-0.93, ecart-type de la box ~50), ABSENTE 536.1-539.84 (aucun
+# visage, ecart-type 4.4 = slide blanche vide), presente a nouveau jusqu a 542.1. Le
+# rendu peignait donc 3.7 s de vert sur une slide vide = "vert sans carte dessous".
+# Les bornes du trou sont de VRAIES coupes (amplitude 205 sur un seuil CUT_V de 25),
+# donc on reutilise _cuts_in : aucun echantillonnage nouveau, aucune borne inventee.
+# Deux preuves EXIGEES pour demonter un morceau, comme partout ailleurs dans ce
+# fichier : pas de visage narrateur dans la box (meme cos>=0.363 qu ailleurs) ET box
+# plate par rapport au reste de la MEME scene. Le rapport est auto-calibre, pas un
+# seuil absolu : mesure 0.09-0.20 dans le trou contre 1.0 avec la carte, le tiers
+# tombe dans le vide entre les deux. La double preuve protege le cas Id9G (narrateur
+# FLOUTE, aucun visage detectable) : une personne floue garde de la texture.
+# Bornes de cout et de neutralite : scenes >180 s ignorees, _cuts_in rend [] au-dela
+# de 8 pics (plan a forte motion), morceaux voisins de meme host refusionnes, et une
+# scene dont aucun morceau ne tombe est laissee telle quelle. La scene pip de 864 s
+# d eglV (37 coupes) est donc intouchee par les deux gardes.
+def _card_at(box, t):
+    global _narr_ref, _sface
+    cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
+    ok, fr = cap.read()
+    if not ok: return None
+    x = max(0, int(box[0]*W)); y = max(0, int(box[1]*H))
+    w = max(8, int(box[2]*W)); h = max(8, int(box[3]*H))
+    crop = fr[y:y+h, x:x+w]
+    if crop.size == 0: return None
+    sd = float(crop.std())
+    pth = os.path.join(wd, "narrator_feat.npy")
+    if _narr_ref is None and os.path.exists(pth):
+        _narr_ref = np.load(pth)
+        _sface = cv2.FaceRecognizerSF.create(
+            "/home/boss/videogen/face_recognition_sface_2021dec.onnx", "")
+    if _narr_ref is None: return True, sd     # pas de reference : jamais de demontage
+    _, faces = yfd.detect(fr)
+    if faces is not None:
+        for f in faces:
+            fx = float(f[0]) + float(f[2])/2.0; fy = float(f[1]) + float(f[3])/2.0
+            if not (x <= fx <= x+w and y <= fy <= y+h): continue
+            try:
+                ft = _sface.feature(_sface.alignCrop(fr, f)).flatten().astype(np.float32)
+            except Exception:
+                continue
+            c = float(np.dot(ft, _narr_ref)/(np.linalg.norm(ft)*np.linalg.norm(_narr_ref)+1e-9))
+            if c >= 0.363: return True, sd
+    return False, sd
+
+def _split_pip_gaps(segs, cap, fps):
+    if not fps or fps <= 1: return 0
+    out = []; nsplit = 0; ndem = 0
+    for s in segs:
+        dur = s["end"] - s["start"]
+        if s["host"] != "pip" or not s.get("bbox") or dur < 1.5 or dur > 180.0:
+            out.append(s); continue
+        cuts = _cuts_in(cap, fps, s["start"] + 0.4, s["end"] - 0.4)
+        if not cuts:
+            out.append(s); continue
+        edges = [s["start"]] + cuts + [s["end"]]
+        pieces = []
+        for a, z in zip(edges, edges[1:]):
+            if z - a < 0.4: continue
+            pr = [_card_at(s["bbox"], a + (z-a)*fr) for fr in (0.2, 0.5, 0.8)]
+            pr = [q for q in pr if q is not None]
+            if not pr: pieces.append([a, z, True, 0.0]); continue
+            pieces.append([a, z, any(q[0] for q in pr), max(q[1] for q in pr)])
+        if not pieces:
+            out.append(s); continue
+        sdmax = max(p[3] for p in pieces)
+        keep = [p[2] or p[3] >= sdmax/3.0 for p in pieces]
+        if all(keep):
+            out.append(s); continue
+        nsplit += 1
+        for (a, z, _f, _sd), k in zip(pieces, keep):
+            if k:
+                q = dict(s); q["start"] = round(a, 2); q["end"] = round(z, 2)
+            else:
+                q = {"host": "off", "start": round(a, 2), "end": round(z, 2), "bbox": None}
+                ndem += 1
+                print("  pip trou %.2f-%.2f -> off (ecart-type %.1f / %.1f)" % (a, z, _sd, sdmax))
+            if out and out[-1]["host"] == q["host"] and out[-1].get("bbox") == q.get("bbox")                and abs(out[-1]["end"] - q["start"]) < 1e-6:
+                out[-1]["end"] = q["end"]; continue
+            out.append(q)
+    if nsplit: print("  pip/trous : %d scenes decoupees, %d morceaux off" % (nsplit, ndem))
+    segs[:] = out
+    return nsplit
+
 _split_hero_cuts(segs, cap, cap.get(cv2.CAP_PROP_FPS))
+_split_pip_gaps(segs, cap, cap.get(cv2.CAP_PROP_FPS))
 
 json.dump(segs,open(os.path.join(wd,"host_map.json"),"w"),indent=2)
 print("host_map: %d segs (%d pip) genere depuis pinpoint"%(len(segs),sum(1 for s in segs if s["host"]=="pip")))
