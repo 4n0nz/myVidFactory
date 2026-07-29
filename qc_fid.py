@@ -39,7 +39,7 @@ NR = narr_role.NarrRole(wd, W, H)
 
 TOL_BIG = 0.020     # le vert deborde la carte de >2.0% de l ecran -> TROP-GRAND
 TOL_SMALL = 0.015   # la carte deborde le vert de >1.5% -> SOUS-COUVERTURE
-SUJET_MIN = 0.25    # faceH / hauteur du VERT : pip webcam 0.33-0.47, contenu 0.00-0.22
+SUJET_MIN = 0.18    # faceH / hauteur du VERT : pip webcam 0.33-0.47, contenu 0.00-0.22
 
 
 def green_box(t):
@@ -124,6 +124,20 @@ def cons_match(card):
     return best if bd < 0.20 else None
 
 
+
+def cons_kind(rect):
+    """kind du cluster consensus le plus proche (hero/pip), ou None. Le consensus repose
+    sur des centaines d echantillons : il tranche mieux qu un seuil d aire. Ajoute le
+    29/07 apres deux erreurs mesurees sur XzEg — voir les deux usages ci-dessous."""
+    if not cons: return None
+    cx = (rect[0] + rect[2]) / 2.0 / W; cy = (rect[1] + rect[3]) / 2.0 / H
+    best = None; bd = 9.0
+    for c in cons:
+        b = c['box']; d = abs(cx - (b[0] + b[2] / 2)) + abs(cy - (b[1] + b[3] / 2))
+        if d < bd: best, bd = c, d
+    if best is None or bd > 0.18: return None
+    return best.get('kind')
+
 def nb(r):
     return [round(r[0] / W, 4), round(r[1] / H, 4),
             round((r[2] - r[0]) / W, 4), round((r[3] - r[1]) / H, 4)]
@@ -163,6 +177,20 @@ for e in hm:
         # de pip correct, vert 15% de l ecran) partait en hero plein ecran.
         ga = (gb[2] - gb[0]) * (gb[3] - gb[1]) / float(W * H)
         pres, dom, fh = NR.probe(cs, t0, t1)
+        _k = cons_kind(gb)
+        if _k == 'pip':
+            # cluster PIP confirme (XzEg coin bas-droit, n=87) : vrai pip meme si le
+            # visage y est trop petit pour etre identifie (~5% de H, sous le seuil de
+            # detection). Le declarer FAUX-PIP laissait le vrai narrateur a nu.
+            continue
+        if _k == 'hero':
+            # cluster HERO confirme (XzEg rectangle vertical, n=221) : hero rate quelle
+            # que soit l aire — la garde d aire (>=25%) le ratait a 23.2% et le laissait
+            # en pip, d ou le rectangle vertical sur le torse vu par Boss.
+            fails.append({'t0': t0, 't1': t1, 'type': 'HERO-RATE', 'green': nb(gb),
+                          'card': None, 'faceH': round(fh, 3), 'dominant': bool(dom),
+                          'preuve': 'consensus kind=hero'})
+            continue
         if ga < 0.25:
             if not pres: 
                 fails.append({'t0': t0, 't1': t1, 'type': 'FAUX-PIP', 'green': nb(gb),
@@ -189,7 +217,7 @@ for e in hm:
     # effaces. Carte presente + narrateur non trouve = ambigu -> on ne touche pas.
     pres, dom, fh = NR.probe(cs, t0, t1, rect=gb)
     gh = (gb[3] - gb[1]) / float(H)
-    if fh > 0 and gh > 0 and (fh / gh) < SUJET_MIN:
+    if fh > 0 and gh > 0 and (fh / gh) < SUJET_MIN and cons_kind(gb) != 'pip':
         fails.append({'t0': t0, 't1': t1, 'type': 'PAS-NARRATEUR', 'green': nb(gb),
                       'card': None, 'faceH': round(fh, 3), 'dominant': bool(dom),
                       'ratio': round(fh / gh, 2)})
