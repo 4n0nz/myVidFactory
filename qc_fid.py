@@ -64,6 +64,21 @@ def _scan(line):
     return None
 
 
+
+def _scan_edge(line, span):
+    """Bord de carte cherche DEPUIS le bord de l ecran. Retourne l offset de la
+    transition, ou 0 si la carte touche reellement le bord.
+    Deux garde-fous contre le faux bord interne : la transition doit survenir dans les
+    12 premiers % de la fenetre, et la bande qui la precede doit etre homogene
+    (ecart-type < 12 par canal) — une marge de fond est unie, un contenu de carte non."""
+    lim = max(4, int(0.12 * span))
+    if len(line) < 8: return 0
+    i = _scan(line[:lim])
+    if i is None or i < 3: return 0
+    band = line[:i]
+    if band.size and float(np.max(np.std(band, axis=0))) > 12.0: return 0
+    return i
+
 def card_rect(gb, t0, t1):
     gw = gb[2] - gb[0]; gh = gb[3] - gb[1]
     fx0 = max(0, gb[0] - int(gw * 0.30)); fy0 = max(0, gb[1] - int(gh * 0.30))
@@ -77,10 +92,15 @@ def card_rect(gb, t0, t1):
         if not ok: continue
         img = img.astype('float32')
         row = img[fy0 + fh // 2, fx0:fx1]; col = img[fy0:fy1, fx0 + fw // 2]
-        L = 0 if fx0 == 0 else _scan(row[:fw // 2])
-        R = 0 if fx1 == W else _scan(row[::-1][:fw // 2])
-        T = 0 if fy0 == 0 else _scan(col[:fh // 2])
-        B = 0 if fy1 == H else _scan(col[::-1][:fh // 2])
+        # Cote NON clampe : scan normal depuis l exterieur de la carte.
+        # Cote clampe a l ecran : on ne peut pas partir du fond, on part du bord de
+        # l ecran — la transition n est retenue que si elle est PROCHE (<=12% de la
+        # fenetre) et si la bande qui la precede est HOMOGENE (une marge de fond l est,
+        # l interieur d une carte ne l est pas). Sinon : la carte touche vraiment.
+        L = _scan_edge(row[:fw // 2], fw) if fx0 == 0 else _scan(row[:fw // 2])
+        R = _scan_edge(row[::-1][:fw // 2], fw) if fx1 == W else _scan(row[::-1][:fw // 2])
+        T = _scan_edge(col[:fh // 2], fh) if fy0 == 0 else _scan(col[:fh // 2])
+        B = _scan_edge(col[::-1][:fh // 2], fh) if fy1 == H else _scan(col[::-1][:fh // 2])
         if None in (L, R, T, B): continue
         res.append((L, R, T, B))
     if len(res) < 3: return None
@@ -196,10 +216,34 @@ for e in hm:
     bad = [s for s, v in cdet.items()
            if v is not None and (v[1] is None or v[1] > cardness.STD_MAX
                                  or v[0] < cardness.HIT_STRAIGHT)]
+    # Un cote non prouve n autorise aucun verdict de geometrie SUR CE COTE — mais il
+    # ne doit PAS faire taire le juge sur les autres (Boss 29/07 : « fid=OK » ne prouvait
+    # plus rien, les cartes etaient rejetees en masse et le juge s abstenait, ce qui a
+    # laisse passer la regression XzEg — 39 pips au lieu de 7 — et la sous-couverture
+    # eglV de 11 px a gauche / 23 px en bas).
+    good = [s for s in 'LTRB' if cdet.get(s) is not None and s not in bad]
+    # DEUXIEME SOURCE DE PREUVE (Boss 29/07) : la preuve bord par bord seule rendait le
+    # juge muet sur les vraies cartes a coins arrondis et fond peu contraste (eglV :
+    # 3 cotes sur 4 non prouves alors que la carte est mesuree juste a 3 px pres).
+    # Si la carte mesuree CONCORDE avec le consensus en aire — un consensus repose sur
+    # des centaines d echantillons, c est une preuve independante et robuste — alors
+    # tous les cotes mesurables sont jugeables. eglV : carte 0.1038 vs consensus 0.092,
+    # ratio 1.13. Une carte fausse s en ecarte largement (mCE +31%, eglV t=7.6 +88%).
+    _cm0 = cons_match(card)
+    if _cm0 is not None:
+        _ca = (card[2] - card[0]) * (card[3] - card[1]) / float(W * H)
+        _ka = _cm0['box'][2] * _cm0['box'][3]
+        if _ka > 0 and 0.77 <= (_ca / _ka) <= 1.30:
+            good = [s for s in 'LTRB' if cdet.get(s) is not None]
     if bad:
-        print('  t=%.1f-%.1f carte %s REJETEE : cote(s) %s pas une droite (%s)'
+        print('  t=%.1f-%.1f carte %s : cote(s) %s non prouve(s) -> juges sur %s'
               % (t0, t1, nb(card), ','.join(sorted(bad)),
-                 ' '.join('%s=%s' % (s, cdet[s]) for s in sorted(bad))))
+                 ','.join(good) if good else 'AUCUN'))
+    if not good:
+        # aucun bord fiable : on ne se tait pas, on le DIT. La scene devra etre revue,
+        # elle ne peut pas etre declaree conforme par defaut.
+        fails.append({'t0': t0, 't1': t1, 'type': 'CARTE-DOUTEUSE', 'green': nb(gb),
+                      'card': nb(card), 'bords': str(cdet)})
         continue
 
     cm = cons_match(card)
@@ -211,13 +255,17 @@ for e in hm:
         # contre 0.227 au consensus). Sous 1.8 on laisse passer les vraies variations
         # de layout (intro eglV, carte collee aux bords : 1.6).
         if ka > 0 and (ca / ka > 1.8 or ka / ca > 1.8): continue
-    over = [(card[0] - gb[0]) / W, (card[1] - gb[1]) / H,
-            (gb[2] - card[2]) / W, (gb[3] - card[3]) / H]
+    # ecarts par cote, dans l ordre L, T, R, B ; >0 = le vert deborde la carte
+    over_all = [(card[0] - gb[0]) / W, (card[1] - gb[1]) / H,
+                (gb[2] - card[2]) / W, (gb[3] - card[3]) / H]
+    idx = {'L': 0, 'T': 1, 'R': 2, 'B': 3}
+    over = [over_all[idx[s]] for s in good]     # seuls les cotes prouves comptent
     big = max(over); small = max(-v for v in over)
     typ = 'TROP-GRAND' if big > TOL_BIG else ('SOUS-COUVERTURE' if small > TOL_SMALL else None)
     if typ:
         fails.append({'t0': t0, 't1': t1, 'type': typ, 'green': nb(gb), 'card': nb(card),
-                      'ecart_pct': [round(v * 100, 1) for v in over]})
+                      'cotes': ''.join(good),
+                      'ecart_pct': [round(v * 100, 1) for v in over_all]})
 
 json.dump(fails, open(os.path.join(wd, 'qc_fid.json'), 'w'), indent=1)
 from collections import Counter
