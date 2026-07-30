@@ -266,6 +266,14 @@ def _narr_match(fr):
         _sface = cv2.FaceRecognizerSF.create('/home/boss/videogen/face_recognition_sface_2021dec.onnx', '')
     _, faces = yfd.detect(fr)
     if faces is None: return False
+    # DOMINANCE (29/07 minuit) : le seuil  visage >= 0.30 H  seul declassait en OFF les
+    # scenes hero de XzEg, ou le narrateur est plein cadre mais filme large (visage
+    # 0.227 H). _split_hero_cuts appelle _narr_live sur chaque morceau de plan et met
+    # OFF tout ce qui echoue -> 53% de la video sans aucun vert, defaut signale par Boss.
+    # Un narrateur qui EST le plus grand visage du plan est live meme a 0.15 H ; une
+    # PHOTO de lui dans du contenu ne domine pas (eglV photo de groupe 0.099-0.11,
+    # screencast 0.146-0.152 avec le vrai narrateur ailleurs dans le cadre).
+    _big = max((float(f[3]) for f in faces), default=0.0)
     for f in faces:
         if f[3]/H < 0.045: continue
         try:
@@ -278,7 +286,9 @@ def _narr_match(fr):
         # cos 0.58-0.69 mais visage 0.099-0.11 H). Un vrai hero live a un visage 0.368-0.415 H
         # (mesures eglV 39/41/908/1388/1393 ; meme echelle que qc_ident : plans serres >=0.40,
         # contenu <=0.31). Seuil 0.30 = marge des deux cotes.
-        if c >= 0.363 and float(f[3])/H >= 0.30: return True
+        _fh = float(f[3])/H
+        if c >= 0.363 and (_fh >= 0.30 or (_fh >= 0.15 and float(f[3]) >= 0.85*_big)):
+            return True
     return False
 
 def is_hero(t0, t1, box, need_ident=False):
