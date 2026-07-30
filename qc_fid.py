@@ -79,6 +79,54 @@ def _scan_edge(line, span):
     if band.size and float(np.max(np.std(band, axis=0))) > 12.0: return 0
     return i
 
+# --- ⓣ MESURE DE CARTE ANCREE SUR LE CONSENSUS (Boss 29/07 22h) -----------------
+# Le scan libre en fenetre large derape : sur eglV t=7.6 il rendait R=679 px alors que
+# la carte s arrete a 507 (+172), et sur 4D7 il ne rendait RIEN (abstention = defaut
+# invisible). Or box_consensus mesure la meme carte sur des centaines d echantillons :
+# eglV n=1335 -> 53,590,489,1026 pour une carte reelle 54,590,507,1026 (18 px pres).
+# On part donc de CE prior et on ne fait que l affiner dans +/-6% : borne par
+# construction, aucune fuite possible. Un cote colle a l ecran n est jamais affine.
+_REF_WIN = 0.06
+_REF_FLOOR = 8.0
+
+def _best_jump(prof, a, b):
+    a = max(1, int(a)); b = min(len(prof) - 1, int(b))
+    bi, bs = None, 0.0
+    for i in range(a, b):
+        s = float(np.abs(prof[i] - prof[i - 1]).sum())
+        if s > bs: bi, bs = i, s
+    return bi, bs
+
+def _refine_one(img, prior):
+    L, T, R, B = prior
+    cw, ch = R - L, B - T
+    if cw < 12 or ch < 12: return None
+    wx = max(6, int(cw * _REF_WIN)); wy = max(6, int(ch * _REF_WIN))
+    ry0, ry1 = max(0, T + ch // 4), min(H, B - ch // 4)
+    cx0, cx1 = max(0, L + cw // 4), min(W, R - cw // 4)
+    if ry1 - ry0 < 4 or cx1 - cx0 < 4: return None
+    colp = img[ry0:ry1, :, :].mean(axis=0)
+    rowp = img[:, cx0:cx1, :].mean(axis=1)
+    out = []
+    for prof, p, w, lim in ((colp, L, wx, W), (rowp, T, wy, H),
+                            (colp, R, wx, W), (rowp, B, wy, H)):
+        if p <= 2 or p >= lim - 2:
+            out.append(p); continue          # bord colle a l ecran : rien a affiner
+        i, s = _best_jump(prof, p - w, p + w)
+        out.append(i if (i is not None and s >= _REF_FLOOR) else p)
+    return out
+
+def _refine_card(prior, t0, t1):
+    res = []
+    for frac in (0.2, 0.35, 0.5, 0.65, 0.8):
+        cs.set(cv2.CAP_PROP_POS_MSEC, (t0 + (t1 - t0) * frac) * 1000.0)
+        ok, img = cs.read()
+        if not ok: continue
+        r = _refine_one(img.astype('float32'), prior)
+        if r is not None: res.append(r)
+    if len(res) < 3: return None
+    return [sorted(r[i] for r in res)[len(res) // 2] for i in range(4)]
+
 def card_rect(gb, t0, t1):
     # FENETRE DE RECHERCHE — ne doit PAS dependre du seul vert (Boss 29/07, capture du
     # pip dans le jeu : la  carte mesuree  ne couvrait qu une bande centrale). Piege
@@ -88,6 +136,13 @@ def card_rect(gb, t0, t1):
     # mauvais, plus la mesure l etait — aucune convergence possible.
     # On part donc de l UNION du vert et de la box consensus (mesuree globalement sur
     # des centaines d echantillons, independante du vert), elargie de 40%.
+    _cp = cons_match(gb)
+    if _cp is not None and _cp.get('n', 0) >= 50:
+        _b = _cp['box']
+        _pri = [int(_b[0] * W), int(_b[1] * H),
+                int((_b[0] + _b[2]) * W), int((_b[1] + _b[3]) * H)]
+        _r = _refine_card(_pri, t0, t1)
+        if _r is not None: return _r
     ux0, uy0, ux1, uy1 = gb[0], gb[1], gb[2], gb[3]
     _c0 = cons_match(gb)
     if _c0 is not None:
