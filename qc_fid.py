@@ -80,9 +80,23 @@ def _scan_edge(line, span):
     return i
 
 def card_rect(gb, t0, t1):
-    gw = gb[2] - gb[0]; gh = gb[3] - gb[1]
-    fx0 = max(0, gb[0] - int(gw * 0.30)); fy0 = max(0, gb[1] - int(gh * 0.30))
-    fx1 = min(W, gb[2] + int(gw * 0.30)); fy1 = min(H, gb[3] + int(gh * 0.30))
+    # FENETRE DE RECHERCHE — ne doit PAS dependre du seul vert (Boss 29/07, capture du
+    # pip dans le jeu : la  carte mesuree  ne couvrait qu une bande centrale). Piege
+    # circulaire : la fenetre valait vert+30%, donc un vert trop etroit donnait une
+    # fenetre trop etroite pour contenir les vrais bords, et le scan s arretait sur une
+    # transition INTERNE (le narrateur contre le fond du studio). Plus le vert etait
+    # mauvais, plus la mesure l etait — aucune convergence possible.
+    # On part donc de l UNION du vert et de la box consensus (mesuree globalement sur
+    # des centaines d echantillons, independante du vert), elargie de 40%.
+    ux0, uy0, ux1, uy1 = gb[0], gb[1], gb[2], gb[3]
+    _c0 = cons_match(gb)
+    if _c0 is not None:
+        _b = _c0['box']
+        ux0 = min(ux0, int(_b[0] * W)); uy0 = min(uy0, int(_b[1] * H))
+        ux1 = max(ux1, int((_b[0] + _b[2]) * W)); uy1 = max(uy1, int((_b[1] + _b[3]) * H))
+    gw = ux1 - ux0; gh = uy1 - uy0
+    fx0 = max(0, ux0 - int(gw * 0.40)); fy0 = max(0, uy0 - int(gh * 0.40))
+    fx1 = min(W, ux1 + int(gw * 0.40)); fy1 = min(H, uy1 + int(gh * 0.40))
     fw = fx1 - fx0; fh = fy1 - fy0
     if fw < 16 or fh < 16: return None
     res = []
@@ -178,6 +192,17 @@ for e in hm:
         ga = (gb[2] - gb[0]) * (gb[3] - gb[1]) / float(W * H)
         pres, dom, fh = NR.probe(cs, t0, t1)
         _k = cons_kind(gb)
+        # ORDRE (Boss 29/07 20h20) : le narrateur dominant l emporte sur l ETIQUETTE du
+        # cluster. Les 4 scenes plein cadre de XzEg (t=48.5/58/154/216) matchaient un
+        # cluster etiquete kind=pip de 0.402 x 0.706 — soit 28% de l ecran, ce qui n est
+        # pas un pip : le consensus s est trompe (116 echantillons quand meme). Ma
+        # protection  pip confirme  les faisait donc sauter. Un narrateur dominant avec
+        # un visage >=0.15 H sur une scene SANS carte est un hero, quoi qu en dise
+        # l etiquette. Le vrai petit pip du coin (2.5%, dominant=False) reste protege.
+        if dom and fh >= 0.15:
+            fails.append({'t0': t0, 't1': t1, 'type': 'HERO-RATE', 'green': nb(gb),
+                          'card': None, 'faceH': round(fh, 3), 'dominant': True})
+            continue
         if _k == 'pip':
             # cluster PIP confirme (XzEg coin bas-droit, n=87) : vrai pip meme si le
             # visage y est trop petit pour etre identifie (~5% de H, sous le seuil de
@@ -191,14 +216,21 @@ for e in hm:
                           'card': None, 'faceH': round(fh, 3), 'dominant': bool(dom),
                           'preuve': 'consensus kind=hero'})
             continue
-        if ga < 0.25:
-            if not pres: 
-                fails.append({'t0': t0, 't1': t1, 'type': 'FAUX-PIP', 'green': nb(gb),
-                              'card': None, 'faceH': round(fh, 3), 'dominant': bool(dom)})
-            continue
-        typ = 'HERO-RATE' if dom else 'FAUX-PIP'
-        fails.append({'t0': t0, 't1': t1, 'type': typ, 'green': nb(gb),
-                      'card': None, 'faceH': round(fh, 3), 'dominant': bool(dom)})
+        # Verdict Boss 29/07 20h15 (montage XzEg t=48.5 / 58 / 154 / 216) : narrateur
+        # plein cadre dans son studio, AUCUNE carte, et le vert le tronque (tete a nu,
+        # texte du decor efface). Ces scenes doivent etre des HEROS.
+        # Deux conditions les bloquaient, toutes deux retirees :
+        #   - garde d aire >=25% : t=216 fait 15.5%, t=58 21.2% -> ratees. Elle avait ete
+        #     posee quand cardness ratait la carte d eglV ; depuis que la fenetre de mesure
+        #     est decouplee du vert, eglV est bien reconnu comme CARTE et ne passe plus ici.
+        #   - proximite au cluster hero : t=154 est decale a gauche (centre 0.28 contre
+        #     0.51 pour le cluster) -> hors du rayon 0.18.
+        # Il reste le seul critere qui compte : le narrateur est-il LE SUJET du plan ?
+        # dominant ET visage >=0.15 H. Mesures : XzEg plein cadre 0.21-0.23 (passe),
+        # pip dans le jeu ~0.03 et non dominant (ne passe pas).
+        if not pres:
+            fails.append({'t0': t0, 't1': t1, 'type': 'FAUX-PIP', 'green': nb(gb),
+                          'card': None, 'faceH': round(fh, 3), 'dominant': bool(dom)})
         continue
 
     # LE NARRATEUR EST-IL LE SUJET ? — place ICI, AVANT card_rect, et mesure sur le VERT.
