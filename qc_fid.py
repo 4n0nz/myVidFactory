@@ -158,6 +158,18 @@ def nb(r):
 
 
 fails = []
+# --- controle des scenes OFF : le narrateur y est-il plein cadre et ignore ?
+# (angle mort trouve le 29/07 : 53% de XzEg etait en off, narrateur dominant dedans,
+# aucun vert pose. Le juge ne regardait que pip et hero.)
+for e in hm:
+    if e['host'] != 'off': continue
+    t0, t1 = e['start'], e['end']
+    if t1 - t0 < 1.0: continue          # micro-trou de montage : on ne touche pas
+    pres, dom, fh = NR.probe(cs, t0, t1)
+    if pres and dom and fh >= 0.15:
+        fails.append({'t0': t0, 't1': t1, 'type': 'HERO-MANQUANT', 'green': None,
+                      'card': None, 'faceH': round(fh, 3), 'dominant': True})
+
 # --- controle des scenes HERO : un hero couvre TOUT l ecran, c est l action la plus
 # destructrice du pipeline. Angle mort constate le 28/07 : le juge ne regardait que les
 # pips, donc une video entierement mal classee en hero sortait « fid=OK ».

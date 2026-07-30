@@ -30,6 +30,8 @@ for f in fails:
                 s['patched_keep'] = True    # autorite : le consensus ne l ecrase pas
                 s['fid'] = True
                 n_box += 1
+            elif f['type'] == 'HERO-MANQUANT':
+                pass      # traite hors de cette boucle : il faut INSERER, pas modifier
             elif f['type'] == 'HERO-RATE':
                 # CONTRADICTION (28/07) : deux verdicts peuvent tomber dans la meme scene
                 # pin. Sur mCE 13.0-20.12 une carte avait ete mesuree (TROP-GRAND, flag
@@ -52,10 +54,24 @@ for f in fails:
                 drop.append(i)
             break
 
+# INSERTION des heros manquants : une scene off ou le narrateur est plein cadre et
+# dominant doit devenir un hero. Elle n'existe pas dans host_map_pin (un off est un TROU),
+# il faut donc l'y creer. (Boss 29/07 : 53% de XzEg etait ignore de cette facon.)
+n_ins = 0
+for f in fails:
+    if f['type'] != 'HERO-MANQUANT': continue
+    t0, t1 = f['t0'], f['t1']
+    if any(s['start'] < t1 and t0 < s['end'] for s in pin): continue   # deja couvert
+    pin.append({'start': round(t0, 2), 'end': round(t1, 2), 'region': 'hero',
+                'box': [0.0, 0.0, 1.0, 1.0], 'edges': ['L', 'T', 'R', 'B'],
+                'src': 'fid', 'fid': True})
+    n_ins += 1
+pin.sort(key=lambda s: s['start'])
+
 # retrait des scenes a ne pas toucher (trou dans host_map_pin = OFF chez pin_render)
 for i in sorted(set(drop), reverse=True):
     pin.pop(i)
 
 json.dump(pin, open(pinf, 'w'), indent=1)
-print('qc_fid_fix : %d box alignees sur la carte, %d scene(s) -> HERO, %d scene(s) -> OFF'
-      % (n_box, n_hero, len(set(drop))))
+print('qc_fid_fix : %d box alignees sur la carte, %d scene(s) -> HERO, %d HERO insere(s), %d scene(s) -> OFF'
+      % (n_box, n_hero, n_ins, len(set(drop))))
