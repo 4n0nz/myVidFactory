@@ -86,7 +86,18 @@ if [ "$fid" != "OK" ]; then
   [ "${_nc:-0}" != "0" ] && fid="${fid}_NOCARD${_nc}"
 fi
 
+# INVARIANTS : controle TOTAL du host_map final — zero pixel, zero echantillonnage,
+# donc zero angle mort par construction. Complement des juges perceptuels, qui eux
+# echantillonnent et ont donc des trous (qc_ident : 1 frame/s + tolerance +-0.6 s dans
+# covered_by_avatar = aucun trou de frontiere sous 1.2 s ne peut etre flagge, 71 trous
+# passes CLEAN le 2026-08-01). Ne relance AUCUNE passe : c est un rapport, pas un fixer.
+echo "invariants..." >> "$PROG"
+inv="OK"
+$PY $VG/vf_invariants.py "$WD" > /tmp/vf_one_inv.log 2>&1 || inv="INV_$(grep -oE INVARIANTS : [0-9]+ /tmp/vf_one_inv.log | grep -oE [0-9]+ | tail -1)"
+_ns=$(grep -oE SUSPECTS : [0-9]+ /tmp/vf_one_inv.log | grep -oE [0-9]+ | tail -1)
+[ "${_ns:-0}" != "0" ] && inv="${inv}+SUSP${_ns}"
+
 sdur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WD/source.mp4")
 vdur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WD/segs/videoonly.mp4" 2>/dev/null)
 durok=$($PY -c "print('OK' if abs($sdur-($vdur or 0))<0.5 else 'DESYNC(%.1f)'%($vdur or 0))" 2>/dev/null)
-echo "DONE qc=$qc geom=$geom fid=$fid tours=$tours dur=$durok $(date '+%F %T')" >> "$PROG"
+echo "DONE qc=$qc geom=$geom fid=$fid inv=$inv tours=$tours dur=$durok $(date '+%F %T')" >> "$PROG"
