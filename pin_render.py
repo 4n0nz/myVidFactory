@@ -332,7 +332,7 @@ nhero=0
 pips=[]
 for sc in pin:
     if sc["start"]>prev+0.3:
-        segs.append({"host":"off","start":round(prev,2),"end":round(sc["start"],2),"bbox":None})
+        segs.append({"host":"off","start":round(prev,2),"end":round(sc["start"],2),"bbox":None,"_gap":True})
     # src=ident : promotion hero DETERMINISTE par _narr_live (SFace calibre, cos>=0.363
     # et visage >=0.30 H). Le verdict VLM fullface est stochastique : (40,43)/(1391,95)
     # flippaient hero<->pip d une passe a l autre (A/B 27/07 05h). VLM reste pour les
@@ -972,6 +972,94 @@ def _split_pip_gaps(segs, cap, fps):
 
 _split_hero_cuts(segs, cap, cap.get(cv2.CAP_PROP_FPS))
 _split_pip_gaps(segs, cap, cap.get(cv2.CAP_PROP_FPS))
+
+# ---- TROUS DE FRONTIERE (sub-seconde) : le bord DROIT n'est jamais prouve ----
+# PASS 5/6 de pinpoint3 rognent la FIN d'une scene a la sonde fine (multiple de
+# FINE/2 = 0.125 s) parce que les sondes ont VU la carte disparaitre la. Le DEBUT de la
+# scene suivante, lui, reste sur la grille grossiere STEP=1.0 de la detection de scenes,
+# et n'a ete prouve par rien. L'ecart tombe entre les deux et devient soit une scene
+# "off" (gap > 0.3, le remplissage juste au-dessus), soit une discontinuite muette
+# (gap <= 0.3) : dans les DEUX cas rien n'est peint sur ces frames.
+# Mesure corpus 2026-08-01 sur les 40 host_map : 71 trous "off" sur 19 videos (41.9 s)
+# + 36 discontinuites sur 11 videos (2.2 s). Verifie a la frame sur Id9GbZ4k4R4
+# 98.03-99.00 (entre un pip et un hero) : source et rendu STRICTEMENT identiques, le
+# vrai visage du narrateur plein cadre passe a nu pendant 0.97 s ; XzEgfmesG8c
+# 45.54-47.00 fait 1.46 s ENTRE DEUX HERO. Aucun juge ne les voit : qc_ident
+# echantillonne, qc_geom et qc_fid ne regardent que les scenes EXISTANTES, jamais ce
+# qui n'a pas de scene. C'est une fuite d'identite, pas un defaut esthetique.
+# SENS DE LA FERMETURE : on etend la scene SUIVANTE vers l'arriere, jamais la
+# precedente vers l'avant. La carte de la precedente vient d'etre prouvee ABSENTE a sa
+# fin : l'etendre peindrait du vert sans carte dessous, aussi grave qu'une carte sans
+# vert (verdict Boss 27/07 07h25). La precedente n'est etendue qu'en REPLI, et
+# seulement si sa carte est RE-prouvee presente au milieu du trou.
+# PREUVE EXIGEE des deux cotes, comme partout ailleurs dans ce fichier : _narr_live
+# pour un hero (le meme gate que la promotion hero), _card_at pour un pip. Sans preuve
+# le trou reste off : un vrai plan sans narrateur existe (Id9G 305.2-410.4 = 105 s de
+# contenu, il ne doit surtout pas etre absorbe).
+# NEUTRALITE : ne touche que les trous < 1.0 s bordes de DEUX scenes non-off. Les
+# morceaux off produits par _split_hero_cuts / _split_pip_gaps sont des demontages
+# PROUVES et ne portent pas le drapeau _gap ; en plus la sonde les re-garderait. Une
+# video sans trou de frontiere sort donc bit-a-bit identique.
+GAP_MAX = 1.0
+
+def _close_boundary_gaps(segs):
+    def _covers(s, t0, t1):
+        """La scene s couvre-t-elle vraiment [t0,t1] ? Meme preuve qu'ailleurs."""
+        if s["host"] == "hero":
+            return _narr_live(t0, t1)
+        if s["host"] == "pip" and s.get("bbox"):
+            q = _card_at(s["bbox"], (t0 + t1) / 2.0)
+            return bool(q) and bool(q[0])
+        return False
+
+    out = []
+    nb = nf = nk = 0
+    i = 0
+    while i < len(segs):
+        s = segs[i]
+        gap = s.get("_gap") and s["host"] == "off" and (s["end"] - s["start"]) < GAP_MAX
+        if gap and out and i + 1 < len(segs) and out[-1]["host"] != "off" and segs[i + 1]["host"] != "off":
+            a, b = out[-1], segs[i + 1]
+            t0, t1 = s["start"], s["end"]
+            if _covers(b, t0, t1):
+                # On recolle sur la borne EXACTE de la scene precedente, pas sur le
+                # debut arrondi du remplissage : round(prev,2) laissait jusqu'a 5 ms
+                # d'ecart residuel (mesure Id9G 825.67 : 3.3 ms), donc une frontiere
+                # toujours ouverte et une sonde relancee pour rien au second passage.
+                b["start"] = a["end"]; nb += 1
+                print("  trou %.2f-%.2f (%.2fs) -> %s suivant etendu en arriere" % (t0, t1, t1 - t0, b["host"]))
+                i += 1; continue
+            if _covers(a, t0, t1):
+                a["end"] = b["start"]; nf += 1
+                print("  trou %.2f-%.2f (%.2fs) -> %s precedent etendu en avant" % (t0, t1, t1 - t0, a["host"]))
+                i += 1; continue
+            nk += 1
+            print("  trou %.2f-%.2f (%.2fs) -> laisse off (aucune des deux scenes prouvee)" % (t0, t1, t1 - t0))
+        out.append(s); i += 1
+
+    # Discontinuites muettes : gap <= 0.3 s, aucune scene off n'a ete emise, la frame
+    # n'appartient donc a personne. Meme regle, meme preuve.
+    for a, b in zip(out, out[1:]):
+        g = b["start"] - a["end"]
+        if not (1e-6 < g < GAP_MAX): continue
+        if a["host"] == "off" or b["host"] == "off": continue
+        if _covers(b, a["end"], b["start"]):
+            print("  discontinuite %.2f-%.2f (%.2fs) -> %s suivant etendu en arriere" % (a["end"], b["start"], g, b["host"]))
+            b["start"] = a["end"]; nb += 1
+        elif _covers(a, a["end"], b["start"]):
+            print("  discontinuite %.2f-%.2f (%.2fs) -> %s precedent etendu en avant" % (a["end"], b["start"], g, a["host"]))
+            a["end"] = b["start"]; nf += 1
+        else:
+            nk += 1
+
+    for s in out:
+        s.pop("_gap", None)
+    if nb or nf or nk:
+        print("  trous de frontiere : %d fermes par la suivante, %d par la precedente, %d laisses off" % (nb, nf, nk))
+    segs[:] = out
+    return nb + nf
+
+_close_boundary_gaps(segs)
 
 json.dump(segs,open(os.path.join(wd,"host_map.json"),"w"),indent=2)
 print("host_map: %d segs (%d pip) genere depuis pinpoint"%(len(segs),sum(1 for s in segs if s["host"]=="pip")))
