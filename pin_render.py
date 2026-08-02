@@ -327,6 +327,69 @@ def _narr_live(t0, t1):
         if ok and _narr_match(fr): return True
     return False
 
+_cons = []
+_cpath = os.path.join(wd, "box_consensus.json")
+if os.path.exists(_cpath):
+    try: _cons = json.load(open(_cpath))
+    except Exception: _cons = []
+
+# CARTE vs HERO. Une tete de narrateur qui tombe dans un cluster PIP du consensus est
+# dans une CARTE, elle ne prouve pas un narrateur plein cadre. Sans ce test pinpoint3
+# declare region="hero" sur des scenes de partage d ecran ou le narrateur n a qu une
+# vignette, et pin_render l acceptait SANS AUCUN controle d identite (site A) : mesure
+# OfrZE35gHM0 02/08, 240,5 s de faux hero sur 618 s, visage 0.21-0.25 H contre 0.35-0.53 H
+# pour les vrais hero de la meme video, tout le cadre peint par-dessus la page partagee.
+# La clause de DOMINANCE de _narr_match ne peut pas les separer : sur un partage d ecran
+# la vignette est le SEUL visage du cadre, donc elle domine trivialement (elle avait ete
+# ajoutee le 29/07 pour les hero filmes large de XzEg, visage 0.227 H, et elle reste
+# valide la : leur tete n est dans aucun cluster pip).
+# Cluster PIP seulement, et vote 2 sondes sur 3 pour ne pas dependre d une frame.
+def _pip_boxes():
+    out = []
+    for c in _cons:
+        if c.get("kind") != "pip": continue
+        if not any(c.get("votes") or [0, 0.0, 0.0]): continue
+        out.append(c)
+    return out
+
+def _pip_hit(t0, t1):
+    cls = _pip_boxes()
+    if not cls: return None
+    votes = {}
+    for f_ in (0.25, 0.5, 0.75):
+        cap.set(cv2.CAP_PROP_POS_MSEC, (t0+(t1-t0)*f_)*1000.0)
+        ok, fr = cap.read()
+        if not ok: continue
+        c = _narr_cluster(fr, cls)
+        if c is not None: votes[id(c)] = votes.get(id(c), [0, c])[0]+1, c
+    for k, (n, c) in votes.items():
+        if n >= 2: return c
+    return None
+
+def _narr_cluster(fr, cls):
+    """Cluster pip contenant la tete du narrateur sur cette frame, sinon None."""
+    global _narr_ref, _sface
+    p_ = os.path.join(wd, "narrator_feat.npy")
+    if _narr_ref is None:
+        if not os.path.exists(p_): return None
+        _narr_ref = np.load(p_)
+        _sface = cv2.FaceRecognizerSF.create("/home/boss/videogen/face_recognition_sface_2021dec.onnx", "")
+    _, faces = yfd.detect(fr)
+    if faces is None: return None
+    best = None; bh = 0.0
+    for f in faces:
+        if f[3]/H < 0.045: continue
+        try: ft = _sface.feature(_sface.alignCrop(fr, f)).flatten().astype(np.float32)
+        except Exception: continue
+        cs = float(np.dot(ft, _narr_ref)/(np.linalg.norm(ft)*np.linalg.norm(_narr_ref)+1e-9))
+        if cs < 0.363 or float(f[3]) <= bh: continue
+        fx = (float(f[0])+float(f[2])/2)/W; fy = (float(f[1])+float(f[3])/2)/H
+        for c in cls:
+            b = c["box"]
+            if b[0]-0.02 <= fx <= b[0]+b[2]+0.02 and b[1]-0.02 <= fy <= b[1]+b[3]+0.02:
+                best = c; bh = float(f[3]); break
+    return best
+
 segs=[]; prev=0.0
 nhero=0
 pips=[]
@@ -337,13 +400,19 @@ for sc in pin:
     # et visage >=0.30 H). Le verdict VLM fullface est stochastique : (40,43)/(1391,95)
     # flippaient hero<->pip d une passe a l autre (A/B 27/07 05h). VLM reste pour les
     # sources sans narrator_feat.
-    if sc.get("region") == "hero" or sc["box"][2]*sc["box"][3] > 0.85 \
+    _isher = (sc.get("region") == "hero" or sc["box"][2]*sc["box"][3] > 0.85 \
             or (sc.get("src") == "ident"
                 and ((sc["box"][3] > 0.9 and sc["box"][2] > 0.35)
                      or sc["box"][2]*sc["box"][3] > 0.5)
                 and _narr_live(sc["start"], sc["end"])) \
             or (sc.get("src") != "ident"
-                and is_hero(sc["start"], sc["end"], sc["box"])):
+                and is_hero(sc["start"], sc["end"], sc["box"])))
+    _ph = _pip_hit(sc["start"], sc["end"]) if _isher else None
+    if _ph is not None:
+        print("  hero REFUSE %.2f-%.2f : tete du narrateur dans le cluster pip %s"
+              % (sc["start"], sc["end"], _ph["box"]))
+        sc["box"] = list(_ph["box"])
+    if _isher and _ph is None:
         segs.append({"host":"hero","start":round(sc["start"],2),"end":round(sc["end"],2),"bbox":None})
         nhero+=1
     else:
@@ -359,11 +428,6 @@ for sc in pin:
 # CONSENSUS TEMPOREL (box_consensus.py, lance par le batch apres pinpoint3) : box+forme
 # mesurees par cluster de position sur TOUTE la video (activite temporelle + bords
 # persistants + anneau-juge). Prioritaire sur toute la tour heuristique par scene.
-_cons = []
-_cpath = os.path.join(wd, "box_consensus.json")
-if os.path.exists(_cpath):
-    try: _cons = json.load(open(_cpath))
-    except Exception: _cons = []
 def _cons_match(b):
     # match par centres proches OU par CONTENANCE : une box de scene gonflee (union
     # pinpoint3 cam+previews, AAmd 0.79x0.84) a son centre loin du cluster mais le
@@ -439,7 +503,10 @@ for p in pips:
                            # (pLos popout : tete qui depasse du cercle -> boucle QC sterile)
         abox2 = _motion_extend(list(abox), p["t0"], p["t1"])
         if abox2[2]*abox2[3] > 0.85 or (p.get("pident") and abox2[2]*abox2[3] > 0.5):
-            if p.get("src") != "ident" or _narr_live(p["t0"], p["t1"]):
+            # _motion_extend gonfle une CARTE quand le CONTENU partage bouge (page qui
+            # defile) : OfrZE 158.5-179.9, box 0.198 -> 0.66, promue hero alors que le
+            # narrateur est dans sa vignette. La tete dans un cluster pip le prouve.
+            if (p.get("src") != "ident" or _narr_live(p["t0"], p["t1"]))                     and _pip_hit(p["t0"], p["t1"]) is None:
                 # l'extension revele un corps quasi plein cadre -> narrateur libre -> hero.
                 p["seg"]["host"] = "hero"; p["seg"]["bbox"] = None
                 p["hero"] = True
