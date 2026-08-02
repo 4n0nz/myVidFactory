@@ -161,29 +161,7 @@ for s in samples:
         # faceH=0.30, bounded=False) -> 3 scenes pip classees hero. Un vrai narrateur
         # libre n'a pas de petit panneau mesurable autour de lui ; un visage dont la
         # carte fait <0.5 d'un cote vit dans un panneau de contenu -> pas hero.
-        # TALKING-HEAD SOUS LA BARRE DES 0.40. Le seuil de 0.40 laissait sans aucune
-        # couverture un narrateur LIVE plein cadre cadre un peu large : itWI5CDVVfQ
-        # 331.4-351.5, 20.2 s de visage a nu, fh=0.347-0.379. Ses samples devenaient des
-        # pip, formaient le cluster 2 (n=30, cos_median 0.694, box 0.366x0.903) que la
-        # regle FANTOME (cos_median < COS_PIP) supprimait -> zero scene, zero pixel peint.
-        # La carte de repli vaut min(1, fh*3.0) : elle SATURE a 1.0 exactement quand
-        # fh >= 1/3. Mesure 02/08 sur tous les visages non bornes et centres des deux
-        # etalons + itWI (19 samples) :
-        #   narrateurs LIVE plein cadre : ch=1.000 partout, fh 0.347-0.479
-        #     (eglV 0/20/25/40/915/1385/1390/1395, itWI 228/232/332-348)
-        #   contenu a garder INTACT    : ch=0.800-0.917, fh 0.267-0.306
-        #     (4D7 228-272 grille de vignettes navigateur, eglV 45 et 85)
-        # Deux nuages disjoints, et le contre-exemple 4D7 rate AUSSI la fenetre de
-        # centrage : cx=0.333-0.336 contre 0.483-0.579 pour les vrais. Deux portes
-        # independantes, chacune refusant 4D7 seule.
-        # Cette branche n'AJOUTE que des heros, elle n'en retire aucun : une video sans
-        # visage non borne, centre, de hauteur dans [1/3, 0.40[ est inchangee.
-        # Justification du deplacement de l'etalon eglV (frames 02/08) : 38.6-42.6 et
-        # 1388.5-1395.3 sont du narrateur LIVE plein cadre peint en bande verticale
-        # x in [0.329,0.752], epaule gauche a nu. Passer en hero est une correction.
         return (fc["f"][3]/H > 0.40
-                or (not fc.get("bounded", True) and fc["f"][3]/H >= 1.0/3.0
-                    and 0.40 < cx < 0.70)
                 or (not fc.get("bounded", True) and fc["f"][3]/H > 0.20
                     and 0.25 < cx < 0.75
                     and fc["card"][2] > 0.5 and fc["card"][3] > 0.5))
