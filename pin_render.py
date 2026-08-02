@@ -1119,6 +1119,30 @@ def _close_boundary_gaps(segs):
         else:
             nk += 1
 
+    # PAVAGE TOTAL : un trou laisse ouvert (aucune des deux scenes prouvee) doit rester
+    # NON PEINT -- peindre sans preuve serait du vert sans carte -- mais il doit etre
+    # DECLARE off. Sinon la frame n'appartient a aucune scene et vf_invariants leve TROU
+    # (mesure N1rACQTJepA 66.38-66.50 : 0.12 s entre deux pip, inv=INV_1). Le rendu est
+    # identique dans les deux cas (off = source intacte) : on ne change que la
+    # declaration, jamais un pixel.
+    # EPS = 0.01 s, sous la frame (0.033 s a 30 fps) : en dessous il n'y a pas une seule
+    # frame a declarer et l'ecart n'est que du bruit d'arrondi a 2 decimales (mesure sur
+    # les deux etalons : residu de queue a 860.83 et 1395.29, segments de duree nulle).
+    EPS = 0.01
+    filled = []
+    for s in out:
+        if filled and s["start"] - filled[-1]["end"] >= EPS:
+            filled.append({"host": "off", "start": filled[-1]["end"],
+                           "end": s["start"], "bbox": None})
+        filled.append(s)
+    if filled and filled[0]["start"] >= EPS:
+        filled.insert(0, {"host": "off", "start": 0.0,
+                          "end": filled[0]["start"], "bbox": None})
+    if filled and round(float(DUR), 2) - filled[-1]["end"] >= EPS:
+        filled.append({"host": "off", "start": filled[-1]["end"],
+                       "end": round(float(DUR), 2), "bbox": None})
+    out = filled
+
     for s in out:
         s.pop("_gap", None)
     if nb or nf or nk:
