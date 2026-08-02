@@ -82,7 +82,7 @@ def consensus(c):
     ts = [m["t"] for m in ms]
     idx = np.linspace(0, len(ts)-1, min(NPAIRS, len(ts))).astype(int)
     cntF = np.zeros((H, W), np.float32)     # activite PLEIN CADRE (l'anneau peut sortir
-    gcnt = np.zeros((y1-y0, x1-x0), np.float32)   # de la fenetre visage)
+    gcntF = np.zeros((H, W), np.float32)          # de la fenetre visage)
     npairs = 0
     for i in idx:
         a = _frame(ts[i]); b = _frame(min(ts[i]+0.4, DUR-0.05))
@@ -90,14 +90,16 @@ def consensus(c):
         gaF = cv2.cvtColor(a, cv2.COLOR_BGR2GRAY)
         gbF = cv2.cvtColor(b, cv2.COLOR_BGR2GRAY)
         cntF += (cv2.absdiff(gaF, gbF) > ACT_DIFF).astype(np.float32)
-        ga = gaF[y0:y1, x0:x1]
-        gx = cv2.Sobel(ga, cv2.CV_32F, 1, 0, ksize=3); gy = cv2.Sobel(ga, cv2.CV_32F, 0, 1, ksize=3)
-        gcnt += (cv2.magnitude(gx, gy) > 60).astype(np.float32)
+        gx = cv2.Sobel(gaF, cv2.CV_32F, 1, 0, ksize=3); gy = cv2.Sobel(gaF, cv2.CV_32F, 0, 1, ksize=3)
+        gcntF += (cv2.magnitude(gx, gy) > 60).astype(np.float32)   # PLEIN CADRE : les
+        # bornes de recherche des bords sont proportionnelles au visage, donc trop
+        # petites pour une carte large — la fenetre elle-meme cachait la reponse.
         npairs += 1
     if npairs < 10: return None
     actF = cntF / npairs
     act = actF[y0:y1, x0:x1]
-    gper = gcnt / npairs   # persistance de gradient : bord de CARTE = ligne droite
+    gperF = gcntF / npairs
+    gper = gperF[y0:y1, x0:x1]   # persistance de gradient : bord de CARTE = ligne droite
                            # presente sur ~toutes les frames (le contenu bouge, pas elle)
     blob = (act >= ACT_MIN).astype(np.uint8)
     blob = cv2.morphologyEx(blob, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
@@ -225,6 +227,34 @@ def consensus(c):
         if bx1 < W and (bx1-bx0) < 2.5*w0 and _hotband(bx1, bx1+band, by0, by1):
             bx1 = min(W, bx1+band); grew = True
         if not grew: break
+    # EXTENSION LATERALE vers une ligne de carte FORTE. Les deux bornes de la mesure de
+    # bord sont proportionnelles au VISAGE (fenetre x0/x1 a 2.2*fw, portee rx a 1.5*fw).
+    # Une carte large par rapport au visage a donc ses vrais bords HORS PORTEE, et les
+    # bords retenus sont des lignes INTERNES. Mesure itWI5CDVVfQ (2026-08-02) : carte
+    # reelle 0..413, fw=67 donc rx=100, fenetre 11..393 (le bord droit n est meme pas
+    # dedans), portees 48..147 et 248..347, box sortie 85..335 -> 38.7% de la carte a nu.
+    # Un bord de carte est une ligne droite qui traverse TOUTE la hauteur de la carte et
+    # survit a ~toutes les frames : on moyenne gper sur la hauteur de BOX (pas sur les
+    # rangees du blob) et on exige un seuil ABSOLU. Sur la hauteur de carte itWI5 donne
+    # 0.939 en x=413 contre 0.244 au meilleur rival ; sur le tiers central — ce que
+    # mesure colstr — le vrai bord tombe a 0.968 contre 0.959, indiscernable.
+    # Le RATIO est inutilisable : teste le 2026-08-02, il declenche sur les DEUX etalons
+    # (4D7 gauche 0.222 sur un bord a 0.074, eglV droite 0.150 sur 0.084) parce que leurs
+    # bords ne sont pas des lignes de gradient. Le seuil absolu les laisse immobiles au
+    # chiffre pres (candidats 0.204 / 0.141 / 0.024 / 0.174 / 0.132 / 0.151, tous < 0.60)
+    # avec un facteur 3.8 de marge sur le vrai bord. Monotone : n agrandit que vers une
+    # ligne MESUREE, borne a une hauteur de carte, jamais au-dela de l ecran.
+    # RESTE OUVERT : le cote qui touche le bord d ecran n a AUCUNE ligne a trouver
+    # (itWI5 gauche, carte a x=0, meilleur candidat 0.464 rejete a raison) — la bande
+    # 0..84 reste a nu. Absence de bord ne prouve pas un bord d ecran, mesure a faire.
+    EXT_MIN = 0.60
+    if by1 > by0:
+        csF = np.mean(gperF[by0:by1, :], axis=0)
+        ext = by1-by0
+        cL = max(range(max(0, bx0-ext), max(0, bx0-4)), key=lambda i: csF[i], default=None)
+        if cL is not None and csF[cL] >= EXT_MIN: bx0 = cL
+        cR = max(range(min(W, bx1+4), min(W, bx1+ext)), key=lambda i: csF[i], default=None)
+        if cR is not None and csF[cR] >= EXT_MIN: bx1 = cR+1
     lx = bx0-x0; ly = by0-y0; lw = bx1-bx0; lh = by1-by0
     box = [bx0/W, by0/H, lw/W, lh/H]
     # snap bords ecran (<2%)
