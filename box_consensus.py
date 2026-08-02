@@ -22,6 +22,8 @@ yfd = cv2.FaceDetectorYN.create(VG+"/face_detection_yunet_2023mar.onnx", "", (W,
 rec = cv2.FaceRecognizerSF.create(VG+"/face_recognition_sface_2021dec.onnx", "")
 
 COS_SAME = 0.363
+COS_PIP = 0.75      # identite MEDIANE exigee d un cluster pour etre une vraie carte
+                    # (meme constante et meme regle que pinpoint3.py:45 / flag ghost)
 ACT_DIFF = 5        # seuil de changement pixel (attrape le bruit video, pas le rendu statique)
 ACT_MIN = 0.55      # pixel "carte" = change dans >55% des paires
 NPAIRS = 60
@@ -48,8 +50,9 @@ while t < DUR:
                     feat = rec.feature(rec.alignCrop(fr, f)).flatten().astype(np.float32)
                 except Exception:
                     continue
-                if _cos(feat, narr) >= COS_SAME:
-                    samples.append({"t": t, "f": [float(v) for v in f[:4]]})
+                _c = _cos(feat, narr)
+                if _c >= COS_SAME:
+                    samples.append({"t": t, "f": [float(v) for v in f[:4]], "c": _c})
     t += 1.0
 if not samples:
     print("aucun sample narrateur"); sys.exit(1)
@@ -70,6 +73,21 @@ for s in samples:
         hit["cx"] = (hit["cx"]*n+cx)/(n+1); hit["cy"] = (hit["cy"]*n+cy)/(n+1)
         hit["members"].append(s)
 clusters = [c for c in clusters if len(c["members"]) >= 8]
+# Un cluster doit etre porte par l IDENTITE, pas seulement par la position.
+# box_consensus recrute ses membres a COS_SAME (0.363) et n appliquait aucun test
+# median, alors que pinpoint3 exige deja COS_PIP (0.75) sur la mediane pour appeler
+# un cluster "vraie carte" (pinpoint3.py:45 et 248, flag ghost). Sans ce test une
+# vignette de grille devient un pip de consensus : mesure vKMxgHn6P_Q 02/08, cluster
+# [0.387,0.5398,0.2333,0.4324] = 7 visages sur 235 frames, cos median 0.59, contre
+# 230/235 a cos 0.97 pour le vrai pip bas-gauche. Les scenes dont la mesure locale a
+# echoue (box geante) s y accrochaient et peignaient 228 000 px de contenu la ou le
+# narrateur n etait pas. Aucun juge ne le voit (doctrine monotone).
+_idm = lambda c: float(np.median([m["c"] for m in c["members"]]))
+for c in clusters:
+    if _idm(c) < COS_PIP:
+        print("cluster cx=%.2f cy=%.2f n=%d -> REJETE identite mediane %.3f < %.2f"
+              % (c["cx"], c["cy"], len(c["members"]), _idm(c), COS_PIP))
+clusters = [c for c in clusters if _idm(c) >= COS_PIP]
 
 # ---- 3. par cluster : carte d'activite temporelle -> box + forme ----
 def consensus(c):
