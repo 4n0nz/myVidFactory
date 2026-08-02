@@ -93,8 +93,8 @@ fi
 # passes CLEAN le 2026-08-01). Ne relance AUCUNE passe : c est un rapport, pas un fixer.
 echo "invariants..." >> "$PROG"
 inv="OK"
-$PY $VG/vf_invariants.py "$WD" > /tmp/vf_one_inv.log 2>&1 || inv="INV_$(grep -oE INVARIANTS : [0-9]+ /tmp/vf_one_inv.log | grep -oE [0-9]+ | tail -1)"
-_ns=$(grep -oE SUSPECTS : [0-9]+ /tmp/vf_one_inv.log | grep -oE [0-9]+ | tail -1)
+$PY $VG/vf_invariants.py "$WD" > /tmp/vf_one_inv.log 2>&1 || inv="INV_$(grep -oE "INVARIANTS : [0-9]+" /tmp/vf_one_inv.log | grep -oE "[0-9]+" | tail -1)"
+_ns=$(grep -oE "SUSPECTS : [0-9]+" /tmp/vf_one_inv.log | grep -oE "[0-9]+" | tail -1)
 [ "${_ns:-0}" != "0" ] && inv="${inv}+SUSP${_ns}"
 
 sdur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WD/source.mp4")
