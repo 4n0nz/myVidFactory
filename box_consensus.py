@@ -36,6 +36,50 @@ def _frame(t):
 def _cos(a, b):
     return float(np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b)+1e-9))
 
+CORR_MIN = 0.45     # correlation temporelle minimale pour declarer qu une colonne/ligne
+                    # appartient encore a la carte
+CORR_REL = 0.80     # ... et jamais sous 80% de la correlation mediane de l interieur
+
+def _corr_extend(ts, idx, bx0, by0, bx1, by1):
+    """Etend la box vers le bord tant que la colonne/ligne varie DANS LE TEMPS comme
+    l interieur de la carte. Le mode commun (luminance globale : coupes de plan, expo
+    auto) est retire avant correlation, sinon tout correle avec tout (u0SSS s etendait
+    de x=1567 a x=461 sans ce retrait)."""
+    if bx1-bx0 < 24 or by1-by0 < 24:
+        return bx0, by0, bx1, by1
+    g = []; cols = []; rows = []; ref = []
+    for t in [ts[i] for i in idx[:48]]:
+        fr = _frame(t)
+        if fr is None: continue
+        gr = cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY).astype(np.float32)
+        g.append(gr.mean())
+        cols.append(gr[by0+8:by1-8, :].mean(axis=0))
+        rows.append(gr[:, bx0+8:bx1-8].mean(axis=1))
+        ref.append(gr[by0+8:by1-8, bx0+8:bx1-8].mean())
+    if len(g) < 12:
+        return bx0, by0, bx1, by1
+    g = np.array(g, np.float32); ref = np.array(ref, np.float32)
+    cols = np.stack(cols); rows = np.stack(rows)
+    gz = (g-g.mean())/max(g.std(), 1e-6)
+    def _dec(x):
+        return x - np.outer(gz, (x*gz[:, None]).mean(0))
+    r = _dec(ref[:, None])[:, 0]
+    r = (r-r.mean())/max(r.std(), 1e-6)
+    def _z(x):
+        x = _dec(x); x = x - x.mean(0, keepdims=True)
+        sd = x.std(0, keepdims=True)
+        return np.where(sd > 0.25, x/np.maximum(sd, 1e-6), 0.0)
+    cc = (_z(cols)*r[:, None]).mean(0)
+    cr = (_z(rows)*r[:, None]).mean(0)
+    tc = max(CORR_MIN, CORR_REL*float(np.median(cc[bx0+8:bx1-8])))
+    tr = max(CORR_MIN, CORR_REL*float(np.median(cr[by0+8:by1-8])))
+    while bx0-1 >= 0 and cc[bx0-1] >= tc: bx0 -= 1
+    while bx1 <= W-1 and cc[bx1] >= tc: bx1 += 1
+    while by0-1 >= 0 and cr[by0-1] >= tr: by0 -= 1
+    while by1 <= H-1 and cr[by1] >= tr: by1 += 1
+    return bx0, by0, bx1, by1
+
+
 # ---- 1. echantillonnage narrateur (1/s) ----
 samples = []
 t = 0.0
@@ -273,13 +317,17 @@ def consensus(c):
         if cL is not None and csF[cL] >= EXT_MIN: bx0 = cL
         cR = max(range(min(W, bx1+4), min(W, bx1+ext)), key=lambda i: csF[i], default=None)
         if cR is not None and csF[cR] >= EXT_MIN: bx1 = cR+1
+    # Bords : extension par CORRELATION TEMPORELLE, en remplacement du snap aveugle
+    # "a moins de 2% du bord d ecran = colle au bord". Ce snap detruisait des marges
+    # design reelles (AAmd 02/08 : carte mesuree a x=18 et bas 1049, snappee a 0 et
+    # 1080) sans reparer la sous-couverture (w_Px4 : carte jusqu au bord, box 48%
+    # trop courte). Discriminants falsifies avant celui-ci, tous mesures : mouvement
+    # (mur statique derriere le narrateur sur w_Px4), texture laplacienne, ecart-type
+    # temporel (ratios croises sur 6 videos), et "pas de ligne de bord mesuree" (les
+    # 4 cotes de l etalon eglV scorent 0.00-0.08 en gper).
+    bx0, by0, bx1, by1 = _corr_extend(ts, idx, bx0, by0, bx1, by1)
     lx = bx0-x0; ly = by0-y0; lw = bx1-bx0; lh = by1-by0
     box = [bx0/W, by0/H, lw/W, lh/H]
-    # snap bords ecran (<2%)
-    if box[0] < 0.02: box[2] += box[0]; box[0] = 0.0
-    if box[1] < 0.02: box[3] += box[1]; box[1] = 0.0
-    if box[0]+box[2] > 0.98: box[2] = 1.0-box[0]
-    if box[1]+box[3] > 0.98: box[3] = 1.0-box[1]
     # forme : sondes de coin MULTI-FRAMES (in/out aux profondeurs 2% et 8%), un coin ne
     # vote que si contraste exterieur/carte a cet instant (dark-on-dark = abstention).
     # Vote majoritaire sur ~20 frames : les moments contrastes decident, le reste se tait.
