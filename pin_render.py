@@ -344,11 +344,27 @@ if os.path.exists(_cpath):
 # ajoutee le 29/07 pour les hero filmes large de XzEg, visage 0.227 H, et elle reste
 # valide la : leur tete n est dans aucun cluster pip).
 # Cluster PIP seulement, et vote 2 sondes sur 3 pour ne pas dependre d une frame.
+# UNE CARTE EST UN ENCART. Un cluster qui couvre presque tout le cadre n est pas une
+# carte, c est le narrateur lui-meme : box_consensus offre +1 "bord trouve" par bord
+# d ecran touche (box[1] < 0.02, box[1]+box[3] > 0.98...), donc une box pleine hauteur
+# recolte 2 bords gratuits et tombe en kind="pip" sans qu aucune ligne de carte existe.
+# Inventaire des 20 clusters pip du corpus le 02/08 : les vraies cartes plafonnent a
+# aire 0.239 et hauteur 0.719 (OfrZE35gHM0), les fausses sont a 0.416/h=1.0
+# (u0SSSUmUEX0), 0.547/h=1.0 (eglVxLaWRUU) et 0.767/h=0.897 (Lh1bVjtjbw4). Deux modes
+# separes par un facteur 2 des deux cotes : seuils 0.30 d aire et 0.85 de hauteur.
+# Sans ce test, 5dd374b declassait 150,7 s de vrai hero sur Lh1bVjtjbw4 et 29,8 s sur
+# u0SSSUmUEX0 (visage 0.34-0.45 H, la signature d un narrateur plein cadre, contre
+# 0.21-0.25 H pour les vignettes de partage d ecran d OfrZE).
+CARD_AREA_MAX = 0.30
+CARD_H_MAX = 0.85
+
 def _pip_boxes():
     out = []
     for c in _cons:
         if c.get("kind") != "pip": continue
         if not any(c.get("votes") or [0, 0.0, 0.0]): continue
+        b = c.get("box") or [0, 0, 1, 1]
+        if b[2]*b[3] >= CARD_AREA_MAX or b[3] >= CARD_H_MAX: continue
         out.append(c)
     return out
 
@@ -386,8 +402,23 @@ def _narr_cluster(fr, cls):
         fx = (float(f[0])+float(f[2])/2)/W; fy = (float(f[1])+float(f[3])/2)/H
         for c in cls:
             b = c["box"]
-            if b[0]-0.02 <= fx <= b[0]+b[2]+0.02 and b[1]-0.02 <= fy <= b[1]+b[3]+0.02:
-                best = c; bh = float(f[3]); break
+            if not (b[0]-0.02 <= fx <= b[0]+b[2]+0.02 and b[1]-0.02 <= fy <= b[1]+b[3]+0.02):
+                continue
+            # LA BOX EST-ELLE UNE CARTE, OU EST-CE LA TETE ELLE-MEME ? Une vraie carte
+            # cadre tete + epaules + fond : le visage y occupe environ un tiers de la
+            # hauteur. Un cluster bati sur les detections de visage d un narrateur LIVE
+            # plein cadre a la taille de sa tete, le visage le remplit.
+            # Mesure 02/08, 3 sondes par scene region="hero" :
+            #   OfrZE35gHM0, vraies demotions (vignette sur partage d ecran) : 0.29-0.42
+            #   N1rACQTJepA, fausses demotions (narrateur live plein cadre)  : 0.80-1.07
+            # Bimodal sans recouvrement, facteur 2. Seuil 0.65, place du cote haut :
+            # se tromper en GARDANT le hero repeint tout le cadre, se tromper en le
+            # refusant ne coute qu une box. Sans ce test les 22 scenes hero de N1rAC
+            # recevaient un rectangle de la taille du front, bouche torse et mains a nu,
+            # et du vert sans carte dessous (frames t=18 et t=137).
+            if b[3] > 0 and float(f[3])/H/b[3] >= 0.65:
+                continue
+            best = c; bh = float(f[3]); break
     return best
 
 segs=[]; prev=0.0
