@@ -111,8 +111,11 @@ $PY $VG/vf_headcover.py "$WD" "$VG/out/$OUT" --probes 3 --thr 0.80 > /tmp/vf_one
 echo "offprobe..." >> "$PROG"
 op="OK"
 $PY $VG/vf_offprobe.py "$WD" > /tmp/vf_one_op.log 2>&1 || op="OP_$(grep -cE "OFF-LIVE|MARGE-TETE" /tmp/vf_one_op.log)"
+echo "overcover..." >> "$PROG"
+oc="OK"
+$PY $VG/vf_overcover.py "$WD" > /tmp/vf_one_oc.log 2>&1 || oc="OC_$(grep -cE "SUR_struct|SUR_cont " /tmp/vf_one_oc.log)"
 
 sdur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WD/source.mp4")
 vdur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WD/segs/videoonly.mp4" 2>/dev/null)
 durok=$($PY -c "print('OK' if abs($sdur-($vdur or 0))<0.5 else 'DESYNC(%.1f)'%($vdur or 0))" 2>/dev/null)
-echo "DONE qc=$qc geom=$geom fid=$fid inv=$inv hc=$hc op=$op tours=$tours dur=$durok $(date '+%F %T')" >> "$PROG"
+echo "DONE qc=$qc geom=$geom fid=$fid inv=$inv hc=$hc op=$op oc=$oc tours=$tours dur=$durok $(date '+%F %T')" >> "$PROG"
