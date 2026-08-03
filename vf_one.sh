@@ -97,7 +97,22 @@ $PY $VG/vf_invariants.py "$WD" > /tmp/vf_one_inv.log 2>&1 || inv="INV_$(grep -oE
 _ns=$(grep -oE "SUSPECTS : [0-9]+" /tmp/vf_one_inv.log | grep -oE "[0-9]+" | tail -1)
 [ "${_ns:-0}" != "0" ] && inv="${inv}+SUSP${_ns}"
 
+# JUGES ANCRES SOURCE (rapport seul, plan Efforts/VF-Plan-Robustesse.md #1) :
+#   hc = la tete du narrateur (trouvee dans la SOURCE) est-elle verte dans le rendu la
+#        ou le plan dit pip/hero ? Chercher dans le rendu est vain : le vert cache pile
+#        la box du detecteur (o9x8 t=428, qc_ident disait "0 fuite" sur une demi-tete).
+#   op = narrateur LIVE dans les scenes off (le trou de rognage itWI 331-351 etait
+#        inv=OK : une scene off est legale, mais elle ne peint rien) + marge tete
+#        pre-rendu sur les pip.
+# AUCUN fixer ne consomme ces verdicts — ils pointent, la loop confirme aux frames.
+echo "headcover..." >> "$PROG"
+hc="OK"
+$PY $VG/vf_headcover.py "$WD" "$VG/out/$OUT" --probes 3 --thr 0.80 > /tmp/vf_one_hc.log 2>&1 || hc="HC_$(grep -cE "^  scene\[" /tmp/vf_one_hc.log)"
+echo "offprobe..." >> "$PROG"
+op="OK"
+$PY $VG/vf_offprobe.py "$WD" > /tmp/vf_one_op.log 2>&1 || op="OP_$(grep -cE "OFF-LIVE|MARGE-TETE" /tmp/vf_one_op.log)"
+
 sdur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WD/source.mp4")
 vdur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WD/segs/videoonly.mp4" 2>/dev/null)
 durok=$($PY -c "print('OK' if abs($sdur-($vdur or 0))<0.5 else 'DESYNC(%.1f)'%($vdur or 0))" 2>/dev/null)
-echo "DONE qc=$qc geom=$geom fid=$fid inv=$inv tours=$tours dur=$durok $(date '+%F %T')" >> "$PROG"
+echo "DONE qc=$qc geom=$geom fid=$fid inv=$inv hc=$hc op=$op tours=$tours dur=$durok $(date '+%F %T')" >> "$PROG"

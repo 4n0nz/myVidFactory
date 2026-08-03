@@ -156,6 +156,63 @@ for i, s in enumerate(hm):
     S.append("off NON PEINT %.2f-%.2f (%.2fs) entre %s et %s — narrateur present des deux cotes"
              % (s["start"], s["end"], s["end"] - s["start"], a["host"], b["host"]))
 
+# --- 9. ARBITRAGE : une scene pip qui CONTIENT un cluster consensus fort ---------
+# Le defaut dominant du corpus (mesure 2026-08-02, 6 videos) : le prior mesure le
+# CONTENEUR (panneau UI, colonne de layout, fenetre) au lieu de la carte, et la mesure
+# brute n'est jamais arbitree ALORS QUE le bon cluster existe (N1rACQTJepA : cluster
+# n=238 servant 12 scenes, 4 scenes-panneau a 4.3x son aire jamais rappelees a l ordre).
+# Regle relationnelle (JSON pur, host_map + box_consensus) : une scene pip dont la bbox
+# contient (epsilon EPS_ARB — le bon cluster de N1rAC DEBORDE de 9 px de la box
+# fautive) la box d un cluster pip a forte fraction des votes, avec un ratio d aires
+# eleve, n est probablement pas une carte : c est ce qu il y a AUTOUR.
+# SEUILS PAR INVENTAIRE (269 paires mesurees sur les archives des runs 1-2, jamais a
+# priori) : l extension d anneau legitime monte a 1.6-1.8x (bgMs 1.61 fracvotes 1.00,
+# video CLEAN), donc pas de vallee sur le ratio seul ; le COUPLE ratio x fracvotes
+# separe. FORT = ratio>=3.0 ET fracvotes>=0.10 : attrape TOUS les defauts verifies
+# (N1rAC 3.97-4.45, gnfHl 7.82, OfrZE 4.18/13.42, T-chq 4.12/8.86) et AUCUNE video
+# saine (les 5.72/4.52/3.32 du corpus sont tous a fracvotes<=0.03). INFO = ratio>=2.0
+# ET fracvotes>=0.30 : zone grise documentee (T-chq 2.01, w_Px4 2.81), signalee sans
+# certitude. Deux paliers SUSPECT, jamais fatal : rapport seul, aucun fixer.
+EPS_ARB = 0.012
+ARB_FORT = (3.0, 0.10)
+ARB_INFO = (2.0, 0.30)
+bc_p = os.path.join(wd, "box_consensus.json")
+if os.path.exists(bc_p):
+    try:
+        bc = json.load(open(bc_p))
+    except Exception:
+        bc = []
+    pcl = [c for c in bc if c.get("kind") == "pip" and c.get("box")]
+    tot_votes = sum(c.get("n", 0) for c in pcl) or 1
+    for s in hm:
+        if s.get("host") != "pip" or not s.get("bbox"): continue
+        bx0, by0, bw, bh = [float(v) for v in s["bbox"]]
+        bx1, by1 = bx0 + bw, by0 + bh
+        sa = bw * bh
+        best = None
+        for c in pcl:
+            cx0, cy0, cw, ch = [float(v) for v in c["box"]]
+            cx1, cy1 = cx0 + cw, cy0 + ch
+            ca = cw * ch
+            if ca <= 0 or sa <= ca: continue
+            if not (cx0 >= bx0 - EPS_ARB and cy0 >= by0 - EPS_ARB
+                    and cx1 <= bx1 + EPS_ARB and cy1 <= by1 + EPS_ARB): continue
+            same = (abs(bx0-cx0) < EPS_ARB and abs(by0-cy0) < EPS_ARB
+                    and abs(bx1-cx1) < EPS_ARB and abs(by1-cy1) < EPS_ARB)
+            if same: continue
+            ratio = sa / ca; frac = c.get("n", 0) / tot_votes
+            if best is None or ratio * frac > best[0] * best[1]:
+                best = (ratio, frac, c)
+        if best is None: continue
+        ratio, frac, c = best
+        tier = None
+        if ratio >= ARB_FORT[0] and frac >= ARB_FORT[1]: tier = "ARBITRAGE-FORT"
+        elif ratio >= ARB_INFO[0] and frac >= ARB_INFO[1]: tier = "ARBITRAGE-INFO"
+        if tier:
+            S.append("%s scene pip %.2f-%.2f contient le cluster n=%d (%.0f%% des votes) "
+                     "a %.1fx son aire — box probablement = conteneur, pas carte"
+                     % (tier, s["start"], s["end"], c.get("n", 0), 100 * frac, ratio))
+
 # --- rapport ---------------------------------------------------------------
 from collections import Counter
 if S:
