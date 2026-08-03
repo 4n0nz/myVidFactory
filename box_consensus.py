@@ -89,6 +89,30 @@ for c in clusters:
               % (c["cx"], c["cy"], len(c["members"]), _idm(c), COS_PIP))
 clusters = [c for c in clusters if _idm(c) >= COS_PIP]
 
+# ---- 2b. DUMP DE CALIBRATION (plan Efforts/VF-Plan-Robustesse.md #5) ----
+# Le centre d un cluster est une moyenne COURANTE (l.70-73) : deux positions de carte
+# distinctes fusionnent par derive en chaine (o9x8kycf3Wo : positions a 216 px, une
+# seule box a cheval, 47% de carte a nu). Le fix est un cap de diametre ancre sur la
+# graine — mais son rayon doit sortir d un INVENTAIRE des dispersions reelles, pas
+# d un a priori. Ce dump enregistre la dispersion de chaque cluster ; les prochains
+# passages corpus fournissent la distribution. try/except integral : le dump ne doit
+# JAMAIS faire echouer une passe.
+try:
+    _dump = {"clusters": []}
+    for c in clusters:
+        _dx = [abs((m["f"][0]+m["f"][2]/2)/W - c["cx"]) for m in c["members"]]
+        _dy = [abs((m["f"][1]+m["f"][3]/2)/H - c["cy"]) for m in c["members"]]
+        _dump["clusters"].append({
+            "cx": round(c["cx"], 4), "cy": round(c["cy"], 4), "n": len(c["members"]),
+            "dx_p50": round(float(np.percentile(_dx, 50)), 4),
+            "dx_p95": round(float(np.percentile(_dx, 95)), 4),
+            "dx_max": round(float(max(_dx)), 4),
+            "dy_p95": round(float(np.percentile(_dy, 95)), 4),
+            "dy_max": round(float(max(_dy)), 4)})
+    json.dump(_dump, open(os.path.join(wd, "samples_bc.json"), "w"), indent=1)
+except Exception:
+    pass
+
 # ---- 3. par cluster : carte d'activite temporelle -> box + forme ----
 def consensus(c):
     ms = c["members"]
