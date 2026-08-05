@@ -22,23 +22,24 @@ PY=$VG/.venv/bin/python
 [ -f "$BG" ]  || { echo "pas de background $BG"; exit 1; }
 [ -f "$INTRO" ] || { echo "pas d intro $INTRO"; exit 1; }
 
-read cx cy <<< $($PY - "$WD" <<'PYEOF'
+read cx cy bh <<< $($PY - "$WD" <<'PYEOF'
 import json, sys, os
 try:
     m = json.load(open(os.path.join(sys.argv[1], "host_map.json")))
-    tot = wx = wy = 0.0
+    tot = wx = wy = wh = 0.0
     for s in m:
         if s.get("host") == "pip" and s.get("bbox"):
             d = s["end"] - s["start"]
             wx += (s["bbox"][0] + s["bbox"][2] / 2.0) * d
             wy += (s["bbox"][1] + s["bbox"][3] / 2.0) * d
+            wh += s["bbox"][3] * d
             tot += d
     if tot:
-        print(round(wx / tot, 3), round(wy / tot, 3))
+        print(round(wx / tot, 3), round(wy / tot, 3), round(wh / tot, 3))
     else:
-        print(0.5, 0.5)
+        print(0.5, 0.5, 0.0)
 except Exception:
-    print(0.5, 0.5)
+    print(0.5, 0.5, 0.0)
 PYEOF
 )
 X=240; Y=135   # centre par defaut : (1920-1440)/2, (1080-810)/2
@@ -47,6 +48,10 @@ if $PY -c "exit(0 if float('$cx') > 0.58 else 1)"; then X=50;  sx="gauche (pips 
 if $PY -c "exit(0 if float('$cx') < 0.42 else 1)"; then X=430; sx="droite (pips a gauche, cx=$cx)"; fi
 if $PY -c "exit(0 if float('$cy') > 0.58 else 1)"; then Y=50;  sy="haut (pips en bas, cy=$cy)"; fi
 if $PY -c "exit(0 if float('$cy') < 0.42 else 1)"; then Y=220; sy="bas (pips en haut, cy=$cy)"; fi
+# Colonne pleine hauteur (detail Boss 2026-08-05) : un pip qui occupe toute la hauteur
+# (hauteur ponderee >= 0.85 — QU-fG 0.962, gnfHl 1.0, contre 0.45 pour un coin) fait
+# partie du LAYOUT, pas d un coin a fuir : la video reste centree sur les deux axes.
+if $PY -c "exit(0 if float('$bh') >= 0.85 else 1)"; then X=240; Y=135; sx="centre (colonne pleine hauteur, h=$bh)"; sy="centre"; fi
 
 DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$SRC")
 TOT=$($PY -c "print(round(float('$DUR')+3.0, 3))")
