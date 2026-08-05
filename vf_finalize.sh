@@ -76,6 +76,6 @@ ffmpeg -y -v error -stream_loop -1 -i "$BG" -i "$SRC" -i "$INTRO" -filter_comple
 [sn0][fv][sn1]concat=n=3:v=1:a=0[fgall];\
 [sa0][fa][sa1]concat=n=3:v=0:a=1[a];\
 [0:v]fps=30,scale=1920:1080,setsar=1,trim=duration=${TOT},setpts=PTS-STARTPTS[bg];\
-[bg][fgall]overlay=${X}:${Y}:eof_action=pass[v]" \
+[bg][fgall]overlay=${X}:${Y}:eof_action=pass[ov];[ov]drawbox=$((X-1)):$((Y-1)):1442:812:color=0x00FF00@1:t=1[v]" \
   -map "[v]" -map "[a]" -t "$TOT" -c:v $ENC -c:a aac "$OUT"
 [ -s "$OUT" ] && echo "OK $OUT" || { echo "FINALIZE_FAIL"; exit 1; }
