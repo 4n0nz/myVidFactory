@@ -364,7 +364,17 @@ def _pip_boxes():
         if c.get("kind") != "pip": continue
         if not any(c.get("votes") or [0, 0.0, 0.0]): continue
         b = c.get("box") or [0, 0, 1, 1]
-        if b[2]*b[3] >= CARD_AREA_MAX or b[3] >= CARD_H_MAX: continue
+        # OCCUPATION (mesure corpus 2026-08-04, fix QU-fGu6imlE) : le critere de taille
+        # seul disqualifiait la colonne pleine hauteur de QU-fG (0.326x0.962, n=1164
+        # sur 1163 s) alors que c est une VRAIE carte — resultat 27 faux heroes, 1153 s
+        # de vert plein cadre sur le contenu, invisibles a tous les juges (un hero
+        # couvre la tete, hc=OK, doctrine monotone). Le discriminant n est pas la
+        # taille ni les votes (Lh1b: votes reels sur un faux cluster) mais la fraction
+        # de la video que le narrateur passe DANS le cluster : une colonne de layout
+        # permanente = ~1.00, un artefact de passages plein cadre = <= 0.18 (Id9G 0.18,
+        # gnfHl 0.15, Lh1b 0.085, u0SS 0.033). Vallee 0.18 -> 1.00, seuil 0.5 au large
+        # des deux bords. Un cluster geant OU le narrateur habite reste une carte.
+        if (b[2]*b[3] >= CARD_AREA_MAX or b[3] >= CARD_H_MAX)                 and c.get("n", 0) < 0.5 * max(DUR, 1.0): continue
         out.append(c)
     return out
 
