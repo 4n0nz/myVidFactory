@@ -14,6 +14,8 @@ id=$1
 VG=/home/boss/videogen
 WD=$VG/wk_b_$id
 SRC=$VG/out/b_${id}.mp4
+# branche avatar : la presentation se construit sur la version AVATAR quand elle existe
+[ -f "$VG/out/av_${id}.mp4" ] && SRC=$VG/out/av_${id}.mp4
 OUT=$VG/out/final_${id}.mp4
 BG=$VG/assets/background.mp4
 INTRO=$VG/assets/pipintro.mp4

@@ -115,6 +115,11 @@ echo "overcover..." >> "$PROG"
 oc="OK"
 $PY $VG/vf_overcover.py "$WD" > /tmp/vf_one_oc.log 2>&1 || oc="OC_$(grep -cE "SUR_struct|SUR_cont " /tmp/vf_one_oc.log)"
 
+# AVATAR (branche avatar) : remplace le vert par l avatar du projet, bordure 1 px.
+echo "avatar..." >> "$PROG"
+av="OK"
+$PY $VG/vf_avatar.py "$id" > /tmp/vf_one_av.log 2>&1 || av="AV_FAIL"
+
 # FINALIZE (presentation) : composite du master vert devant le background anime,
 # 1,5 s de fond seul avant et apres, cote auto selon la position des pips.
 # Le master b_<id>.mp4 reste la reference pour l avatar.
@@ -125,4 +130,4 @@ bash $VG/vf_finalize.sh "$id" > /tmp/vf_one_fin.log 2>&1 || fin="FIN_FAIL"
 sdur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WD/source.mp4")
 vdur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WD/segs/videoonly.mp4" 2>/dev/null)
 durok=$($PY -c "print('OK' if abs($sdur-($vdur or 0))<0.5 else 'DESYNC(%.1f)'%($vdur or 0))" 2>/dev/null)
-echo "DONE qc=$qc geom=$geom fid=$fid inv=$inv hc=$hc op=$op oc=$oc fin=$fin tours=$tours dur=$durok $(date '+%F %T')" >> "$PROG"
+echo "DONE qc=$qc geom=$geom fid=$fid inv=$inv hc=$hc op=$op oc=$oc av=$av fin=$fin tours=$tours dur=$durok $(date '+%F %T')" >> "$PROG"
