@@ -91,13 +91,26 @@ if not groups:
 # 1re passe : geometrie des pop-out en coordonnees RELATIVES a la fenetre (sans clamp)
 rel = []
 for bbox, segs in groups.items():
+    # colonne pleine hauteur (h >= 0.85, meme seuil que la doctrine de centrage) :
+    # PAS de pop-out — l av_ en dessous couvre deja la colonne exactement, et toute
+    # box x1.25 dessus mangerait la video (crash QU-fG 2026-08-06)
+    if bbox[3] >= 0.85:
+        continue
     rx = int(round(bbox[0] * VW)); ry = int(round(bbox[1] * VH))
     pw = max(2, int(round(bbox[2] * VW))); ph = max(2, int(round(bbox[3] * VH)))
-    # ratio ADAPTATIF (verdict Boss 2026-08-05) : 5:4 minimum, mais une zone verte
-    # deja plus large que 5:4 garde SON ratio (sinon la box gonfle en hauteur et
-    # mange la video) ; plafond = 16:9 natif de l avatar
-    ar = min(max(pw / float(ph), AW / float(AH)), 848 / 464.0)
-    w2 = min(CW, int(round(max(pw, ph * ar) * AV_SCALE))) // 2 * 2
+    # ratio ADAPTATIF (verdicts Boss 2026-08-05/06) : cible = bande [5:4, 16:9], mais
+    # SEULEMENT si l elargissement reste <= 40% de la zone (un grand portrait force
+    # en 5:4 = +268% de largeur, il garde son ratio) ; plafond 16:9 natif
+    zr = pw / float(ph)
+    ar = min(max(zr, AW / float(AH)), 848 / 464.0)
+    if ar / zr > 1.4:
+        ar = zr
+    # scale DEGRESSIF selon la part de fenetre occupee : x1.25 pour un petit pip,
+    # glisse vers x1.08 quand la zone approche 30% de la fenetre (gros pip = deja
+    # proeminent, le surplus mange la video)
+    f = (pw * ph) / float(VW * VH)
+    sc = AV_SCALE - (AV_SCALE - 1.08) * min(1.0, max(0.0, (f - 0.10) / 0.20))
+    w2 = min(CW, int(round(max(pw, ph * ar) * sc))) // 2 * 2
     h2 = min(CH, int(round(w2 / ar))) // 2 * 2
     # ancrage : surplus vers l EXTERIEUR de la fenetre (cote background), jamais
     # vers l interieur de la video ; zone neutre (0.45-0.55) -> centre
