@@ -32,8 +32,9 @@ if os.path.exists(cp):
     try: cons = json.load(open(cp))
     except Exception: cons = []
 
-cr = cv2.VideoCapture(rendu)
-cs = cv2.VideoCapture(os.path.join(wd, 'source.mp4'))
+from smartseek import SmartCap
+cr = SmartCap(rendu)
+cs = SmartCap(os.path.join(wd, 'source.mp4'))
 W = int(cs.get(cv2.CAP_PROP_FRAME_WIDTH)); H = int(cs.get(cv2.CAP_PROP_FRAME_HEIGHT))
 NR = narr_role.NarrRole(wd, W, H)
 

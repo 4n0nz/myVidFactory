@@ -28,7 +28,8 @@ MG_PX = 13.0
 wd = sys.argv[1]
 pin = json.load(open(os.path.join(wd, "host_map_pin.json")))
 src = os.path.join(wd, "source.mp4")
-cap = cv2.VideoCapture(src); W=int(cap.get(3)); H=int(cap.get(4)); DUR=cap.get(7)/(cap.get(5) or 30)
+from smartseek import SmartCap
+cap = SmartCap(src); W=int(cap.get(3)); H=int(cap.get(4)); DUR=cap.get(7)/(cap.get(5) or 30)
 yfd = cv2.FaceDetectorYN.create(YUNET, "", (W, H), score_threshold=0.6)
 mdir = os.path.join(wd, "masks"); os.makedirs(mdir, exist_ok=True)
 

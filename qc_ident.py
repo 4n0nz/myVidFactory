@@ -75,13 +75,42 @@ def _off_layout(t, fb):
     return seen
 
 cap = cv2.VideoCapture(rend)
-W = int(cap.get(3)); H = int(cap.get(4)); DUR = cap.get(7)/(cap.get(5) or 30)
+W = int(cap.get(3)); H = int(cap.get(4)); FPSX = cap.get(5) or 30; DUR = cap.get(7)/FPSX
 yfd = cv2.FaceDetectorYN.create(VG+"/face_detection_yunet_2023mar.onnx", "", (W, H), score_threshold=0.6)
 rec = cv2.FaceRecognizerSF.create(VG+"/face_recognition_sface_2021dec.onnx", "")
 
+# BALAYAGE SEQUENTIEL (branche optimisation 2026-08-06) : l ancien _frame faisait un
+# cap.set(POS_MSEC) par acces = ~98 ms/seek (mesure iABox) contre 1.5 ms en lecture
+# sequentielle. Tous les acces du QC sont sur la grille 0.5 s et le t principal ne
+# recule jamais -> on decode le flux UNE fois en avancant, en gardant une fenetre
+# glissante des frames echantillonnees (lookahead max +1.5 s, eviction derriere t).
+# Meme frame retournee que le seek : premiere frame de pts >= t (ceil sur la grille).
+import math
+_win = {}          # k (index demi-seconde) -> frame
+_next_fidx = 0     # prochain index de frame que cap.read() rendra
+_evict_k = 0
 def _frame(t):
-    cap.set(cv2.CAP_PROP_POS_MSEC, t*1000.0); ok, fr = cap.read()
-    return fr if ok else None
+    global _next_fidx
+    if t < 0: return None
+    k = int(round(t / 0.5))
+    if k in _win: return _win[k]
+    fidx = int(math.ceil(k * 0.5 * FPSX - 1e-6))
+    if fidx < _next_fidx: return None   # derriere la fenetre (jamais atteint sur la grille)
+    fr = None
+    while _next_fidx <= fidx:
+        ok, f = cap.read()
+        if not ok: return None
+        _next_fidx += 1
+        fr = f
+    _win[k] = fr
+    return fr
+def _evict(t):
+    """libere les frames plus vieilles que t-0.5 (le QC ne re-regarde jamais derriere)."""
+    global _evict_k
+    k0 = int(round(t / 0.5)) - 1
+    for k in range(_evict_k, k0):
+        _win.pop(k, None)
+    _evict_k = max(_evict_k, k0)
 
 def _cos(a, b):
     return float(np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b)+1e-9))
@@ -89,6 +118,7 @@ def _cos(a, b):
 leaks = []
 t = 0.5
 while t < DUR:
+    _evict(t)
     fr = _frame(t); fr2 = _frame(min(t+0.5, DUR-0.05))
     if fr is None: t += 1.0; continue
     _, faces = yfd.detect(fr)

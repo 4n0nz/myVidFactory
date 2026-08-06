@@ -16,7 +16,8 @@ import cardness
 wd = sys.argv[1]
 src = os.path.join(wd, "source.mp4")
 hm = json.load(open(os.path.join(wd, "host_map.json")))
-cap = cv2.VideoCapture(src)
+from smartseek import SmartCap
+cap = SmartCap(src)
 W = int(cap.get(3)); H = int(cap.get(4))
 ACT_MIN = 0.5  # sous ce niveau d'activite, la bande est consideree figee (fond)
 

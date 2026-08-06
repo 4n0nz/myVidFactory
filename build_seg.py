@@ -5,7 +5,7 @@
 #   - webcam FIXE  : env/arg PIP_RECT="x,y,w,h" -> meme rect pour tous les pips (coins nets).
 #   - webcam MOBILE: pas de PIP_RECT -> bbox PAR-SEGMENT de la detection (suit la webcam),
 #     avec extension du haut (la box ancree-visage sous-evalue le haut du cadre webcam).
-import json, subprocess, os, sys
+import json, subprocess, os, sys, hashlib
 
 workdir  = sys.argv[1] if len(sys.argv) > 1 else '/home/boss/videogen/wk_full'
 out_name = sys.argv[2] if len(sys.argv) > 2 else 'my_remix.mp4'
@@ -15,8 +15,32 @@ source = workdir + '/source.mp4'
 outp   = '/home/boss/videogen/out/' + out_name
 os.makedirs('/home/boss/videogen/out', exist_ok=True)
 segdir = workdir + '/segs'; os.makedirs(segdir, exist_ok=True)
+# RENDER INCREMENTAL (branche optimisation 2026-08-06) : on ne supprime PLUS les segs.
+# Un seg est re-rendu SEULEMENT si sa cle (commande ffmpeg + contenu du masque) a change
+# depuis le dernier rendu reussi — la cle est ecrite en seg%04d.hash par run_seg.sh
+# APRES le ffmpeg (donc un rendu interrompu n'a pas de hash = re-rendu au tour suivant).
+# Un tour de QC ne re-rend ainsi que les segments touches par le fix (~90% du temps de
+# render economise sur les tours 2+). Les .txt sont regeneres a chaque passe.
 for f in os.listdir(segdir):
-    if f.endswith(('.png', '.mp4', '.txt')): os.remove(segdir + '/' + f)
+    if f.endswith('.txt'): os.remove(segdir + '/' + f)
+
+def _sha(s):
+    return hashlib.sha1(s.encode() if isinstance(s, str) else s).hexdigest()
+
+_mask_sha = {}
+def mask_sha(p):
+    """empreinte du CONTENU du masque (le chemin peut garder le meme nom avec des
+    pixels differents apres un qc_fix + gen_masks)."""
+    if p not in _mask_sha:
+        try: _mask_sha[p] = _sha(open(p, 'rb').read())
+        except Exception: _mask_sha[p] = 'NOMASK'
+    return _mask_sha[p]
+
+# cache des verdicts detect_round : 3 seeks video par pip candidat a chaque passe,
+# resultat pourtant deterministe pour (rect, fenetre temporelle) donnes.
+_round_path = segdir + '/round_cache.json'
+try: _round_cache = json.load(open(_round_path))
+except Exception: _round_cache = {}
 
 r = subprocess.check_output(
     'ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,nb_frames -of csv=p=0 ' + source,
@@ -190,6 +214,7 @@ _i1 = _i0[1:] + [_last]
 lines = ["#!/bin/bash", "set -e", "exec > %s/seg.log 2>&1" % workdir, "echo '=== START SEG RENDER ==='",
          "date", 'T0=$(date +%s)']
 concat = []
+skipped = 0
 for si, s in enumerate(hmap):
     n = _i1[si] - _i0[si]
     if n <= 0: continue
@@ -221,7 +246,11 @@ for si, s in enumerate(hmap):
             x, y, w, h = rect
             if PIP_ROUND == '1': rnd = True
             elif PIP_ROUND == '0': rnd = False
-            else: rnd = detect_round(x, y, w, h, ss, d)
+            else:
+                _rk = '%d,%d,%d,%d,%.3f,%.3f' % (x, y, w, h, ss, d)
+                if _rk not in _round_cache:
+                    _round_cache[_rk] = detect_round(x, y, w, h, ss, d)
+                rnd = _round_cache[_rk]
             fc = pip_fc(w, h, x, y, rnd)
             cmd = ('ffmpeg -y -ss %s -t %s -i %s %s '
                    '-filter_complex "%s" -map "[vo]" -an -r %s -frames:v %s %s "%s"'
@@ -234,8 +263,17 @@ for si, s in enumerate(hmap):
                % (ss, din, source, RATE, n, NV, sf))
 
     concat.append("file '%s'" % sf)
+    # cle d identite du seg : commande complete + contenu du masque. Hash present et
+    # identique + fichier present -> seg reutilise tel quel (bit-identique).
+    key = _sha(cmd + '|' + (mask_sha(s['mask']) if host == 'pip' and s.get('mask') and not FIXED else ''))
+    hf = sf.rsplit('.', 1)[0] + '.hash'
+    if os.path.exists(sf) and os.path.exists(hf) and open(hf).read().strip() == key:
+        lines.append("echo '--- seg %d/%d  %s  %.1f-%.1fs [CACHE] ---'" % (si + 1, len(hmap), host, s['start'], s['end']))
+        skipped += 1
+        continue
     lines.append("echo '--- seg %d/%d  %s  %.1f-%.1fs ---'" % (si + 1, len(hmap), host, s['start'], s['end']))
     lines.append(cmd)
+    lines.append("echo '%s' > '%s'" % (key, hf))
 
 listf = segdir + '/concat.txt'
 open(listf, 'w').write('\n'.join(concat) + '\n')
@@ -252,6 +290,16 @@ lines.append('ls -lh "%s"' % outp)
 
 open(workdir + '/run_seg.sh', 'w').write('\n'.join(lines) + '\n')
 os.chmod(workdir + '/run_seg.sh', 0o755)
+json.dump(_round_cache, open(_round_path, 'w'))
+# menage : les segs/hashes qui ne font plus partie du plan (renumerotation apres un
+# fix qui change le nombre de scenes) ne doivent pas trainer sur disque
+_want = set(c.split("'")[1] for c in concat)
+for f in os.listdir(segdir):
+    p = segdir + '/' + f
+    if f.endswith('.mp4') and f.startswith('seg') and p not in _want and f != 'videoonly.mp4':
+        os.remove(p)
+        hp = p.rsplit('.', 1)[0] + '.hash'
+        if os.path.exists(hp): os.remove(hp)
 npip = sum(1 for s in hmap if s['host'] == 'pip')
 mode = ("FIXE %s" % (FIXED,)) if FIXED else "PAR-SEGMENT (bbox detectee, top+%.0f%%)" % (TOP_EXT * 100)
-print("SEG: %d segments, %d pip, mode=%s, %dx%d @%sfps" % (len(hmap), npip, mode, W, H, FPS))
+print("SEG: %d segments, %d pip, %d en cache, mode=%s, %dx%d @%sfps" % (len(hmap), npip, skipped, mode, W, H, FPS))
