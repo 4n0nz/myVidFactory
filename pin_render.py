@@ -33,6 +33,39 @@ cap = SmartCap(src); W=int(cap.get(3)); H=int(cap.get(4)); DUR=cap.get(7)/(cap.g
 yfd = cv2.FaceDetectorYN.create(YUNET, "", (W, H), score_threshold=0.6)
 mdir = os.path.join(wd, "masks"); os.makedirs(mdir, exist_ok=True)
 
+# CACHE seg_mask (branche optimisation 2026-08-06) : grabCut = 64% du CPU de pin_render
+# (cProfile MS7 : 179 s / 282 s, ~2 s par appel), recalcule A L IDENTIQUE a chaque
+# relance de pin_render dans la boucle QC alors que la scene n a pas bouge. Fonction
+# pure de (source du wk, t0, t1, seed_box) -> cle exacte sur ces valeurs ; un fix qui
+# change la box change la cle et force le recalcul. Hit = resultat bit-identique du
+# run precedent (grabCut est deterministe, prouve par les A/B PIN_IDENTIQUE).
+import hashlib as _hl
+_smdir = os.path.join(wd, "cache_masks"); os.makedirs(_smdir, exist_ok=True)
+_seg_mask_raw = webcam_mask.seg_mask
+def _seg_mask_cached(cap_, W_, H_, t0, t1, seed, yfd_):
+    key = _hl.sha1(repr((round(t0, 4), round(t1, 4),
+                         [round(float(v), 5) for v in seed])).encode()).hexdigest()[:16]
+    jp = os.path.join(_smdir, key + ".json"); mp = os.path.join(_smdir, key + ".png")
+    if os.path.exists(jp):
+        try:
+            info = json.load(open(jp))
+            if info.get("none"): return None, None
+            m = cv2.imread(mp, cv2.IMREAD_GRAYSCALE)
+            if m is not None: return (m > 0).astype(np.uint8), info["bbox"]
+        except Exception:
+            pass
+    m, bb = _seg_mask_raw(cap_, W_, H_, t0, t1, seed, yfd_)
+    try:
+        if m is None:
+            json.dump({"none": True}, open(jp, "w"))
+        else:
+            cv2.imwrite(mp, (m * 255).astype(np.uint8))
+            json.dump({"bbox": [float(v) for v in bb]}, open(jp, "w"))
+    except Exception:
+        pass
+    return m, bb
+webcam_mask.seg_mask = _seg_mask_cached
+
 def shape_of(t0, t1, box, allow_shrink=True):
     """(shape, box) : ellipse si le blob grabcut remplit ~78% du box (rond), sinon rect.
     fill < 0.45 = la box detectee SUR-couvre largement le blob reel (card_extent qui deborde
