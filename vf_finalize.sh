@@ -58,6 +58,95 @@ if $PY -c "exit(0 if float('$bh') >= 0.85 else 1)"; then X=240; Y=135; sx="centr
 DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$SRC")
 TOT=$($PY -c "print(round(float('$DUR')+3.0, 3))")
 
+# Avatar POP-OUT (ordre Boss 2026-08-05) : l avatar est pose ICI, par-dessus la fenetre
+# 75%, box 5:4 = plus petite box couvrant la zone verte projetee, puis AV_SCALE — il
+# couvre le vert a 100% et DEBORDE de la fenetre video sur le background. Timing decale
+# de +1.5 s (la neige d ouverture). En dessous, av_<id>.mp4 garde son pip exact.
+# CENTRAGE ENSEMBLE (ordre Boss 2026-08-05) : quand le pop-out est actif, la position
+# de la fenetre est recalculee pour que l ENSEMBLE fenetre+avatar soit centre sur le
+# background — remplace la logique fuis-le-pip (le python renvoie X Y sur la 1re ligne).
+AVATAR=$VG/public/avatar.mp4
+AVCHAIN=";[vwin]null[v]"; AVIN=()
+if [ -f "$AVATAR" ]; then
+  AVOUT=$($PY - "$WD" "$X" "$Y" <<'PYEOF'
+import json, sys, os
+from collections import OrderedDict
+AV_SCALE = 1.25
+# ratio de la box pop-out (essais Boss 2026-08-05 : 5:4 retenu ; 848,464 = natif 16:9)
+AW, AH = 5, 4
+wd, X, Y = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+VW, VH, CW, CH = 1440, 810, 1920, 1080
+def bail():
+    print("%d %d" % (X, Y)); print(";[vwin]null[v]"); sys.exit()
+try:
+    m = json.load(open(os.path.join(wd, "host_map.json")))
+except Exception:
+    bail()
+groups = OrderedDict()
+for s in m:
+    if s.get("host") == "pip" and s.get("bbox"):
+        groups.setdefault(tuple(s["bbox"]), []).append(s)
+if not groups:
+    bail()
+# 1re passe : geometrie des pop-out en coordonnees RELATIVES a la fenetre (sans clamp)
+rel = []
+for bbox, segs in groups.items():
+    rx = int(round(bbox[0] * VW)); ry = int(round(bbox[1] * VH))
+    pw = max(2, int(round(bbox[2] * VW))); ph = max(2, int(round(bbox[3] * VH)))
+    # ratio ADAPTATIF (verdict Boss 2026-08-05) : 5:4 minimum, mais une zone verte
+    # deja plus large que 5:4 garde SON ratio (sinon la box gonfle en hauteur et
+    # mange la video) ; plafond = 16:9 natif de l avatar
+    ar = min(max(pw / float(ph), AW / float(AH)), 848 / 464.0)
+    w2 = min(CW, int(round(max(pw, ph * ar) * AV_SCALE))) // 2 * 2
+    h2 = min(CH, int(round(w2 / ar))) // 2 * 2
+    # ancrage : surplus vers l EXTERIEUR de la fenetre (cote background), jamais
+    # vers l interieur de la video ; zone neutre (0.45-0.55) -> centre
+    bcx = bbox[0] + bbox[2] / 2.0; bcy = bbox[1] + bbox[3] / 2.0
+    if bcx > 0.55:   dx = rx
+    elif bcx < 0.45: dx = rx + pw - w2
+    else:            dx = rx - (w2 - pw) // 2
+    if bcy > 0.55:   dy = ry
+    elif bcy < 0.45: dy = ry + ph - h2
+    else:            dy = ry - (h2 - ph) // 2
+    rel.append((dx, dy, w2, h2, rx, ry, pw, ph, segs))
+# ensemble = fenetre ∪ pop-out SIGNIFICATIFS (>= 20% du temps pip total) -> position
+# de fenetre qui centre l ensemble. Les groupes rares (ex. MS7 : 20 s a gauche contre
+# 411 s a droite) sont rendus quand meme mais ne comptent pas dans le centrage, sinon
+# ils decentrent toute la video pour quelques secondes d ecran.
+tot = sum(sum(s["end"] - s["start"] for s in r[8]) for r in rel)
+big = [r for r in rel if sum(s["end"] - s["start"] for s in r[8]) >= 0.2 * tot] or rel
+minx = min([0] + [r[0] for r in big]); maxx = max([VW] + [r[0] + r[2] for r in big])
+miny = min([0] + [r[1] for r in big]); maxy = max([VH] + [r[1] + r[3] for r in big])
+X = max(0, min(CW - VW, int(round((CW - (maxx - minx)) / 2.0 - minx))))
+Y = max(0, min(CH - VH, int(round((CH - (maxy - miny)) / 2.0 - miny))))
+flt = []; chain = "[vwin]"; step = 0
+for dx, dy, w2, h2, rx, ry, pw, ph, segs in rel:
+    x = X + rx; y = Y + ry
+    # clamp au canvas dans l intervalle qui garantit vert ⊂ box avatar
+    x2 = min(max(X + dx, max(0, x + pw - w2)), min(x, CW - w2))
+    y2 = min(max(Y + dy, max(0, y + ph - h2)), min(y, CH - h2))
+    e = "+".join("between(t,%.3f,%.3f)" % (s["start"] + 1.5, s["end"] + 1.5) for s in segs)
+    flt.append("[3:v]scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,setsar=1[af%d]"
+               % (w2, h2, w2, h2, step))
+    flt.append("%s[af%d]overlay=%d:%d:enable='%s'[ao%d]" % (chain, step, x2, y2, e, step))
+    bx = max(0, x2 - 1); by = max(0, y2 - 1)
+    bw = min(CW - bx, w2 + 2); bh = min(CH - by, h2 + 2)
+    flt.append("[ao%d]drawbox=%d:%d:%d:%d:color=0x00FF00@1:t=1:enable='%s'[av%d]"
+               % (step, bx, by, bw, bh, e, step))
+    chain = "[av%d]" % step; step += 1
+flt.append("%snull[v]" % chain)
+print("%d %d" % (X, Y))
+print(";" + ";".join(flt))
+PYEOF
+)
+  read X Y <<< $(echo "$AVOUT" | sed -n 1p)
+  AVCHAIN=$(echo "$AVOUT" | sed -n 2p)
+  if [ "$AVCHAIN" != ";[vwin]null[v]" ]; then
+    AVIN=(-stream_loop -1 -i "$AVATAR")
+    sx="centre ensemble fenetre+avatar"; sy="centre ensemble"
+  fi
+fi
+
 # encodeur : NVENC si vivant, sinon CPU (meme repli que vf_one.sh)
 ENC="h264_nvenc -preset p4 -b:v 8M"
 ffmpeg -y -v error -f lavfi -i color=c=red:s=320x180:r=30 -t 1 -c:v h264_nvenc /tmp/nvenc_probe.mp4 2>/dev/null || ENC="libx264 -preset fast -crf 20"
@@ -69,8 +158,8 @@ ffmpeg -y -v error -f lavfi -i color=c=red:s=320x180:r=30 -t 1 -c:v h264_nvenc /
 # video + 3 s. Audio : burst accelere, puis piste video, puis burst. concat exige des
 # formats identiques : chaque branche est amenee a 1440x810 / SAR 1 / 30 fps cote
 # video et 48 kHz stereo cote audio.
-echo "finalize $id : x=$X ($sx), y=$Y ($sy), duree ${TOT}s (neige dans la fenetre, 2x1.5s)"
-ffmpeg -y -v error -stream_loop -1 -i "$BG" -i "$SRC" -i "$INTRO" -filter_complex \
+echo "finalize $id : x=$X ($sx), y=$Y ($sy), duree ${TOT}s (neige dans la fenetre, 2x1.5s, avatar pop-out $([ ${#AVIN[@]} -gt 0 ] && echo ON || echo OFF))"
+ffmpeg -y -v error -stream_loop -1 -i "$BG" -i "$SRC" -i "$INTRO" "${AVIN[@]}" -filter_complex \
   "[2:v]trim=duration=3,setpts=(PTS-STARTPTS)/2,scale=1440:810,setsar=1,fps=30,split[sn0][sn1];\
 [2:a]atrim=duration=3,atempo=2,aresample=48000,aformat=channel_layouts=stereo,asplit[sa0][sa1];\
 [1:v]scale=1440:810,setsar=1,fps=30,setpts=PTS-STARTPTS[fv];\
@@ -78,6 +167,6 @@ ffmpeg -y -v error -stream_loop -1 -i "$BG" -i "$SRC" -i "$INTRO" -filter_comple
 [sn0][fv][sn1]concat=n=3:v=1:a=0[fgall];\
 [sa0][fa][sa1]concat=n=3:v=0:a=1[a];\
 [0:v]fps=30,scale=1920:1080,setsar=1,trim=duration=${TOT},setpts=PTS-STARTPTS[bg];\
-[bg][fgall]overlay=${X}:${Y}:eof_action=pass[ov];[ov]drawbox=$((X-1)):$((Y-1)):1442:812:color=0x00FF00@1:t=1[v]" \
+[bg][fgall]overlay=${X}:${Y}:eof_action=pass[ov];[ov]drawbox=$((X-1)):$((Y-1)):1442:812:color=0x00FF00@1:t=1[vwin]${AVCHAIN}" \
   -map "[v]" -map "[a]" -t "$TOT" -c:v $ENC -c:a aac "$OUT"
 [ -s "$OUT" ] && echo "OK $OUT" || { echo "FINALIZE_FAIL"; exit 1; }
