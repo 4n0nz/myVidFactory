@@ -21,7 +21,11 @@ OUT = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else "av_%s.m
 VG = "/home/boss/videogen"
 WD = os.path.join(VG, "wk_b_" + vid)
 BASE = os.path.join(VG, "out", "b_%s.mp4" % vid)
-AVATAR = os.path.join(VG, "public", "avatar.mp4")
+# --avatar : fournir une piste PROPRE A CETTE VIDEO (par exemple deja synchronisee sur la
+# voix) sans ecraser le fichier global public/avatar.mp4. Sans l option, comportement
+# strictement identique a avant.
+AVATAR = (sys.argv[sys.argv.index("--avatar") + 1] if "--avatar" in sys.argv
+          else os.path.join(VG, "public", "avatar.mp4"))
 outp = os.path.join(VG, "out", OUT)
 
 hm = json.load(open(os.path.join(WD, "host_map.json")))

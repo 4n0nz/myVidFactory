@@ -115,10 +115,19 @@ echo "overcover..." >> "$PROG"
 oc="OK"
 $PY $VG/vf_overcover.py "$WD" > /tmp/vf_one_oc.log 2>&1 || oc="OC_$(grep -cE "SUR_struct|SUR_cont " /tmp/vf_one_oc.log)"
 
+# --stop-master : s arreter au master vert, sans poser l avatar ni monter la presentation.
+# Sert au nouvel ordre : on veut la VOIX avant l avatar, pour synchroniser les mouvements
+# de tete dessus. Sans l option, comportement strictement identique a avant.
+if [ "${VF_STOP_MASTER:-0}" = "1" ]; then
+  echo "stop-master : b_$id.mp4 pret, avatar et finalize sautes" >> "$PROG"
+  echo "MASTER $id qc=$qc geom=$geom fid=$fid inv=$inv hc=$hc op=$op oc=$oc"
+  exit 0
+fi
+
 # AVATAR (branche avatar) : remplace le vert par l avatar du projet, bordure 1 px.
 echo "avatar..." >> "$PROG"
 av="OK"
-$PY $VG/vf_avatar.py "$id" > /tmp/vf_one_av.log 2>&1 || av="AV_FAIL"
+$PY $VG/vf_avatar.py "$id" ${VF_AVATAR_PISTE:+--avatar "$VF_AVATAR_PISTE"} > /tmp/vf_one_av.log 2>&1 || av="AV_FAIL"
 
 # FINALIZE (presentation) : composite du master vert devant le background anime,
 # 1,5 s de fond seul avant et apres, cote auto selon la position des pips.
