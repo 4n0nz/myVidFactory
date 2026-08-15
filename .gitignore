@@ -1,0 +1,16 @@
+# modeles telecharges (32 Go Wan + SDXL + SVD + poids LivePortrait)
+models/
+LivePortrait/
+# environnements
+.venv/
+.venv-sd/
+__pycache__/
+*.pyc
+# sorties : videos, images, clips generes, et les photos sources de Boss
+out/
+*.mp4
+*.webm
+*.png
+*.jpg
+*.jpeg
+*.wav
