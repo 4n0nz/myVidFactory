@@ -17,7 +17,9 @@ SRC=$VG/out/b_${id}.mp4
 # branche avatar : la presentation se construit sur la version AVATAR quand elle existe
 [ -f "$VG/out/av_${id}.mp4" ] && SRC=$VG/out/av_${id}.mp4
 OUT=$VG/out/final_${id}.mp4
-BG=$VG/assets/background.mp4
+# VF_BACKGROUND : choisir un autre decor sans toucher a assets/background.mp4, qui reste
+# le defaut. Meme logique que --avatar sur vf_avatar.py.
+BG=${VF_BACKGROUND:-$VG/assets/background.mp4}
 INTRO=$VG/assets/pipintro.mp4
 PY=$VG/.venv/bin/python
 [ -f "$SRC" ] || { echo "pas de rendu $SRC"; exit 1; }
