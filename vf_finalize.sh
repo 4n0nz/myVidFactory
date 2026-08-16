@@ -67,7 +67,11 @@ TOT=$($PY -c "print(round(float('$DUR')+3.0, 3))")
 # CENTRAGE ENSEMBLE (ordre Boss 2026-08-05) : quand le pop-out est actif, la position
 # de la fenetre est recalculee pour que l ENSEMBLE fenetre+avatar soit centre sur le
 # background — remplace la logique fuis-le-pip (le python renvoie X Y sur la 1re ligne).
-AVATAR=$VG/public/avatar.mp4
+# VF_AVATAR_POPOUT : l avatar pose ICI par-dessus la fenetre. Il est DISTINCT de celui que
+# vf_avatar.py met dans le vert — sans cette variable, une piste passee a vf_avatar.py
+# --avatar est recouverte par l avatar par defaut, et on croit que le changement n a pas
+# pris. Defaut inchange.
+AVATAR=${VF_AVATAR_POPOUT:-$VG/public/avatar.mp4}
 AVCHAIN=";[vwin]null[v]"; AVIN=()
 if [ -f "$AVATAR" ]; then
   AVOUT=$($PY - "$WD" "$X" "$Y" <<'PYEOF'
