@@ -36,6 +36,9 @@ FORCE = float(arg('--force', '1.0'))
 # --fond : decor pose DERRIERE l avatar, dans sa fenetre. Sans lui, fond noir comme avant.
 # A ne pas confondre avec le background du montage (Matrix), gere par vf_finalize.
 FOND = arg('--fond')
+# defini ici et pas seulement dans le bloc host_map : l anticipation des changements s en
+# sert plus bas, meme si aucun host_map n est fourni
+CP = arg('--coupures')
 DECOR = cv2.imread(FOND) if FOND else None
 if FOND and DECOR is None:
     sys.exit('decor illisible : %s' % FOND)
@@ -113,7 +116,6 @@ if HM and os.path.exists(HM):
     # donc une coupe franche y passe inapercue (et le fondu croise devient inutile).
     # ESPACEMENT impose une duree minimale de parole entre deux changements : sans lui, on
     # basculerait a chacune des 78 coupures de la video, soit une toutes les 10 s.
-    CP = arg('--coupures')
     if CP and os.path.exists(CP):
         cuts = sorted(float(x) for x in open(CP).read().split() if x.strip())
         esp = float(arg('--espacement', '45'))
@@ -171,12 +173,38 @@ if HM and os.path.exists(HM):
         for k in range(max(0, a), max(0, b)):
             TYPE[k] = s['host']
 
+    # Les 'off' ne sont PAS des zones franches : vf_finalize continue d afficher l avatar
+    # pendant les trous courts. Les traiter comme "tout est permis" a fait basculer une
+    # pose aux mains vers un buste au milieu d une suite de pips (defaut vu a 5:06).
+    # On comble donc chaque 'off' avec le cadrage qui ARRIVE — c est vers lui qu on va —
+    # et a defaut avec celui qui precede.
+    suivant = 'hero'
+    for k in range(NF - 1, -1, -1):
+        if TYPE[k] in ('hero', 'pip'):
+            suivant = TYPE[k]
+        else:
+            TYPE[k] = suivant
+    precedent = None
+    for k in range(NF):
+        if TYPE[k] in ('hero', 'pip'):
+            precedent = TYPE[k]
+        elif precedent:
+            TYPE[k] = precedent
+
 
 def permis(t):
-    """clips utilisables a cet instant : pas de mains en plein cadre."""
+    """Le groupe de clips AFFECTE a ce cadrage.
+
+    Pas une simple permission : en pip on veut VOIR les mains (la fenetre est petite, le
+    defaut de rendu ne s y voit pas), en hero on veut les bustes. Se contenter d autoriser
+    les mains en pip ne suffisait pas — sur 13 changements tires au hasard parmi 18 clips,
+    dont 2 seulement tombaient pendant un pip, elles ne sortaient jamais.
+    """
+    if t == 'pip' and AVEC_MAINS:
+        return sorted(AVEC_MAINS)
     if t == 'hero' and SANS_MAINS:
         return SANS_MAINS
-    return list(range(len(banque)))
+    return list(range(len(banque)))          # 'off' : le narrateur n est pas visible
 # FONDU : duree du croise entre deux poses. Une bascule seche se voit meme au bon moment —
 # le personnage saute d une position a l autre. Sur un fondu, comme c est le meme
 # personnage dans le meme cadre sur le meme decor, seul le GESTE change : l oeil ne
@@ -184,18 +212,41 @@ def permis(t):
 TRANS = int(round(float(arg('--fondu', '0.5')) * FPS))
 ci, pos, sens, plan = 0, 0.0, 1, []
 sortant = None            # (clip, position, images restantes) pendant un fondu
+# ANTICIPER les changements imposes par le cadrage.
+# Quand le montage passe de pip a hero, le groupe de poses change : basculer PILE a la
+# frontiere se voit, car l image, elle, est continue a cet instant. On avance donc le
+# changement sur la derniere coupure de montage qui precede (jusqu a 5 s avant) : la pose
+# est deja la bonne quand le cadrage bascule, et le changement s est fait sur une rupture.
+# Sans coupure disponible, on garde la frontiere (mieux vaut une pose juste au bon moment
+# qu une pose aux mains en plein cadre).
+CUTS_ALL = sorted(int(round(float(x) * FPS)) for x in open(CP).read().split()) if (
+    CP and os.path.exists(CP)) else []
+if CUTS_ALL and TYPE:
+    # On DECALE la frontiere de cadrage jusqu a la coupure, au lieu de poser une exception
+    # a cet instant : une exception isolee se fait annuler des l image suivante, ou le type
+    # courant est encore l ancien — d ou un aller-retour et des mains qui passaient en plein
+    # cadre. En avancant la frontiere, le groupe reste coherent jusqu au vrai changement.
+    bornes = [i for i in range(1, NF) if permis(TYPE[i]) != permis(TYPE[i - 1])]
+    for i in bornes:
+        fen = [c for c in CUTS_ALL if i - int(5 * FPS) <= c < i]
+        if fen:
+            c = max(fen)
+            for k in range(c, i):
+                TYPE[k] = TYPE[i]
+
 forces = 0
 for i in range(NF):
-    # une pose aux mains ne doit jamais passer en plein cadre : si le montage bascule en
-    # hero, on change TOUT DE SUITE sans attendre une coupure — la bascule hero/pip est
-    # elle-meme une rupture visuelle, le changement y passe.
-    if ci in AVEC_MAINS and TYPE[i] == 'hero' and SANS_MAINS:
+    grp = permis(TYPE[i])
+    # le cadrage a change et impose l autre groupe : on bascule TOUT DE SUITE, sans
+    # attendre une coupure. Le passage hero<->pip est deja une rupture visuelle franche,
+    # le changement de pose y disparait.
+    if grp and ci not in grp:
         sortant = [ci, pos, TRANS] if TRANS > 0 else None
-        ci = int(rng.choice(SANS_MAINS))
+        ci = int(rng.choice(grp))
         pos, sens = 0.0, 1
         forces += 1
     elif MODE == 'segments' and i in fset and len(banque) > 1:
-        cand = [k for k in permis(TYPE[i]) if k != ci]
+        cand = [k for k in grp if k != ci]
         if cand:
             sortant = [ci, pos, TRANS] if TRANS > 0 else None
             ci = int(rng.choice(cand))
@@ -249,6 +300,10 @@ fondus = sum(1 for e in plan if len(e) == 5)
 d = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries',
                                    'format=duration', '-of', 'csv=p=0', DST]))
 mains_hero = sum(1 for i, e in enumerate(plan) if e[0] in AVEC_MAINS and TYPE[i] == 'hero')
+mains_pip = sum(1 for i, e in enumerate(plan) if e[0] in AVEC_MAINS and TYPE[i] == 'pip')
+n_pip = sum(1 for t in TYPE if t == 'pip')
+print('  pip avec les mains : %.0f%% du temps de pip (%d images sur %d)'
+      % (100.0 * mains_pip / max(1, n_pip), mains_pip, n_pip))
 print('%s : %.1f s, %dx%d | %d changements de pose (%d forces par un passage en hero) '
       '| %d images de fondu | %d images distinctes'
       % (os.path.basename(DST), d, W, H, chg, forces, fondus, len(set(e[:2] for e in plan))))
