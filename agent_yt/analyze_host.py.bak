@@ -1,0 +1,68 @@
+
+import cv2, json, sys, os
+import mediapipe as mp
+from mediapipe.tasks import python as P
+from mediapipe.tasks.python import vision as V
+video_path=sys.argv[1]; out_dir=os.path.dirname(os.path.abspath(video_path))
+MODEL='/home/anon/videogen/efficientdet.tflite'
+det=V.ObjectDetector.create_from_options(V.ObjectDetectorOptions(base_options=P.BaseOptions(model_asset_path=MODEL),score_threshold=0.30,category_allowlist=['person'],max_results=5))
+cap=cv2.VideoCapture(video_path); fps=cap.get(cv2.CAP_PROP_FPS) or 30
+total=int(cap.get(cv2.CAP_PROP_FRAME_COUNT)); W=int(cap.get(3)); H=int(cap.get(4)); dur=total/fps
+print("Video: %.1fs %dx%d"%(dur,W,H))
+SAMPLE=1.0; raw=[]; t=0.0
+while t<dur:
+    cap.set(cv2.CAP_PROP_POS_FRAMES,int(t*fps)); ok,fr=cap.read()
+    if not ok: t+=SAMPLE; continue
+    rgb=cv2.cvtColor(fr,cv2.COLOR_BGR2RGB)
+    res=det.detect(mp.Image(image_format=mp.ImageFormat.SRGB,data=rgb))
+    if res.detections:
+        b=max(res.detections,key=lambda d:d.bounding_box.width*d.bounding_box.height).bounding_box
+        fx=max(0.0,b.origin_x/W); fy=max(0.0,b.origin_y/H); fw=min(b.width/W,1-fx); fh=min(b.height/H,1-fy)
+        area=fw*fh; cx=fx+fw/2
+        # CENTRE = hero (talking head) ; BORD = pip ; sinon off
+        if area>=0.28:
+            host='hero'
+        elif 0.28<=cx<=0.72 and area>=0.06:
+            host='hero'
+        elif 0.015<=area<0.22:
+            host='pip'
+        else:
+            host='off'
+        raw.append({'t':round(t,2),'host':host,'bbox':[round(fx,4),round(fy,4),round(fw,4),round(fh,4)],'cx':round(cx,4)})
+    else:
+        raw.append({'t':round(t,2),'host':'off','bbox':None,'cx':None})
+    t+=SAMPLE
+cap.release(); det.close()
+
+# LISSAGE: vote majoritaire +-2 pour pip<->hero (ne touche pas off)
+hosts=[r['host'] for r in raw]
+sm=list(hosts)
+for i in range(len(hosts)):
+    if hosts[i] in ('hero','pip'):
+        win=[hosts[j] for j in range(max(0,i-2),min(len(hosts),i+3)) if hosts[j] in ('hero','pip')]
+        if win:
+            sm[i]='hero' if win.count('hero')>=win.count('pip') else 'pip'
+for i,r in enumerate(raw): r['host']=sm[i]
+
+# merge consecutifs + bbox moyenne
+segs=[]
+if raw:
+    ch=raw[0]['host']; cs=raw[0]['t']; bxs=[raw[0]['bbox']] if raw[0]['bbox'] else []
+    for r in raw[1:]:
+        if r['host']==ch:
+            if r['bbox']: bxs.append(r['bbox'])
+        else:
+            avg=[round(sum(b[i] for b in bxs)/len(bxs),4) for i in range(4)] if bxs else None
+            segs.append({'start':cs,'end':round(r['t'],2),'host':ch,'bbox':avg})
+            ch=r['host']; cs=r['t']; bxs=[r['bbox']] if r['bbox'] else []
+    avg=[round(sum(b[i] for b in bxs)/len(bxs),4) for i in range(4)] if bxs else None
+    segs.append({'start':cs,'end':round(dur,2),'host':ch,'bbox':avg})
+# absorber petits trous off (<1.5s) entre meme host
+merged=[]
+for s in segs:
+    if merged and s['host']!='off' and merged[-1]['host']==s['host'] and s['start']-merged[-1]['end']<1.5:
+        merged[-1]['end']=s['end']
+    else: merged.append(dict(s))
+json.dump(merged, open(os.path.join(out_dir,'host_map.json'),'w'), indent=2)
+hc=sum(1 for s in merged if s['host']=='hero');pc=sum(1 for s in merged if s['host']=='pip');oc=sum(1 for s in merged if s['host']=='off')
+print("host_map: %d segs hero=%d pip=%d off=%d"%(len(merged),hc,pc,oc))

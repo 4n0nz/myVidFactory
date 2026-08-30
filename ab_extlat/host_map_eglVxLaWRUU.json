@@ -1,0 +1,152 @@
+[
+  {
+    "host": "hero",
+    "start": 0.0,
+    "end": 2.34,
+    "bbox": null
+  },
+  {
+    "host": "off",
+    "start": 2.34,
+    "end": 3.0,
+    "bbox": null
+  },
+  {
+    "host": "off",
+    "start": 3.0,
+    "end": 5.1385,
+    "bbox": null
+  },
+  {
+    "host": "pip",
+    "start": 5.1385,
+    "end": 6.38,
+    "bbox": [
+      0.0229,
+      0.538,
+      0.2365,
+      0.4204
+    ],
+    "mask": "/home/boss/videogen/wk_b_eglVxLaWRUU/masks/seg_0000.png",
+    "shape": "rect"
+  },
+  {
+    "host": "off",
+    "start": 6.38,
+    "end": 7.641,
+    "bbox": null
+  },
+  {
+    "host": "pip",
+    "start": 7.641,
+    "end": 9.0,
+    "bbox": [
+      0.0229,
+      0.538,
+      0.2365,
+      0.4204
+    ],
+    "mask": "/home/boss/videogen/wk_b_eglVxLaWRUU/masks/seg_0000.png",
+    "shape": "rect"
+  },
+  {
+    "host": "pip",
+    "start": 9.0,
+    "end": 10.38,
+    "bbox": [
+      0.0229,
+      0.538,
+      0.2365,
+      0.4204
+    ],
+    "mask": "/home/boss/videogen/wk_b_eglVxLaWRUU/masks/seg_0000.png",
+    "shape": "rect"
+  },
+  {
+    "host": "hero",
+    "start": 10.38,
+    "end": 11.0,
+    "bbox": null
+  },
+  {
+    "host": "off",
+    "start": 11.0,
+    "end": 17.5842,
+    "bbox": null
+  },
+  {
+    "host": "hero",
+    "start": 17.5842,
+    "end": 27.9279,
+    "bbox": null
+  },
+  {
+    "host": "off",
+    "start": 27.9279,
+    "end": 38.6386,
+    "bbox": null
+  },
+  {
+    "host": "hero",
+    "start": 38.6386,
+    "end": 42.6426,
+    "bbox": null
+  },
+  {
+    "host": "pip",
+    "start": 42.6426,
+    "end": 906.6057,
+    "bbox": [
+      0.0229,
+      0.538,
+      0.2365,
+      0.4204
+    ],
+    "mask": "/home/boss/videogen/wk_b_eglVxLaWRUU/masks/seg_0000.png",
+    "shape": "rect"
+  },
+  {
+    "host": "hero",
+    "start": 906.6057,
+    "end": 917.7835,
+    "bbox": null
+  },
+  {
+    "host": "pip",
+    "start": 917.7835,
+    "end": 1384.1828,
+    "bbox": [
+      0.0229,
+      0.538,
+      0.2365,
+      0.4204
+    ],
+    "mask": "/home/boss/videogen/wk_b_eglVxLaWRUU/masks/seg_0000.png",
+    "shape": "rect"
+  },
+  {
+    "host": "pip",
+    "start": 1384.1828,
+    "end": 1387.5,
+    "bbox": [
+      0.0229,
+      0.538,
+      0.2365,
+      0.4204
+    ],
+    "mask": "/home/boss/videogen/wk_b_eglVxLaWRUU/masks/seg_0000.png",
+    "shape": "rect"
+  },
+  {
+    "host": "hero",
+    "start": 1387.5,
+    "end": 1388.5,
+    "bbox": null
+  },
+  {
+    "host": "hero",
+    "start": 1388.5,
+    "end": 1395.29,
+    "bbox": null
+  }
+]

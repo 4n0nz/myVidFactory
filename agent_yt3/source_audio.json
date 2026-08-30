@@ -1,0 +1,2542 @@
+[
+  {
+    "start": 0.0,
+    "end": 3.24,
+    "text": "So I met this dark web researcher at Defcon, you know, like you do."
+  },
+  {
+    "start": 3.44,
+    "end": 4.84,
+    "text": "And this guy, he's legit."
+  },
+  {
+    "start": 4.84,
+    "end": 7.08,
+    "text": "He actually infiltrates the dark web for a living."
+  },
+  {
+    "start": 7.12,
+    "end": 9.44,
+    "text": "But he told me about this problem he has and we all have this problem."
+  },
+  {
+    "start": 9.84,
+    "end": 13.84,
+    "text": "It's hard for him to find actual real stuff on the dark web until now."
+  },
+  {
+    "start": 13.96,
+    "end": 18.0,
+    "text": "He built this AI tool that will search and scrape the dark web for him."
+  },
+  {
+    "start": 18.24,
+    "end": 18.64,
+    "text": "What?"
+  },
+  {
+    "start": 18.68,
+    "end": 19.48,
+    "text": "That sounds awesome."
+  },
+  {
+    "start": 19.64,
+    "end": 21.88,
+    "text": "And then he goes, Hey yo, Chuck, play with it."
+  },
+  {
+    "start": 22.24,
+    "end": 23.44,
+    "text": "So get your coffee ready."
+  },
+  {
+    "start": 24.28,
+    "end": 25.2,
+    "text": "Let's go to the dark web."
+  },
+  {
+    "start": 25.96,
+    "end": 27.44,
+    "text": "Most of the dark web is fake."
+  },
+  {
+    "start": 27.96,
+    "end": 28.96,
+    "text": "Yeah, that is true."
+  },
+  {
+    "start": 29.08,
+    "end": 33.04,
+    "text": "And most of the time there are law enforcement people controlling it or"
+  },
+  {
+    "start": 33.04,
+    "end": 35.56,
+    "text": "either massively present on those forums."
+  },
+  {
+    "start": 35.64,
+    "end": 36.4,
+    "text": "That's a problem."
+  },
+  {
+    "start": 36.44,
+    "end": 37.32,
+    "text": "You may have not known that."
+  },
+  {
+    "start": 37.36,
+    "end": 39.44,
+    "text": "And when you go there, it looks kind of real, right?"
+  },
+  {
+    "start": 39.44,
+    "end": 40.6,
+    "text": "Spooky, scary."
+  },
+  {
+    "start": 40.88,
+    "end": 41.44,
+    "text": "But what is that?"
+  },
+  {
+    "start": 41.64,
+    "end": 42.48,
+    "text": "But it's all for show."
+  },
+  {
+    "start": 42.52,
+    "end": 46.04,
+    "text": "Most of it is law enforcement honeypots, but there is real stuff."
+  },
+  {
+    "start": 46.4,
+    "end": 47.52,
+    "text": "Why is it so hard to find?"
+  },
+  {
+    "start": 47.84,
+    "end": 48.52,
+    "text": "Two reasons."
+  },
+  {
+    "start": 48.68,
+    "end": 49.36,
+    "text": "Whiteboard time."
+  },
+  {
+    "start": 49.52,
+    "end": 53.12,
+    "text": "Problem number one, the dark web is run by onions and that makes it stink and"
+  },
+  {
+    "start": 53.12,
+    "end": 55.0,
+    "text": "slow and Beatrice just broke one of them."
+  },
+  {
+    "start": 55.24,
+    "end": 55.56,
+    "text": "What?"
+  },
+  {
+    "start": 55.76,
+    "end": 56.04,
+    "text": "Yes."
+  },
+  {
+    "start": 56.04,
+    "end": 56.44,
+    "text": "Watch this."
+  },
+  {
+    "start": 56.44,
+    "end": 58.76,
+    "text": "So on the clear web, which is what you're using right now, you have a"
+  },
+  {
+    "start": 58.76,
+    "end": 61.88,
+    "text": "direct connection straight to the website server on the dark web."
+  },
+  {
+    "start": 61.88,
+    "end": 62.36,
+    "text": "It's different."
+  },
+  {
+    "start": 62.52,
+    "end": 65.2,
+    "text": "Every website you connect to is going to be connected through a series of"
+  },
+  {
+    "start": 65.2,
+    "end": 66.52,
+    "text": "onion relay servers."
+  },
+  {
+    "start": 66.64,
+    "end": 68.68,
+    "text": "Now this is great because it helps keep you and the website you're"
+  },
+  {
+    "start": 68.68,
+    "end": 69.76,
+    "text": "visiting anonymous."
+  },
+  {
+    "start": 69.84,
+    "end": 71.56,
+    "text": "What's not great is Beatrice operates."
+  },
+  {
+    "start": 71.56,
+    "end": 74.24,
+    "text": "One of these onion relay servers on a spare raspberry pie and her mom's"
+  },
+  {
+    "start": 74.24,
+    "end": 75.92,
+    "text": "basement and her mom just unplugged the power."
+  },
+  {
+    "start": 76.12,
+    "end": 77.12,
+    "text": "Now we have a rotten onion."
+  },
+  {
+    "start": 77.52,
+    "end": 80.36,
+    "text": "This connection was already slow and then Beatrice just broke it"
+  },
+  {
+    "start": 80.52,
+    "end": 81.32,
+    "text": "and you're disconnected."
+  },
+  {
+    "start": 81.56,
+    "end": 83.4,
+    "text": "That's why surfing the dark web is so painful."
+  },
+  {
+    "start": 83.44,
+    "end": 85.64,
+    "text": "But then think about a dark web researcher like a perv."
+  },
+  {
+    "start": 85.8,
+    "end": 88.48,
+    "text": "He has to conduct a ton of different searches on the dark web."
+  },
+  {
+    "start": 88.76,
+    "end": 91.88,
+    "text": "Trying to scrape a ton of websites, but it's slow and these connections"
+  },
+  {
+    "start": 91.88,
+    "end": 93.72,
+    "text": "break the circuit does break."
+  },
+  {
+    "start": 94.08,
+    "end": 97.04,
+    "text": "So you have to like recreate the circuit, then restart your script."
+  },
+  {
+    "start": 97.36,
+    "end": 101.0,
+    "text": "So all those things come into play when you are scraping the problem."
+  },
+  {
+    "start": 101.0,
+    "end": 102.04,
+    "text": "Number two is a crazy one."
+  },
+  {
+    "start": 102.08,
+    "end": 104.88,
+    "text": "Criminals are kind of paranoid and that makes them harder to find."
+  },
+  {
+    "start": 104.96,
+    "end": 108.44,
+    "text": "For example, a perv said that some websites are only operational like two"
+  },
+  {
+    "start": 108.44,
+    "end": 110.44,
+    "text": "days a week and you never know which two days they are."
+  },
+  {
+    "start": 110.56,
+    "end": 111.96,
+    "text": "The connection breaks anytime."
+  },
+  {
+    "start": 112.0,
+    "end": 112.8,
+    "text": "Like you never know."
+  },
+  {
+    "start": 113.04,
+    "end": 115.28,
+    "text": "Like for example, there is a dot any website."
+  },
+  {
+    "start": 115.64,
+    "end": 118.24,
+    "text": "Uh, it is up, let's say two days a week."
+  },
+  {
+    "start": 118.64,
+    "end": 122.24,
+    "text": "So, and you don't know which two days sometimes you have to keep restarting,"
+  },
+  {
+    "start": 122.6,
+    "end": 127.12,
+    "text": "uh, your entire workflow, making it almost impossible to find and search"
+  },
+  {
+    "start": 127.12,
+    "end": 128.24,
+    "text": "and scrape these sites."
+  },
+  {
+    "start": 128.28,
+    "end": 129.12,
+    "text": "So that's a problem."
+  },
+  {
+    "start": 129.32,
+    "end": 132.16,
+    "text": "When you visit the dark web, you think what you're seeing is real."
+  },
+  {
+    "start": 132.16,
+    "end": 135.64,
+    "text": "It's not, but to try and find the real stuff, it's crazy difficult because"
+  },
+  {
+    "start": 135.64,
+    "end": 140.04,
+    "text": "the dark web by design is kind of clunky, which is why a perv built a tool,"
+  },
+  {
+    "start": 140.04,
+    "end": 145.28,
+    "text": "a tool that takes a six to eight hour research marathon and gets that down to"
+  },
+  {
+    "start": 145.28,
+    "end": 147.16,
+    "text": "about a 30 minute stroll in the park."
+  },
+  {
+    "start": 147.28,
+    "end": 148.68,
+    "text": "This thing is kind of crazy."
+  },
+  {
+    "start": 148.68,
+    "end": 151.76,
+    "text": "You got to see it, but first let's get our coffee ready for an ad break."
+  },
+  {
+    "start": 151.84,
+    "end": 154.44,
+    "text": "Now real quick, before I show you how to scrape the dark web with AI,"
+  },
+  {
+    "start": 154.48,
+    "end": 155.36,
+    "text": "that's a crazy sentence."
+  },
+  {
+    "start": 155.4,
+    "end": 157.56,
+    "text": "I want to tell you about something a perv and I discussed during our"
+  },
+  {
+    "start": 157.56,
+    "end": 160.44,
+    "text": "interview, how threat actors actually attack you."
+  },
+  {
+    "start": 160.52,
+    "end": 161.48,
+    "text": "Here's what a perv told me."
+  },
+  {
+    "start": 161.52,
+    "end": 162.72,
+    "text": "Cyber criminals on the dark web."
+  },
+  {
+    "start": 162.76,
+    "end": 164.72,
+    "text": "Aren't just selling drugs or stolen credit cards."
+  },
+  {
+    "start": 164.76,
+    "end": 168.52,
+    "text": "They're selling exploits tools that abuse legitimate software already running"
+  },
+  {
+    "start": 168.52,
+    "end": 169.68,
+    "text": "on your network right now."
+  },
+  {
+    "start": 169.72,
+    "end": 173.36,
+    "text": "Microsoft word, PowerShell apps you trust every single day."
+  },
+  {
+    "start": 173.44,
+    "end": 174.28,
+    "text": "That's your mistake."
+  },
+  {
+    "start": 174.48,
+    "end": 174.96,
+    "text": "Bad on you."
+  },
+  {
+    "start": 175.52,
+    "end": 178.08,
+    "text": "It's really hard to stop this with traditional antivirus."
+  },
+  {
+    "start": 178.12,
+    "end": 178.56,
+    "text": "Why?"
+  },
+  {
+    "start": 178.8,
+    "end": 180.48,
+    "text": "Because these tools are allowed to run."
+  },
+  {
+    "start": 180.64,
+    "end": 182.88,
+    "text": "Your security is saying, yeah, that's Microsoft word."
+  },
+  {
+    "start": 183.16,
+    "end": 184.24,
+    "text": "Of course you can open that."
+  },
+  {
+    "start": 184.36,
+    "end": 187.08,
+    "text": "But what it doesn't see is that word just called PowerShell and"
+  },
+  {
+    "start": 187.08,
+    "end": 188.76,
+    "text": "executed a ransomware payload."
+  },
+  {
+    "start": 188.84,
+    "end": 189.92,
+    "text": "Yeah, that can happen."
+  },
+  {
+    "start": 189.96,
+    "end": 191.2,
+    "text": "And that's where threat locker comes in."
+  },
+  {
+    "start": 191.28,
+    "end": 192.92,
+    "text": "This video is sponsored by threat locker."
+  },
+  {
+    "start": 193.04,
+    "end": 193.76,
+    "text": "I love them."
+  },
+  {
+    "start": 193.8,
+    "end": 194.44,
+    "text": "Thank you."
+  },
+  {
+    "start": 194.68,
+    "end": 198.32,
+    "text": "And after talking to a perv about the attacks, what they do makes a lot of sense."
+  },
+  {
+    "start": 198.36,
+    "end": 201.16,
+    "text": "Threat locker is a zero trust endpoint protection platform."
+  },
+  {
+    "start": 201.24,
+    "end": 201.84,
+    "text": "And here's what they do."
+  },
+  {
+    "start": 201.92,
+    "end": 202.56,
+    "text": "And I love this."
+  },
+  {
+    "start": 202.92,
+    "end": 206.28,
+    "text": "Nothing runs without you explicitly allowing it to run."
+  },
+  {
+    "start": 206.36,
+    "end": 209.08,
+    "text": "And if you do allow an app, like let's say you do want to run Microsoft"
+  },
+  {
+    "start": 209.08,
+    "end": 212.0,
+    "text": "word because you have to threat locker has a thing called ring fencing to"
+  },
+  {
+    "start": 212.0,
+    "end": 213.72,
+    "text": "control what an app is allowed to do."
+  },
+  {
+    "start": 213.96,
+    "end": 217.28,
+    "text": "Let's say word is allowed to run, but with a ring fencing, I can create a policy"
+  },
+  {
+    "start": 217.28,
+    "end": 219.72,
+    "text": "that says word cannot call PowerShell period."
+  },
+  {
+    "start": 219.88,
+    "end": 223.52,
+    "text": "So even if a threat actor does exploit a vulnerability like felina, which does"
+  },
+  {
+    "start": 223.52,
+    "end": 227.08,
+    "text": "weaponize word to launch PowerShell threat locker just says, Nope."
+  },
+  {
+    "start": 227.24,
+    "end": 227.68,
+    "text": "Blocks it."
+  },
+  {
+    "start": 227.84,
+    "end": 229.04,
+    "text": "Now it's not detecting malware."
+  },
+  {
+    "start": 229.04,
+    "end": 230.08,
+    "text": "It's not trying to catch it."
+  },
+  {
+    "start": 230.28,
+    "end": 232.72,
+    "text": "It's just simply saying that behavior is not allowed here."
+  },
+  {
+    "start": 232.76,
+    "end": 233.68,
+    "text": "It's a portion around."
+  },
+  {
+    "start": 233.76,
+    "end": 235.36,
+    "text": "It stops it before it even starts."
+  },
+  {
+    "start": 235.44,
+    "end": 236.08,
+    "text": "And here's a cool part."
+  },
+  {
+    "start": 236.16,
+    "end": 237.44,
+    "text": "Threat locker has a learning mode."
+  },
+  {
+    "start": 237.6,
+    "end": 240.48,
+    "text": "It watches what your network is already doing and then builds policies"
+  },
+  {
+    "start": 240.52,
+    "end": 243.88,
+    "text": "automatically and then locks everything down, which saves a lot of time in"
+  },
+  {
+    "start": 243.88,
+    "end": 245.92,
+    "text": "that initial setup, you're not starting from scratch."
+  },
+  {
+    "start": 246.0,
+    "end": 247.4,
+    "text": "It learns from what you do first."
+  },
+  {
+    "start": 247.52,
+    "end": 251.56,
+    "text": "Plus, if you do need help monitoring threats, they have a cyber hero MDR, a"
+  },
+  {
+    "start": 251.56,
+    "end": 255.2,
+    "text": "team that watches for suspicious activity 24 seven and responds for you."
+  },
+  {
+    "start": 255.32,
+    "end": 256.76,
+    "text": "A threat locker is offering a free trial."
+  },
+  {
+    "start": 256.84,
+    "end": 257.52,
+    "text": "No credit card."
+  },
+  {
+    "start": 257.64,
+    "end": 260.2,
+    "text": "Now, if you're serious about security, especially after seeing what's on the"
+  },
+  {
+    "start": 260.2,
+    "end": 263.2,
+    "text": "dark web in this video, you need to check this out, head to threat locker.com"
+  },
+  {
+    "start": 263.2,
+    "end": 264.84,
+    "text": "forward slash network chuck to start your free trial."
+  },
+  {
+    "start": 264.84,
+    "end": 266.32,
+    "text": "I'll check that link in the description below."
+  },
+  {
+    "start": 266.36,
+    "end": 268.48,
+    "text": "And seriously, thank you to threat locker for sponsoring this video."
+  },
+  {
+    "start": 268.48,
+    "end": 270.16,
+    "text": "They do make videos like this possible."
+  },
+  {
+    "start": 270.2,
+    "end": 272.64,
+    "text": "I wouldn't be able to do this without, you know, like cool editing."
+  },
+  {
+    "start": 273.72,
+    "end": 275.08,
+    "text": "Think these editors cost money."
+  },
+  {
+    "start": 275.08,
+    "end": 276.32,
+    "text": "I have to feed my editors."
+  },
+  {
+    "start": 276.52,
+    "end": 276.88,
+    "text": "Thank you."
+  },
+  {
+    "start": 276.88,
+    "end": 277.44,
+    "text": "Threat locker."
+  },
+  {
+    "start": 277.52,
+    "end": 278.56,
+    "text": "All right, back to the dark web."
+  },
+  {
+    "start": 278.64,
+    "end": 279.36,
+    "text": "I don't know about you."
+  },
+  {
+    "start": 279.52,
+    "end": 280.8,
+    "text": "I got to get my hands on this."
+  },
+  {
+    "start": 280.92,
+    "end": 282.56,
+    "text": "I need to experience this for myself."
+  },
+  {
+    "start": 282.72,
+    "end": 283.76,
+    "text": "You're probably the same way, right?"
+  },
+  {
+    "start": 283.84,
+    "end": 285.28,
+    "text": "Let's play with this tool ourselves."
+  },
+  {
+    "start": 286.84,
+    "end": 287.2,
+    "text": "Okay."
+  },
+  {
+    "start": 287.2,
+    "end": 287.92,
+    "text": "Here's the tool."
+  },
+  {
+    "start": 288.0,
+    "end": 288.92,
+    "text": "It's called Robin."
+  },
+  {
+    "start": 288.96,
+    "end": 290.52,
+    "text": "It is based off that one piece character."
+  },
+  {
+    "start": 290.52,
+    "end": 291.32,
+    "text": "I never seen the show."
+  },
+  {
+    "start": 291.68,
+    "end": 292.72,
+    "text": "Should I watch one piece?"
+  },
+  {
+    "start": 292.96,
+    "end": 293.24,
+    "text": "I don't know."
+  },
+  {
+    "start": 293.24,
+    "end": 293.92,
+    "text": "Let me know below."
+  },
+  {
+    "start": 294.0,
+    "end": 294.84,
+    "text": "It seems kind of long."
+  },
+  {
+    "start": 294.96,
+    "end": 298.24,
+    "text": "Now the secret sauce of Robin is that it uses AI to search the dark web, to"
+  },
+  {
+    "start": 298.24,
+    "end": 300.52,
+    "text": "research it and make it easier for you and me and a perv."
+  },
+  {
+    "start": 300.64,
+    "end": 301.88,
+    "text": "It does this in a few cool ways."
+  },
+  {
+    "start": 301.92,
+    "end": 303.32,
+    "text": "First, it'll help you query."
+  },
+  {
+    "start": 303.56,
+    "end": 304.32,
+    "text": "You type in something."
+  },
+  {
+    "start": 304.32,
+    "end": 305.84,
+    "text": "It'll make your something a bit better."
+  },
+  {
+    "start": 305.92,
+    "end": 306.88,
+    "text": "Like look at what it did here."
+  },
+  {
+    "start": 307.08,
+    "end": 310.04,
+    "text": "Then it will scour the dark web using multiple search engines and"
+  },
+  {
+    "start": 310.04,
+    "end": 311.68,
+    "text": "look at all those results over 900."
+  },
+  {
+    "start": 311.76,
+    "end": 316.16,
+    "text": "It will then use AI to identify the real sources, the real stuff, reducing that"
+  },
+  {
+    "start": 316.16,
+    "end": 319.64,
+    "text": "list from over 900 to just 20 verifiable real results."
+  },
+  {
+    "start": 319.68,
+    "end": 323.0,
+    "text": "It will then scrape those 20 sites and then use AI to tell you what it found"
+  },
+  {
+    "start": 323.08,
+    "end": 325.48,
+    "text": "and even the next steps on how to continue your research."
+  },
+  {
+    "start": 325.52,
+    "end": 326.4,
+    "text": "This tool is amazing."
+  },
+  {
+    "start": 326.52,
+    "end": 328.04,
+    "text": "Now to run Robin, you'll need two things."
+  },
+  {
+    "start": 328.08,
+    "end": 329.28,
+    "text": "First tour."
+  },
+  {
+    "start": 329.36,
+    "end": 331.12,
+    "text": "This will actually be a package we'll install."
+  },
+  {
+    "start": 331.16,
+    "end": 331.52,
+    "text": "Don't worry."
+  },
+  {
+    "start": 331.52,
+    "end": 332.2,
+    "text": "I'll walk you through it."
+  },
+  {
+    "start": 332.56,
+    "end": 334.0,
+    "text": "We'll also need Docker."
+  },
+  {
+    "start": 334.12,
+    "end": 336.32,
+    "text": "If you don't know what Docker is, I'm excited for you."
+  },
+  {
+    "start": 336.48,
+    "end": 337.4,
+    "text": "Go watch this video."
+  },
+  {
+    "start": 337.68,
+    "end": 338.4,
+    "text": "Mind blown."
+  },
+  {
+    "start": 338.48,
+    "end": 343.52,
+    "text": "Now we're going to run and install tour and Docker on Linux based machines or Mac."
+  },
+  {
+    "start": 343.72,
+    "end": 344.76,
+    "text": "So Linux or Mac."
+  },
+  {
+    "start": 344.8,
+    "end": 345.32,
+    "text": "Now don't worry."
+  },
+  {
+    "start": 345.32,
+    "end": 346.08,
+    "text": "Windows folks."
+  },
+  {
+    "start": 346.12,
+    "end": 347.08,
+    "text": "I'm right here with you."
+  },
+  {
+    "start": 347.48,
+    "end": 351.4,
+    "text": "You can run Linux on windows with WSL, the windows subsystem for Linux."
+  },
+  {
+    "start": 351.44,
+    "end": 354.16,
+    "text": "I'm not going to walk through installation here, but I do have a video here about"
+  },
+  {
+    "start": 354.16,
+    "end": 354.72,
+    "text": "how to do that."
+  },
+  {
+    "start": 354.8,
+    "end": 355.0,
+    "text": "All right."
+  },
+  {
+    "start": 355.0,
+    "end": 355.76,
+    "text": "Let's launch our terminal."
+  },
+  {
+    "start": 355.76,
+    "end": 357.36,
+    "text": "The best place in the world."
+  },
+  {
+    "start": 357.4,
+    "end": 359.28,
+    "text": "Home sweet home here in WSL land."
+  },
+  {
+    "start": 359.32,
+    "end": 360.84,
+    "text": "I will launch Ubuntu."
+  },
+  {
+    "start": 361.16,
+    "end": 362.92,
+    "text": "First thing we'll do is make sure Docker is installed."
+  },
+  {
+    "start": 362.92,
+    "end": 364.64,
+    "text": "We'll do Docker dash dash version."
+  },
+  {
+    "start": 365.16,
+    "end": 367.4,
+    "text": "If you don't see that install Docker, I'll have a link below."
+  },
+  {
+    "start": 367.56,
+    "end": 371.08,
+    "text": "Next we'll install tour with a pseudo APT install tour."
+  },
+  {
+    "start": 371.08,
+    "end": 373.36,
+    "text": "Now if you're on Mac, it's going to be brew install tour."
+  },
+  {
+    "start": 373.52,
+    "end": 375.16,
+    "text": "That does require you to have brew on Mac."
+  },
+  {
+    "start": 375.32,
+    "end": 377.44,
+    "text": "Again, I'm not going to come for that here, but I will have a link below."
+  },
+  {
+    "start": 377.52,
+    "end": 380.64,
+    "text": "I probably noticed that this is very command line first, meaning you'll use this"
+  },
+  {
+    "start": 380.64,
+    "end": 382.24,
+    "text": "tool via the command line, but don't worry."
+  },
+  {
+    "start": 382.64,
+    "end": 384.76,
+    "text": "If you love a GUI, we're going to have a GUI for you."
+  },
+  {
+    "start": 384.88,
+    "end": 385.84,
+    "text": "You'll see that here in a moment."
+  },
+  {
+    "start": 386.0,
+    "end": 389.0,
+    "text": "Let's install tour, which is kind of exciting."
+  },
+  {
+    "start": 389.56,
+    "end": 390.8,
+    "text": "Oh wait, wrong pseudo password."
+  },
+  {
+    "start": 390.84,
+    "end": 391.88,
+    "text": "Embarrassing."
+  },
+  {
+    "start": 392.76,
+    "end": 393.28,
+    "text": "There we go."
+  },
+  {
+    "start": 394.12,
+    "end": 394.76,
+    "text": "Yes."
+  },
+  {
+    "start": 394.84,
+    "end": 399.36,
+    "text": "Now, normally if you wanted to use a GUI to explore tour, you would use a tour"
+  },
+  {
+    "start": 399.36,
+    "end": 401.4,
+    "text": "browser like the onion router browser."
+  },
+  {
+    "start": 401.48,
+    "end": 404.36,
+    "text": "I think brave has a tour mode where you can use the network shot cloud browser"
+  },
+  {
+    "start": 404.36,
+    "end": 405.44,
+    "text": "to safely browse tour."
+  },
+  {
+    "start": 405.48,
+    "end": 408.96,
+    "text": "And now with tour installed, we're going to clone the Robin GitHub repo."
+  },
+  {
+    "start": 409.12,
+    "end": 411.56,
+    "text": "I'll have a walkthrough below, but we'll just grab that URL."
+  },
+  {
+    "start": 412.36,
+    "end": 413.36,
+    "text": "Get back to our command line."
+  },
+  {
+    "start": 413.48,
+    "end": 418.4,
+    "text": "We'll type in get clone and then paste in that URL just like this."
+  },
+  {
+    "start": 418.4,
+    "end": 419.36,
+    "text": "Ready, set, go."
+  },
+  {
+    "start": 419.44,
+    "end": 420.88,
+    "text": "It's cloning it cloned."
+  },
+  {
+    "start": 421.04,
+    "end": 421.52,
+    "text": "Copy, break."
+  },
+  {
+    "start": 422.88,
+    "end": 424.16,
+    "text": "And then we'll CD into that folder."
+  },
+  {
+    "start": 424.16,
+    "end": 425.96,
+    "text": "It just made for us called Robin."
+  },
+  {
+    "start": 426.6,
+    "end": 427.56,
+    "text": "And we're there now."
+  },
+  {
+    "start": 427.56,
+    "end": 429.24,
+    "text": "If you're like Chuck, I have no idea what just happened."
+  },
+  {
+    "start": 429.6,
+    "end": 434.44,
+    "text": "We use the tool called get to essentially clone or copy the tool Robin to our"
+  },
+  {
+    "start": 434.44,
+    "end": 435.52,
+    "text": "computer so we can use it."
+  },
+  {
+    "start": 435.76,
+    "end": 437.32,
+    "text": "And then we jumped into the folder that it created."
+  },
+  {
+    "start": 437.36,
+    "end": 440.4,
+    "text": "Now confession, normally when I make a video, I've installed the tool before"
+  },
+  {
+    "start": 440.4,
+    "end": 441.16,
+    "text": "and I played with it."
+  },
+  {
+    "start": 441.76,
+    "end": 442.72,
+    "text": "This one I have not."
+  },
+  {
+    "start": 442.8,
+    "end": 445.08,
+    "text": "So I'm actually discovering this with you in real time."
+  },
+  {
+    "start": 445.2,
+    "end": 446.0,
+    "text": "I'm pretty stoked."
+  },
+  {
+    "start": 446.48,
+    "end": 448.4,
+    "text": "Now we're about to build our Robin Docker container."
+  },
+  {
+    "start": 448.44,
+    "end": 450.96,
+    "text": "But before we do that, we'll need to set up our API keys."
+  },
+  {
+    "start": 451.2,
+    "end": 454.2,
+    "text": "Now remember this tool is going to be using AI, but which AI?"
+  },
+  {
+    "start": 454.52,
+    "end": 455.32,
+    "text": "Well, it's up to you."
+  },
+  {
+    "start": 455.64,
+    "end": 460.6,
+    "text": "With Robin, you can use Chad GPT, anthropic, or even local models like Lama 3.1."
+  },
+  {
+    "start": 461.04,
+    "end": 464.4,
+    "text": "Now for me, I'm going to try using Chad GPT, which will mean I'll need to add an"
+  },
+  {
+    "start": 464.4,
+    "end": 466.48,
+    "text": "API key for Robin to use."
+  },
+  {
+    "start": 466.72,
+    "end": 471.4,
+    "text": "And normally you'll put your API keys safely and securely inside a dot ENV file."
+  },
+  {
+    "start": 471.56,
+    "end": 472.52,
+    "text": "We're going to do that right now."
+  },
+  {
+    "start": 472.68,
+    "end": 472.96,
+    "text": "Don't worry."
+  },
+  {
+    "start": 472.96,
+    "end": 473.56,
+    "text": "It's not too bad."
+  },
+  {
+    "start": 473.64,
+    "end": 476.4,
+    "text": "I think a per view and has an example file for us."
+  },
+  {
+    "start": 476.44,
+    "end": 477.24,
+    "text": "Yes, there it is."
+  },
+  {
+    "start": 477.36,
+    "end": 479.2,
+    "text": "Is a dot ENV dot example."
+  },
+  {
+    "start": 479.2,
+    "end": 483.36,
+    "text": "If I cat that file or look inside of it, type in cat dot ENV dot example."
+  },
+  {
+    "start": 483.52,
+    "end": 484.2,
+    "text": "There it is."
+  },
+  {
+    "start": 484.4,
+    "end": 484.92,
+    "text": "That's simple."
+  },
+  {
+    "start": 486.08,
+    "end": 490.48,
+    "text": "Notice we have a slot for anthropic open AI, Google, and even just put in your"
+  },
+  {
+    "start": 490.48,
+    "end": 491.72,
+    "text": "O llama base URL."
+  },
+  {
+    "start": 491.96,
+    "end": 493.8,
+    "text": "I'm going to put an O llama and open AI."
+  },
+  {
+    "start": 494.2,
+    "end": 500.08,
+    "text": "So what I'll do is I'll copy the example file dot ENV dot example into a new"
+  },
+  {
+    "start": 500.08,
+    "end": 502.28,
+    "text": "file named dot ENV, just like that."
+  },
+  {
+    "start": 502.32,
+    "end": 503.84,
+    "text": "Now it's nano dot ENV."
+  },
+  {
+    "start": 503.88,
+    "end": 505.88,
+    "text": "And now we can add our keys into this new file."
+  },
+  {
+    "start": 506.84,
+    "end": 511.16,
+    "text": "I'm going to add open AI and then I'll put in my O llama base URL, which I always"
+  },
+  {
+    "start": 511.16,
+    "end": 512.32,
+    "text": "forget what that port is."
+  },
+  {
+    "start": 512.32,
+    "end": 513.16,
+    "text": "Let me check it real quick."
+  },
+  {
+    "start": 514.6,
+    "end": 515.16,
+    "text": "There it is."
+  },
+  {
+    "start": 516.8,
+    "end": 517.04,
+    "text": "All right."
+  },
+  {
+    "start": 517.04,
+    "end": 518.68,
+    "text": "Control X, Y, enter to save."
+  },
+  {
+    "start": 518.72,
+    "end": 520.68,
+    "text": "Now we're going to set up the Robin Docker container."
+  },
+  {
+    "start": 520.72,
+    "end": 523.6,
+    "text": "Now currently it's not on any repo and you're not going to find it on Docker Hub."
+  },
+  {
+    "start": 523.6,
+    "end": 525.4,
+    "text": "So we're going to build that Docker container right now."
+  },
+  {
+    "start": 525.6,
+    "end": 529.32,
+    "text": "The command will be pseudo Docker build dash T, which is us naming this container"
+  },
+  {
+    "start": 529.56,
+    "end": 533.4,
+    "text": "Robin, and then we'll do a space T to tell it, Hey, look here for the Docker files."
+  },
+  {
+    "start": 533.64,
+    "end": 534.96,
+    "text": "Ready, set, build."
+  },
+  {
+    "start": 536.44,
+    "end": 537.72,
+    "text": "This gets me every time."
+  },
+  {
+    "start": 537.84,
+    "end": 538.44,
+    "text": "I love it."
+  },
+  {
+    "start": 538.44,
+    "end": 539.88,
+    "text": "Oh, keep going."
+  },
+  {
+    "start": 539.96,
+    "end": 543.12,
+    "text": "There's nothing like sipping coffee and just watching things happen in your terminal."
+  },
+  {
+    "start": 543.32,
+    "end": 544.24,
+    "text": "It's my happy place."
+  },
+  {
+    "start": 544.44,
+    "end": 545.36,
+    "text": "Some people like the beach."
+  },
+  {
+    "start": 545.56,
+    "end": 546.44,
+    "text": "This is it for me."
+  },
+  {
+    "start": 546.64,
+    "end": 547.48,
+    "text": "Dang, a perv."
+  },
+  {
+    "start": 547.48,
+    "end": 548.72,
+    "text": "You get a lot of stuff in this thing."
+  },
+  {
+    "start": 548.92,
+    "end": 549.2,
+    "text": "Yeah."
+  },
+  {
+    "start": 549.2,
+    "end": 550.08,
+    "text": "There's a beautiful soup."
+  },
+  {
+    "start": 550.28,
+    "end": 553.68,
+    "text": "That's a tool you'll normally use to do web scraping."
+  },
+  {
+    "start": 553.88,
+    "end": 554.84,
+    "text": "How big is this thing?"
+  },
+  {
+    "start": 555.04,
+    "end": 555.88,
+    "text": "Oh, it finished."
+  },
+  {
+    "start": 556.08,
+    "end": 557.28,
+    "text": "I was scrolled up like a dummy."
+  },
+  {
+    "start": 557.28,
+    "end": 558.84,
+    "text": "Now with one command, we're going to run the sucker."
+  },
+  {
+    "start": 559.04,
+    "end": 560.88,
+    "text": "A perv already has a Docker run command for us."
+  },
+  {
+    "start": 561.08,
+    "end": 562.08,
+    "text": "Just got to copy that."
+  },
+  {
+    "start": 562.28,
+    "end": 564.08,
+    "text": "Get back to my terminal and paste it in here."
+  },
+  {
+    "start": 564.28,
+    "end": 564.8,
+    "text": "All right."
+  },
+  {
+    "start": 564.8,
+    "end": 565.96,
+    "text": "Running our Docker container."
+  },
+  {
+    "start": 566.04,
+    "end": 568.16,
+    "text": "Notice first it's connecting to the Tor network."
+  },
+  {
+    "start": 568.36,
+    "end": 571.44,
+    "text": "It's connecting to the dark web, handshaking, connecting."
+  },
+  {
+    "start": 571.64,
+    "end": 573.24,
+    "text": "It's being so social."
+  },
+  {
+    "start": 573.44,
+    "end": 578.28,
+    "text": "Now it seems like it started my web app before it fully connected."
+  },
+  {
+    "start": 578.48,
+    "end": 579.88,
+    "text": "Let's go see if our web app works."
+  },
+  {
+    "start": 580.08,
+    "end": 582.96,
+    "text": "Go out to local host port 8501."
+  },
+  {
+    "start": 583.16,
+    "end": 583.76,
+    "text": "OK, cool."
+  },
+  {
+    "start": 583.96,
+    "end": 586.0,
+    "text": "It seems to be working on the left here."
+  },
+  {
+    "start": 586.0,
+    "end": 587.72,
+    "text": "We have our LLM choices in the middle."
+  },
+  {
+    "start": 587.92,
+    "end": 589.36,
+    "text": "We can just search for stuff."
+  },
+  {
+    "start": 589.56,
+    "end": 591.72,
+    "text": "I'm going to go ahead and click on the search button."
+  },
+  {
+    "start": 591.92,
+    "end": 593.52,
+    "text": "I'm going to click on the search button."
+  },
+  {
+    "start": 593.52,
+    "end": 594.8,
+    "text": "LLM choices in the middle."
+  },
+  {
+    "start": 594.8,
+    "end": 598.08,
+    "text": "We can just search for stuff, but I don't think we're connected just yet."
+  },
+  {
+    "start": 598.28,
+    "end": 599.84,
+    "text": "I guess we can try it."
+  },
+  {
+    "start": 600.04,
+    "end": 603.88,
+    "text": "Let's try searching for ransomware."
+  },
+  {
+    "start": 607.76,
+    "end": 608.44,
+    "text": "That's a good sign."
+  },
+  {
+    "start": 608.64,
+    "end": 610.76,
+    "text": "That means it's connected to chat."
+  },
+  {
+    "start": 610.96,
+    "end": 616.24,
+    "text": "It refined my query, but I don't think it's actually searching."
+  },
+  {
+    "start": 616.48,
+    "end": 617.68,
+    "text": "Yeah, nothing's really happening."
+  },
+  {
+    "start": 617.84,
+    "end": 619.68,
+    "text": "I'm going to go up here and click on stop at the top."
+  },
+  {
+    "start": 619.88,
+    "end": 622.92,
+    "text": "Oh, look at that. Lots of weird things happening."
+  },
+  {
+    "start": 623.16,
+    "end": 624.64,
+    "text": "Let's stop that."
+  },
+  {
+    "start": 625.64,
+    "end": 627.36,
+    "text": "I think I need to wait."
+  },
+  {
+    "start": 627.56,
+    "end": 629.6,
+    "text": "We'll give it time to bake."
+  },
+  {
+    "start": 632.48,
+    "end": 633.6,
+    "text": "OK, I made some progress."
+  },
+  {
+    "start": 633.6,
+    "end": 634.92,
+    "text": "I just had to wait for a moment."
+  },
+  {
+    "start": 635.12,
+    "end": 637.24,
+    "text": "Tor is janky. Let's test it out now."
+  },
+  {
+    "start": 637.44,
+    "end": 639.16,
+    "text": "Let's try ransomware."
+  },
+  {
+    "start": 640.84,
+    "end": 643.12,
+    "text": "OK, refining query."
+  },
+  {
+    "start": 643.92,
+    "end": 645.12,
+    "text": "OK, are things happening?"
+  },
+  {
+    "start": 645.32,
+    "end": 646.72,
+    "text": "I don't know."
+  },
+  {
+    "start": 648.88,
+    "end": 650.44,
+    "text": "Oh, did you see that?"
+  },
+  {
+    "start": 650.48,
+    "end": 653.72,
+    "text": "It found 910 results, even more than a perv."
+  },
+  {
+    "start": 653.92,
+    "end": 655.44,
+    "text": "Filter down to 20."
+  },
+  {
+    "start": 655.64,
+    "end": 657.36,
+    "text": "Now it's scraping those sites."
+  },
+  {
+    "start": 657.56,
+    "end": 659.32,
+    "text": "This is so exciting."
+  },
+  {
+    "start": 660.6,
+    "end": 664.56,
+    "text": "Oh, it's done or it's generating a summary."
+  },
+  {
+    "start": 664.76,
+    "end": 666.32,
+    "text": "Dude, these are actual links."
+  },
+  {
+    "start": 666.52,
+    "end": 668.04,
+    "text": "Let's try one."
+  },
+  {
+    "start": 671.2,
+    "end": 673.52,
+    "text": "Dude, even my browser is having problems with Tor."
+  },
+  {
+    "start": 673.72,
+    "end": 675.32,
+    "text": "Come on, get me to the good stuff."
+  },
+  {
+    "start": 675.52,
+    "end": 677.84,
+    "text": "Let's go. Dude, this is taking forever."
+  },
+  {
+    "start": 678.08,
+    "end": 680.32,
+    "text": "Let's let's keep looking at our investigation here."
+  },
+  {
+    "start": 680.52,
+    "end": 682.04,
+    "text": "It found the builders, Cryptor,"
+  },
+  {
+    "start": 682.24,
+    "end": 687.4,
+    "text": "Arsium, Conti, Darknet, Army Forum, Arsium claims easy $500 per hit."
+  },
+  {
+    "start": 687.6,
+    "end": 688.72,
+    "text": "And we got some info here."
+  },
+  {
+    "start": 688.92,
+    "end": 691.24,
+    "text": "And the next steps monitor that forum,"
+  },
+  {
+    "start": 691.44,
+    "end": 695.08,
+    "text": "profile some threat actors and even some other search queries we can try."
+  },
+  {
+    "start": 695.2,
+    "end": 697.44,
+    "text": "We're going to do that. Let's check on our Tor browser now."
+  },
+  {
+    "start": 697.56,
+    "end": 698.4,
+    "text": "Oh, we're almost there."
+  },
+  {
+    "start": 698.48,
+    "end": 700.48,
+    "text": "I'm going to grab that link one more time to test it out."
+  },
+  {
+    "start": 700.68,
+    "end": 702.64,
+    "text": "We're in. Let's go."
+  },
+  {
+    "start": 702.84,
+    "end": 707.56,
+    "text": "OK, bad link. A perv did say that sometimes it does give some bad links,"
+  },
+  {
+    "start": 707.72,
+    "end": 709.48,
+    "text": "but I think we got one."
+  },
+  {
+    "start": 709.68,
+    "end": 712.08,
+    "text": "Oh, that worked."
+  },
+  {
+    "start": 712.28,
+    "end": 714.76,
+    "text": "OK, let's keep investigating. Let's do Conti."
+  },
+  {
+    "start": 714.96,
+    "end": 716.64,
+    "text": "Do another search."
+  },
+  {
+    "start": 718.24,
+    "end": 720.92,
+    "text": "Six hundred and thirty four results filtering down to 20."
+  },
+  {
+    "start": 721.12,
+    "end": 722.48,
+    "text": "It's scraping the content now."
+  },
+  {
+    "start": 722.68,
+    "end": 724.44,
+    "text": "OK, let's see what it found. Whoa."
+  },
+  {
+    "start": 724.64,
+    "end": 725.88,
+    "text": "Oh, look at this."
+  },
+  {
+    "start": 726.08,
+    "end": 728.12,
+    "text": "Dude, they've got cryptocurrency addresses."
+  },
+  {
+    "start": 728.32,
+    "end": 732.0,
+    "text": "Doge, LTC, BTC, XMR."
+  },
+  {
+    "start": 732.2,
+    "end": 734.48,
+    "text": "That's not threat actor info."
+  },
+  {
+    "start": 734.6,
+    "end": 735.76,
+    "text": "Dude, this thing is crazy."
+  },
+  {
+    "start": 735.76,
+    "end": 739.8,
+    "text": "Now we can also click on download right here and download a markdown file of our"
+  },
+  {
+    "start": 739.8,
+    "end": 743.6,
+    "text": "summary so we can throw that sucker right into our obsidian vaults for research."
+  },
+  {
+    "start": 743.8,
+    "end": 746.72,
+    "text": "Now, hold on before you get crazy."
+  },
+  {
+    "start": 746.92,
+    "end": 748.0,
+    "text": "We need to talk about safety."
+  },
+  {
+    "start": 748.08,
+    "end": 751.2,
+    "text": "Now, I just gave you an extremely powerful and dangerous tool."
+  },
+  {
+    "start": 751.28,
+    "end": 752.76,
+    "text": "I know you're wanting to search right now."
+  },
+  {
+    "start": 752.96,
+    "end": 754.28,
+    "text": "You want to go nuts."
+  },
+  {
+    "start": 754.48,
+    "end": 757.04,
+    "text": "Tell you what, while your thing is sitting there waiting to connect to the Tor"
+  },
+  {
+    "start": 757.04,
+    "end": 760.0,
+    "text": "network like mine did, let's let's talk about safety and what you got to do to"
+  },
+  {
+    "start": 760.0,
+    "end": 761.56,
+    "text": "protect yourself when you're doing this."
+  },
+  {
+    "start": 761.64,
+    "end": 762.72,
+    "text": "Remember what a perv said?"
+  },
+  {
+    "start": 762.8,
+    "end": 767.48,
+    "text": "The entire thing of being safe while doing this, it's really important, I would say."
+  },
+  {
+    "start": 767.68,
+    "end": 770.64,
+    "text": "Here are the rules. Use VPN plus Tor."
+  },
+  {
+    "start": 770.84,
+    "end": 774.92,
+    "text": "So like, for example, scraping, you definitely want to do VPN and then Tor"
+  },
+  {
+    "start": 775.12,
+    "end": 778.4,
+    "text": "so that your ISP can't see you are accessing Tor."
+  },
+  {
+    "start": 778.6,
+    "end": 782.8,
+    "text": "But in many countries, Tor is considered like, OK, they must be doing something"
+  },
+  {
+    "start": 782.8,
+    "end": 785.28,
+    "text": "illegal. So that's how you want to go through VPN."
+  },
+  {
+    "start": 785.28,
+    "end": 786.88,
+    "text": "So they can't see where you're going to."
+  },
+  {
+    "start": 787.08,
+    "end": 790.92,
+    "text": "Do not try to access illegal marketplaces or sites selling bad stuff."
+  },
+  {
+    "start": 791.12,
+    "end": 792.08,
+    "text": "Stuff you know you don't need."
+  },
+  {
+    "start": 792.24,
+    "end": 797.12,
+    "text": "There are like drug related stuff, CSAM related stuff, far worse, like hacking,"
+  },
+  {
+    "start": 797.12,
+    "end": 798.48,
+    "text": "killing stuff, all those things, right?"
+  },
+  {
+    "start": 798.56,
+    "end": 801.24,
+    "text": "Yeah, that stuff really exists on the dark web and you really don't need it."
+  },
+  {
+    "start": 801.28,
+    "end": 805.08,
+    "text": "That's why a perv wrote this tool in a way that will put guardrails in for himself"
+  },
+  {
+    "start": 805.28,
+    "end": 805.8,
+    "text": "and for you."
+  },
+  {
+    "start": 806.0,
+    "end": 810.4,
+    "text": "So if someone searches for that, definitely like even if you go on the website,"
+  },
+  {
+    "start": 810.4,
+    "end": 812.52,
+    "text": "you search for that, you will get the result."
+  },
+  {
+    "start": 812.72,
+    "end": 816.8,
+    "text": "As I showed in the prompt, like I do have written that, OK, do not show me not safe"
+  },
+  {
+    "start": 816.8,
+    "end": 817.96,
+    "text": "for work. Just be careful."
+  },
+  {
+    "start": 818.04,
+    "end": 819.0,
+    "text": "It's not foolproof."
+  },
+  {
+    "start": 819.2,
+    "end": 820.08,
+    "text": "I've not tested it."
+  },
+  {
+    "start": 820.24,
+    "end": 823.48,
+    "text": "Like, I don't want to get my hands with that."
+  },
+  {
+    "start": 823.68,
+    "end": 827.08,
+    "text": "So that is a disclaimer, which I put it on the GitHub also."
+  },
+  {
+    "start": 827.28,
+    "end": 829.68,
+    "text": "Please take a purpose warning seriously."
+  },
+  {
+    "start": 829.88,
+    "end": 831.4,
+    "text": "Please don't search for those things."
+  },
+  {
+    "start": 831.4,
+    "end": 832.48,
+    "text": "You will get into trouble."
+  },
+  {
+    "start": 832.48,
+    "end": 833.32,
+    "text": "That is a big thing."
+  },
+  {
+    "start": 833.52,
+    "end": 838.16,
+    "text": "Like, especially in US, if you search any CSAM related stuff and you have something"
+  },
+  {
+    "start": 838.36,
+    "end": 840.64,
+    "text": "saved on your system, you are in big trouble."
+  },
+  {
+    "start": 840.84,
+    "end": 843.32,
+    "text": "That is a full illegal area that you are going into."
+  },
+  {
+    "start": 843.52,
+    "end": 846.72,
+    "text": "Even if you do it mistakenly, like they will not listen to you."
+  },
+  {
+    "start": 846.92,
+    "end": 847.8,
+    "text": "Like you are in trouble."
+  },
+  {
+    "start": 847.8,
+    "end": 848.68,
+    "text": "You will get arrested."
+  },
+  {
+    "start": 848.84,
+    "end": 852.28,
+    "text": "So it's always better to not search for any of those things."
+  },
+  {
+    "start": 852.32,
+    "end": 853.56,
+    "text": "Right. Right away."
+  },
+  {
+    "start": 853.76,
+    "end": 855.44,
+    "text": "Don't download suspicious stuff."
+  },
+  {
+    "start": 855.44,
+    "end": 857.76,
+    "text": "Like really, just don't download anything from the dark web."
+  },
+  {
+    "start": 857.96,
+    "end": 860.4,
+    "text": "Roll the thumb. No."
+  },
+  {
+    "start": 860.6,
+    "end": 862.2,
+    "text": "That actually hurt. I hit myself in my ring."
+  },
+  {
+    "start": 862.32,
+    "end": 865.32,
+    "text": "Now, by the way, this entire thing I've been showing you researching the dark web,"
+  },
+  {
+    "start": 865.52,
+    "end": 868.64,
+    "text": "it's part of a real job, a threat researcher."
+  },
+  {
+    "start": 868.64,
+    "end": 869.72,
+    "text": "That's what a per does."
+  },
+  {
+    "start": 869.92,
+    "end": 873.36,
+    "text": "But the reality, it's not that easy to find things in the dark web."
+  },
+  {
+    "start": 873.36,
+    "end": 876.12,
+    "text": "Like this tool does make it easier, but it's still pretty stinking hard."
+  },
+  {
+    "start": 876.24,
+    "end": 877.44,
+    "text": "But also it's a real job."
+  },
+  {
+    "start": 877.44,
+    "end": 878.24,
+    "text": "And that's kind of cool."
+  },
+  {
+    "start": 878.36,
+    "end": 880.48,
+    "text": "A per told me a little bit about what that entails though."
+  },
+  {
+    "start": 880.52,
+    "end": 882.64,
+    "text": "Like if you want to actually find real things in the dark web,"
+  },
+  {
+    "start": 882.72,
+    "end": 886.44,
+    "text": "it's not as easy as a really fancy searching tool that does some cool stuff."
+  },
+  {
+    "start": 886.84,
+    "end": 888.44,
+    "text": "It's also a waiting game. For example,"
+  },
+  {
+    "start": 888.44,
+    "end": 891.64,
+    "text": "when we do get those good results from the tool Robin, that's just the beginning."
+  },
+  {
+    "start": 891.76,
+    "end": 894.6,
+    "text": "Fingers crossed, you'll eventually find a forum and you'll get in there and you'll"
+  },
+  {
+    "start": 894.6,
+    "end": 899.44,
+    "text": "just wait. You got to be patient. A per told me it takes a long time,"
+  },
+  {
+    "start": 899.72,
+    "end": 903.28,
+    "text": "days, weeks. You have to stay there, build trust. Not just that."
+  },
+  {
+    "start": 903.4,
+    "end": 906.32,
+    "text": "Like you have to kind of go undercover like an undercover cop."
+  },
+  {
+    "start": 906.4,
+    "end": 910.52,
+    "text": "Basically you create accounts that are not tied to you or your company or"
+  },
+  {
+    "start": 910.52,
+    "end": 915.24,
+    "text": "whatever organization you work for, like sockpuppet accounts on forums,"
+  },
+  {
+    "start": 915.24,
+    "end": 918.84,
+    "text": "telegram, even for telegram. Like you have a burner phone number."
+  },
+  {
+    "start": 918.92,
+    "end": 921.0,
+    "text": "Okay. Sockpuppet accounts with burner phones,"
+  },
+  {
+    "start": 921.08,
+    "end": 922.52,
+    "text": "but don't make this beginner mistake."
+  },
+  {
+    "start": 922.76,
+    "end": 925.96,
+    "text": "A lot of beginners, I would say,"
+  },
+  {
+    "start": 927.04,
+    "end": 929.12,
+    "text": "when they try to create these accounts,"
+  },
+  {
+    "start": 929.52,
+    "end": 933.76,
+    "text": "they put recovery email as their main email. You cannot even think about, okay,"
+  },
+  {
+    "start": 934.16,
+    "end": 936.44,
+    "text": "I can say something related to me."
+  },
+  {
+    "start": 936.56,
+    "end": 939.04,
+    "text": "And listen, if you're actively talking to threat actors,"
+  },
+  {
+    "start": 939.28,
+    "end": 942.88,
+    "text": "you got to be on your game. If you adopt a persona, remember it."
+  },
+  {
+    "start": 944.6,
+    "end": 946.4,
+    "text": "Make it real, consistently use it."
+  },
+  {
+    "start": 946.48,
+    "end": 950.72,
+    "text": "If you are actually talking to them, that is a different ball game."
+  },
+  {
+    "start": 950.72,
+    "end": 955.68,
+    "text": "Like you have to be very, very off what you say to the threat actors."
+  },
+  {
+    "start": 955.8,
+    "end": 959.36,
+    "text": "New name, new me, new everything, the way you talk, the accent you have."
+  },
+  {
+    "start": 959.52,
+    "end": 962.76,
+    "text": "And you want to make sure you remember those, those details you create,"
+  },
+  {
+    "start": 962.76,
+    "end": 966.08,
+    "text": "because as you get into those forums, these dark web criminals,"
+  },
+  {
+    "start": 966.08,
+    "end": 966.92,
+    "text": "they're not dumb."
+  },
+  {
+    "start": 966.96,
+    "end": 970.76,
+    "text": "They're anticipating cops getting in there or researchers coming in and they're"
+  },
+  {
+    "start": 970.76,
+    "end": 973.36,
+    "text": "looking for the signs of like inconsistencies."
+  },
+  {
+    "start": 973.48,
+    "end": 976.84,
+    "text": "And also if you're doing multiple personalities, keep track of those things."
+  },
+  {
+    "start": 976.96,
+    "end": 978.92,
+    "text": "Have a habit of note taking,"
+  },
+  {
+    "start": 979.76,
+    "end": 984.0,
+    "text": "because you don't want to combine two different personas into one."
+  },
+  {
+    "start": 984.52,
+    "end": 986.16,
+    "text": "All these small things do matter."
+  },
+  {
+    "start": 986.28,
+    "end": 989.76,
+    "text": "But even when you're on your game and you remember your sock puppet identity and"
+  },
+  {
+    "start": 990.0,
+    "end": 992.28,
+    "text": "you're living it, it still takes a while."
+  },
+  {
+    "start": 992.64,
+    "end": 995.88,
+    "text": "And you might just be waiting for that next link that takes you to the more real"
+  },
+  {
+    "start": 995.88,
+    "end": 999.04,
+    "text": "form where the real guys are, or it might even be a telegram link,"
+  },
+  {
+    "start": 999.16,
+    "end": 1002.48,
+    "text": "a private telegram chat. A lot of people think you go to the dark web and boom,"
+  },
+  {
+    "start": 1002.64,
+    "end": 1005.52,
+    "text": "you're just going to hit that site where all the criminals are hanging out. No,"
+  },
+  {
+    "start": 1006.28,
+    "end": 1009.76,
+    "text": "so many dark websites, dark web websites have been taken down."
+  },
+  {
+    "start": 1009.76,
+    "end": 1012.72,
+    "text": "Marketplace has been removed. They don't make it easy to find them,"
+  },
+  {
+    "start": 1012.92,
+    "end": 1016.76,
+    "text": "yet they do have to advertise the fact that they are around because that's how"
+  },
+  {
+    "start": 1016.76,
+    "end": 1019.0,
+    "text": "they get customers. So they are discoverable,"
+  },
+  {
+    "start": 1019.0,
+    "end": 1020.8,
+    "text": "but they're careful and you have to be patient."
+  },
+  {
+    "start": 1021.12,
+    "end": 1023.72,
+    "text": "I honestly can't believe all that we just described is a real job."
+  },
+  {
+    "start": 1023.88,
+    "end": 1027.76,
+    "text": "If you do this job comment below. And if you want to do this job, comment below."
+  },
+  {
+    "start": 1028.0,
+    "end": 1030.88,
+    "text": "They probably wondering Chuck, why are you showing us this?"
+  },
+  {
+    "start": 1031.24,
+    "end": 1034.44,
+    "text": "This is a way to search the dark web. It's dangerous."
+  },
+  {
+    "start": 1034.48,
+    "end": 1038.2,
+    "text": "I'm showing it to you because of this reason. Actually two reasons. One,"
+  },
+  {
+    "start": 1038.56,
+    "end": 1039.4,
+    "text": "education."
+  },
+  {
+    "start": 1039.44,
+    "end": 1042.64,
+    "text": "I want you to be able to research security threats like a threat researcher"
+  },
+  {
+    "start": 1042.64,
+    "end": 1044.48,
+    "text": "would so you can defend against them."
+  },
+  {
+    "start": 1044.64,
+    "end": 1047.64,
+    "text": "Education and knowledge about the threats we face is how we defeat them."
+  },
+  {
+    "start": 1047.8,
+    "end": 1049.56,
+    "text": "And second, it's just a really awesome tool."
+  },
+  {
+    "start": 1049.56,
+    "end": 1051.24,
+    "text": "Like you can try to search for your own data,"
+  },
+  {
+    "start": 1051.28,
+    "end": 1054.64,
+    "text": "see if you are on the dark web, put in your email address, maybe your name,"
+  },
+  {
+    "start": 1054.76,
+    "end": 1055.84,
+    "text": "just some fun things to try."
+  },
+  {
+    "start": 1056.12,
+    "end": 1059.64,
+    "text": "A dark web researcher gave me his AI tool and I just gave it to you."
+  },
+  {
+    "start": 1060.0,
+    "end": 1060.84,
+    "text": "Think about that."
+  },
+  {
+    "start": 1060.84,
+    "end": 1065.28,
+    "text": "You know how the ability to use the same tools a real threat researcher has on"
+  },
+  {
+    "start": 1065.28,
+    "end": 1069.36,
+    "text": "the dark web. And that just sounds awesome and scary. So be careful. Okay."
+  },
+  {
+    "start": 1069.36,
+    "end": 1072.16,
+    "text": "So most of the dark web is fake. We know that now. Oh, by the way,"
+  },
+  {
+    "start": 1072.2,
+    "end": 1076.84,
+    "text": "that secret hotel suite meetup I had with the perving in Vegas during DEFCON."
+  },
+  {
+    "start": 1077.12,
+    "end": 1078.08,
+    "text": "That was a whole interview."
+  },
+  {
+    "start": 1078.28,
+    "end": 1080.92,
+    "text": "And what you saw here was just a peek behind the curtain."
+  },
+  {
+    "start": 1081.08,
+    "end": 1083.28,
+    "text": "If you want to see that full thing, I've got a video right here."
+  },
+  {
+    "start": 1083.6,
+    "end": 1087.32,
+    "text": "We talked about some stuff like ransomware as a service and how threat actors"
+  },
+  {
+    "start": 1087.32,
+    "end": 1090.88,
+    "text": "get caught with dumb Instagram mistakes. It's pretty nuts."
+  },
+  {
+    "start": 1090.92,
+    "end": 1093.68,
+    "text": "You don't want to miss that. So listen up. Here is your homework."
+  },
+  {
+    "start": 1094.0,
+    "end": 1097.32,
+    "text": "Test out the tool, search for your own email address, search for your name,"
+  },
+  {
+    "start": 1097.48,
+    "end": 1098.32,
+    "text": "see what's out there."
+  },
+  {
+    "start": 1098.4,
+    "end": 1101.2,
+    "text": "Get a feel for what it feels like to be a threat researcher."
+  },
+  {
+    "start": 1101.24,
+    "end": 1104.28,
+    "text": "Comment below what you find. I mean only the safe stuff. That's all I got."
+  },
+  {
+    "start": 1104.68,
+    "end": 1106.12,
+    "text": "I'll catch you guys next time. Hey,"
+  },
+  {
+    "start": 1106.24,
+    "end": 1107.48,
+    "text": "you made it to the end of the video."
+  },
+  {
+    "start": 1107.64,
+    "end": 1111.76,
+    "text": "You may have noticed that at the end of my videos I'm starting to pray for you."
+  },
+  {
+    "start": 1111.92,
+    "end": 1116.32,
+    "text": "I'm a man of faith and a lot of the things I do here on YouTube,"
+  },
+  {
+    "start": 1116.84,
+    "end": 1120.64,
+    "text": "they're fueled by that. In fact, all of it. Every video I make here,"
+  },
+  {
+    "start": 1120.64,
+    "end": 1125.48,
+    "text": "I hope is going to somehow improve your life by either getting you excited about"
+  },
+  {
+    "start": 1125.48,
+    "end": 1128.36,
+    "text": "IT, learning a new skill that you can add to your resume."
+  },
+  {
+    "start": 1128.8,
+    "end": 1131.88,
+    "text": "And it's Jesus that drives me in this."
+  },
+  {
+    "start": 1131.96,
+    "end": 1132.12,
+    "text": "No,"
+  },
+  {
+    "start": 1132.12,
+    "end": 1135.92,
+    "text": "I totally understand that my followers are going to have a bunch of different"
+  },
+  {
+    "start": 1135.92,
+    "end": 1137.44,
+    "text": "beliefs, but if you'll allow me,"
+  },
+  {
+    "start": 1138.08,
+    "end": 1140.96,
+    "text": "I would love to just pray for you and your life and what you're doing."
+  },
+  {
+    "start": 1141.08,
+    "end": 1144.0,
+    "text": "And that's it. So real quick, I know it's going to be kind of weird."
+  },
+  {
+    "start": 1144.04,
+    "end": 1148.2,
+    "text": "You got this YouTuber guy praying for you. Embrace the weirdness. Here we go."
+  },
+  {
+    "start": 1148.44,
+    "end": 1152.16,
+    "text": "God asking your name that you bless this person behind the screen."
+  },
+  {
+    "start": 1152.76,
+    "end": 1155.52,
+    "text": "He's watching this video right now. Um,"
+  },
+  {
+    "start": 1155.72,
+    "end": 1159.76,
+    "text": "I ask in your name that you would let them take the content of this video."
+  },
+  {
+    "start": 1160.76,
+    "end": 1163.2,
+    "text": "And first not do anything bad with it,"
+  },
+  {
+    "start": 1163.24,
+    "end": 1168.24,
+    "text": "but also let it make them excited for IT and give them some amazing skills,"
+  },
+  {
+    "start": 1169.2,
+    "end": 1172.92,
+    "text": "unlock new things for them, unlock new job opportunities, bless their careers."
+  },
+  {
+    "start": 1172.92,
+    "end": 1173.76,
+    "text": "God,"
+  },
+  {
+    "start": 1174.24,
+    "end": 1177.96,
+    "text": "I asked that this will make them go down rabbit holes to find amazing things to"
+  },
+  {
+    "start": 1177.96,
+    "end": 1182.96,
+    "text": "play with and tools to play with and skills to learn that will make their resume"
+  },
+  {
+    "start": 1183.48,
+    "end": 1188.48,
+    "text": "awesome and help them land that next job or help them to land that next razor or"
+  },
+  {
+    "start": 1188.76,
+    "end": 1191.24,
+    "text": "get that next promotion."
+  },
+  {
+    "start": 1192.52,
+    "end": 1194.56,
+    "text": "Go before them and make their path straight, Lord."
+  },
+  {
+    "start": 1194.64,
+    "end": 1197.72,
+    "text": "And I ask that you just bless their families. Let their families be blessed."
+  },
+  {
+    "start": 1197.76,
+    "end": 1201.2,
+    "text": "I know this is the big why for many of them as to why they're doing all this,"
+  },
+  {
+    "start": 1201.2,
+    "end": 1204.08,
+    "text": "all the studying and learning. Lord bless their families."
+  },
+  {
+    "start": 1204.08,
+    "end": 1207.56,
+    "text": "I'll let them be blessed by their study and their hard work. And Lord,"
+  },
+  {
+    "start": 1207.56,
+    "end": 1212.56,
+    "text": "ultimately I pray they find their satisfaction and their identity in you and"
+  },
+  {
+    "start": 1213.96,
+    "end": 1218.08,
+    "text": "that they will know you one day. I ask this in your name, Jesus. Amen. Hey,"
+  },
+  {
+    "start": 1218.16,
+    "end": 1222.68,
+    "text": "I really appreciate you letting me pray for you and that's it."
+  },
+  {
+    "start": 1223.24,
+    "end": 1224.44,
+    "text": "I'll catch you guys next time."
+  }
+]

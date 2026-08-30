@@ -1,0 +1,1792 @@
+[
+  {
+    "start": 0.0,
+    "end": 4.76,
+    "text": "What's up guys, so today we're talking about botnets."
+  },
+  {
+    "start": 4.76,
+    "end": 7.76,
+    "text": "So firstly, what is a botnet, right?"
+  },
+  {
+    "start": 7.76,
+    "end": 10.72,
+    "text": "And then after that, how do we build one?"
+  },
+  {
+    "start": 10.72,
+    "end": 13.0,
+    "text": "And then after that, what can we do with them?"
+  },
+  {
+    "start": 13.0,
+    "end": 15.08,
+    "text": "So firstly, what is a botnet?"
+  },
+  {
+    "start": 15.08,
+    "end": 16.58,
+    "text": "So a botnet is pretty simple."
+  },
+  {
+    "start": 16.58,
+    "end": 20.56,
+    "text": "I have a VM here, and then I have my attack computer here."
+  },
+  {
+    "start": 20.56,
+    "end": 28.44,
+    "text": "So this VM here, this Ubuntu VM is going to become a bot for us, meaning we can control"
+  },
+  {
+    "start": 28.6,
+    "end": 31.08,
+    "text": "it and we can make it do things on our behalf."
+  },
+  {
+    "start": 31.08,
+    "end": 33.4,
+    "text": "Okay, so that's the basics of a botnet."
+  },
+  {
+    "start": 33.4,
+    "end": 37.16,
+    "text": "So firstly, if you guys have joined the video and you guys are going to watch the video"
+  },
+  {
+    "start": 37.16,
+    "end": 41.86,
+    "text": "obviously and enjoy it, hopefully, and you've enjoyed some of my other videos, please like"
+  },
+  {
+    "start": 41.86,
+    "end": 43.0,
+    "text": "and subscribe."
+  },
+  {
+    "start": 43.0,
+    "end": 44.2,
+    "text": "It helps out a ton."
+  },
+  {
+    "start": 44.2,
+    "end": 45.2,
+    "text": "It's free."
+  },
+  {
+    "start": 45.2,
+    "end": 47.56,
+    "text": "It doesn't cost you anything to do it."
+  },
+  {
+    "start": 47.56,
+    "end": 51.46,
+    "text": "And also we have a Patreon going where I have exclusive content."
+  },
+  {
+    "start": 51.46,
+    "end": 54.2,
+    "text": "I have a little bit different type of content."
+  },
+  {
+    "start": 54.2,
+    "end": 55.2,
+    "text": "It's the same."
+  },
+  {
+    "start": 55.2,
+    "end": 57.92,
+    "text": "It's cyber obviously, but it's a little bit different in the fact that it's not so"
+  },
+  {
+    "start": 58.08,
+    "end": 59.08,
+    "text": "formalized."
+  },
+  {
+    "start": 59.08,
+    "end": 61.72,
+    "text": "And then there's also other benefits there."
+  },
+  {
+    "start": 61.72,
+    "end": 63.24,
+    "text": "So hopefully you guys are enjoying it."
+  },
+  {
+    "start": 63.24,
+    "end": 65.76,
+    "text": "And if you are, please like and subscribe."
+  },
+  {
+    "start": 65.76,
+    "end": 67.16,
+    "text": "Helps out tremendously."
+  },
+  {
+    "start": 67.16,
+    "end": 70.12,
+    "text": "We just reached 400 subs and I'm super stoked about it."
+  },
+  {
+    "start": 70.12,
+    "end": 71.84,
+    "text": "So I want to thank you guys."
+  },
+  {
+    "start": 71.84,
+    "end": 72.96,
+    "text": "So let's get right into it."
+  },
+  {
+    "start": 72.96,
+    "end": 75.78,
+    "text": "So we know what a botnet is now, right?"
+  },
+  {
+    "start": 75.78,
+    "end": 77.28,
+    "text": "It's pretty simple."
+  },
+  {
+    "start": 77.28,
+    "end": 83.12,
+    "text": "It's controlling a large group of computers, hosts, whatever you want to call them, and"
+  },
+  {
+    "start": 83.12,
+    "end": 85.26,
+    "text": "having them do your dirty work for you, right?"
+  },
+  {
+    "start": 85.26,
+    "end": 92.14,
+    "text": "So for instance, if I have this computer and it's on a network somewhere in Japan or wherever,"
+  },
+  {
+    "start": 92.14,
+    "end": 98.22,
+    "text": "and I run a scan, meaning I want to start scanning targets in Germany or something like"
+  },
+  {
+    "start": 98.22,
+    "end": 101.5,
+    "text": "that, it's going to come from this IP, right?"
+  },
+  {
+    "start": 101.5,
+    "end": 102.82,
+    "text": "It's going to come from this computer."
+  },
+  {
+    "start": 102.82,
+    "end": 104.78,
+    "text": "That's not going to be me scanning them."
+  },
+  {
+    "start": 104.78,
+    "end": 106.66,
+    "text": "It's going to be this scanning them."
+  },
+  {
+    "start": 106.66,
+    "end": 110.58,
+    "text": "So that's kind of part of what botnetting is, right?"
+  },
+  {
+    "start": 110.58,
+    "end": 117.1,
+    "text": "If I want to do a DDoS attack, if I have just my computer and I try and DDoS somebody, it's"
+  },
+  {
+    "start": 117.1,
+    "end": 118.24,
+    "text": "probably not going to do anything."
+  },
+  {
+    "start": 118.24,
+    "end": 122.08,
+    "text": "It may slow their computer down, maybe depending on my processing computer or my processing"
+  },
+  {
+    "start": 122.08,
+    "end": 125.82,
+    "text": "power and how many packets I can send at a time and all that stuff, but it's not going"
+  },
+  {
+    "start": 125.82,
+    "end": 126.96,
+    "text": "to do anything, right?"
+  },
+  {
+    "start": 126.96,
+    "end": 128.2,
+    "text": "Not today's world."
+  },
+  {
+    "start": 128.2,
+    "end": 133.42,
+    "text": "But if I have a hundred thousand computers sending packets to them, that's going to cause"
+  },
+  {
+    "start": 133.42,
+    "end": 134.68,
+    "text": "some lag, right?"
+  },
+  {
+    "start": 134.68,
+    "end": 137.22,
+    "text": "That's going to start dosing their computers."
+  },
+  {
+    "start": 137.22,
+    "end": 140.72,
+    "text": "So that's the basis of what a botnet's used for."
+  },
+  {
+    "start": 140.72,
+    "end": 143.18,
+    "text": "Now on top of it, botnets can spread."
+  },
+  {
+    "start": 143.18,
+    "end": 148.78,
+    "text": "So then you start taking more hosts, more hosts, and it becomes infectious, literally,"
+  },
+  {
+    "start": 148.78,
+    "end": 150.86,
+    "text": "meaning that it's going to keep spreading."
+  },
+  {
+    "start": 150.86,
+    "end": 152.34,
+    "text": "The botnet's going to grow."
+  },
+  {
+    "start": 152.34,
+    "end": 156.1,
+    "text": "And then on top of that, not only do you have more hosts now that you can control, but you"
+  },
+  {
+    "start": 156.1,
+    "end": 160.1,
+    "text": "might end up having hosts that have information on them that you don't even, you weren't necessarily"
+  },
+  {
+    "start": 160.1,
+    "end": 161.58,
+    "text": "going for, right?"
+  },
+  {
+    "start": 161.58,
+    "end": 164.66,
+    "text": "So this is what hackers use botnets for."
+  },
+  {
+    "start": 164.7,
+    "end": 168.82,
+    "text": "A lot of hackers, especially on the deep web and dark web, whatever you want to call it,"
+  },
+  {
+    "start": 168.82,
+    "end": 170.5,
+    "text": "they buy botnets, right?"
+  },
+  {
+    "start": 170.5,
+    "end": 175.78,
+    "text": "There's no need for them to set it all up because to get a thousand or two thousand"
+  },
+  {
+    "start": 175.78,
+    "end": 177.22,
+    "text": "hosts, right?"
+  },
+  {
+    "start": 177.22,
+    "end": 182.62,
+    "text": "You're looking at a decent amount of setup as far as a server that can hold it, a command"
+  },
+  {
+    "start": 182.62,
+    "end": 185.22,
+    "text": "and control server, things like that."
+  },
+  {
+    "start": 185.22,
+    "end": 188.74,
+    "text": "So what I'm going to show you today is how to set up your own command and control server"
+  },
+  {
+    "start": 188.74,
+    "end": 190.7,
+    "text": "and then how to infect a host."
+  },
+  {
+    "start": 190.7,
+    "end": 194.6,
+    "text": "So this is the, keep in mind, this is our target right here."
+  },
+  {
+    "start": 194.6,
+    "end": 196.04,
+    "text": "This is a Buntu machine."
+  },
+  {
+    "start": 196.04,
+    "end": 200.22,
+    "text": "And this here is our actual attack machine."
+  },
+  {
+    "start": 200.22,
+    "end": 204.08,
+    "text": "So we're going to use what's called BYOB, build your own botnet."
+  },
+  {
+    "start": 204.08,
+    "end": 206.6,
+    "text": "And I will pull it up here for you guys."
+  },
+  {
+    "start": 206.6,
+    "end": 208.44,
+    "text": "So this is the GitHub page."
+  },
+  {
+    "start": 208.44,
+    "end": 212.6,
+    "text": "So this is different than most, the way some command and control servers work."
+  },
+  {
+    "start": 212.6,
+    "end": 216.04,
+    "text": "If you guys don't know what a command and control server is, it's a server that's going"
+  },
+  {
+    "start": 216.04,
+    "end": 220.32,
+    "text": "to, all the hosts are going to reach back out to, to try and receive instructions."
+  },
+  {
+    "start": 220.32,
+    "end": 221.32,
+    "text": "Okay?"
+  },
+  {
+    "start": 221.32,
+    "end": 224.4,
+    "text": "So that's what we're going to set up and that's how we're going to build our botnet."
+  },
+  {
+    "start": 224.52,
+    "end": 228.96,
+    "text": "Now this one is for educational purposes only and that's why I'm using it."
+  },
+  {
+    "start": 228.96,
+    "end": 231.44,
+    "text": "And so it will show you what a command and control server looks like."
+  },
+  {
+    "start": 231.44,
+    "end": 233.16,
+    "text": "It shows you how it works, all that stuff."
+  },
+  {
+    "start": 233.16,
+    "end": 234.92,
+    "text": "But this is written in Python."
+  },
+  {
+    "start": 234.92,
+    "end": 236.92,
+    "text": "It's not very typical that that's going to be the case."
+  },
+  {
+    "start": 236.92,
+    "end": 242.24,
+    "text": "So keep that in mind that this is educational."
+  },
+  {
+    "start": 242.24,
+    "end": 244.12,
+    "text": "So let's go ahead and exit out."
+  },
+  {
+    "start": 244.12,
+    "end": 246.32,
+    "text": "So before we start, what do we have to do, right?"
+  },
+  {
+    "start": 246.32,
+    "end": 248.84,
+    "text": "We have to install it, obviously."
+  },
+  {
+    "start": 248.84,
+    "end": 251.92,
+    "text": "So here you can see I have it installed."
+  },
+  {
+    "start": 251.92,
+    "end": 257.96,
+    "text": "So to install it, you just get clone and then whatever clone would be, which is the"
+  },
+  {
+    "start": 257.96,
+    "end": 258.96,
+    "text": "repository."
+  },
+  {
+    "start": 258.96,
+    "end": 261.84,
+    "text": "So that GitHub page I just showed you, that would install it."
+  },
+  {
+    "start": 261.84,
+    "end": 262.84,
+    "text": "Now I already have it installed."
+  },
+  {
+    "start": 262.84,
+    "end": 265.2,
+    "text": "I'm not going to reinstall it."
+  },
+  {
+    "start": 265.2,
+    "end": 269.96,
+    "text": "I will tell you if you have a fresh install on a computer, maybe you don't have Git, you"
+  },
+  {
+    "start": 269.96,
+    "end": 276.28,
+    "text": "can pseudo apt, apt Git."
+  },
+  {
+    "start": 276.28,
+    "end": 281.12,
+    "text": "And then Git is, is what Git, Git's clones on GitHub."
+  },
+  {
+    "start": 281.12,
+    "end": 289.2,
+    "text": "It's their, it's their application that you need to actually install Git clones."
+  },
+  {
+    "start": 289.2,
+    "end": 291.6,
+    "text": "Either way, that's pretty much the basics, right?"
+  },
+  {
+    "start": 291.6,
+    "end": 294.48,
+    "text": "Once you have the directories, here's your directories."
+  },
+  {
+    "start": 294.48,
+    "end": 295.9,
+    "text": "This is what you're going to look at."
+  },
+  {
+    "start": 295.9,
+    "end": 299.82,
+    "text": "So you have BYOB, which is your command line interface."
+  },
+  {
+    "start": 299.82,
+    "end": 303.24,
+    "text": "So it's going to actually, let me blow this up for you guys."
+  },
+  {
+    "start": 303.24,
+    "end": 304.76,
+    "text": "Move it over here."
+  },
+  {
+    "start": 304.76,
+    "end": 306.48,
+    "text": "So this is the command line."
+  },
+  {
+    "start": 306.48,
+    "end": 310.72,
+    "text": "So what I mean by that is if I go into this directory, the BYOB, that's where I'm going"
+  },
+  {
+    "start": 310.72,
+    "end": 313.04,
+    "text": "to start messing with the command line tool."
+  },
+  {
+    "start": 313.04,
+    "end": 315.8,
+    "text": "I want to use the web GUI for ease of use, right?"
+  },
+  {
+    "start": 315.8,
+    "end": 317.18,
+    "text": "It's much easier."
+  },
+  {
+    "start": 317.18,
+    "end": 319.16,
+    "text": "So we'll go ahead and CD into the web GUI."
+  },
+  {
+    "start": 319.16,
+    "end": 325.84,
+    "text": "All right, so you can see we have build your own botnet, Docker, PyInstalled, Docker, SH,"
+  },
+  {
+    "start": 325.84,
+    "end": 327.72,
+    "text": "read me requirements, blah, blah, blah."
+  },
+  {
+    "start": 327.72,
+    "end": 331.68,
+    "text": "Now I'll tell you, it's, it's good to read the read me."
+  },
+  {
+    "start": 331.68,
+    "end": 335.46,
+    "text": "And it's good to understand that this is going to install Docker on your computer and a bunch"
+  },
+  {
+    "start": 335.46,
+    "end": 336.46,
+    "text": "of other stuff."
+  },
+  {
+    "start": 336.46,
+    "end": 340.2,
+    "text": "I already have Docker, so I'm not going to do all this."
+  },
+  {
+    "start": 340.2,
+    "end": 343.0,
+    "text": "The requirements.text is going to show you everything."
+  },
+  {
+    "start": 343.0,
+    "end": 344.88,
+    "text": "This is all the stuff it's going to install."
+  },
+  {
+    "start": 344.88,
+    "end": 348.52,
+    "text": "Okay, so those are the requirements and it's going to try and install them."
+  },
+  {
+    "start": 348.52,
+    "end": 356.74,
+    "text": "So when you do the, when you do the startup.sh, so that's a bash script, right?"
+  },
+  {
+    "start": 356.74,
+    "end": 359.96,
+    "text": "When you do that, it's going to start trying to install these requirements."
+  },
+  {
+    "start": 359.96,
+    "end": 362.28,
+    "text": "It's going to go through and try and install them."
+  },
+  {
+    "start": 362.28,
+    "end": 363.56,
+    "text": "And this takes a while."
+  },
+  {
+    "start": 363.56,
+    "end": 365.72,
+    "text": "So I will tell you, do this."
+  },
+  {
+    "start": 365.72,
+    "end": 374.36,
+    "text": "If you're on a time crunch, obviously don't do this, but do this when you have time basically."
+  },
+  {
+    "start": 374.36,
+    "end": 376.34,
+    "text": "And then you can see the run.py."
+  },
+  {
+    "start": 376.34,
+    "end": 380.0,
+    "text": "So let's go ahead and start it up and see what we're, what we're dealing with."
+  },
+  {
+    "start": 380.0,
+    "end": 390.12,
+    "text": "So sudo and then we're going to say run.py, whoops, sudo python3 run.py."
+  },
+  {
+    "start": 390.12,
+    "end": 398.08,
+    "text": "That needs my password."
+  },
+  {
+    "start": 398.08,
+    "end": 401.8,
+    "text": "Maybe I typed it wrong."
+  },
+  {
+    "start": 401.8,
+    "end": 403.04,
+    "text": "But so this is going to, there we go."
+  },
+  {
+    "start": 403.04,
+    "end": 405.04,
+    "text": "So it's going to run on web server, right?"
+  },
+  {
+    "start": 405.04,
+    "end": 407.84,
+    "text": "And that's going to be our command and control interface."
+  },
+  {
+    "start": 407.84,
+    "end": 411.88,
+    "text": "So if you guys have ever used, Cobalt Strike is very similar to this."
+  },
+  {
+    "start": 411.88,
+    "end": 416.4,
+    "text": "Cobalt Strike is not a botnet, but it is a C2 machine."
+  },
+  {
+    "start": 416.4,
+    "end": 424.32,
+    "text": "It's a post exploit, I don't know what you necessarily want to call it, but post exploit"
+  },
+  {
+    "start": 424.32,
+    "end": 427.4,
+    "text": "interface or framework, whatever you want to call it."
+  },
+  {
+    "start": 427.4,
+    "end": 429.52,
+    "text": "It's got a lot of tools."
+  },
+  {
+    "start": 429.52,
+    "end": 437.92,
+    "text": "So basically this here, if we open up the internet browser here, you'll see it says"
+  },
+  {
+    "start": 437.92,
+    "end": 439.44,
+    "text": "it's running on 000."
+  },
+  {
+    "start": 439.44,
+    "end": 441.56,
+    "text": "That just means it's running on our host."
+  },
+  {
+    "start": 442.56,
+    "end": 451.16,
+    "text": "Just like anything else, we can go to 127.0.0.1, 5000 and boom, we'll have, now this is running"
+  },
+  {
+    "start": 451.16,
+    "end": 455.32,
+    "text": "really slow because I actually decreased the RAM recently because I am planning on switching"
+  },
+  {
+    "start": 455.32,
+    "end": 459.64,
+    "text": "computers and my computer is getting older."
+  },
+  {
+    "start": 459.64,
+    "end": 468.72,
+    "text": "So now if we go here and we go to, now let's see if it was HTTP or HTTPS, I don't remember."
+  },
+  {
+    "start": 468.72,
+    "end": 476.48,
+    "text": "HTTPS, so 127.0.0.1."
+  },
+  {
+    "start": 476.48,
+    "end": 481.4,
+    "text": "Now this is just our local host, so this is where it's going to be hosted."
+  },
+  {
+    "start": 481.4,
+    "end": 487.32,
+    "text": "Now the nice thing about BYOB is, so I've already created an account on here on the"
+  },
+  {
+    "start": 487.32,
+    "end": 488.8,
+    "text": "local server."
+  },
+  {
+    "start": 488.8,
+    "end": 490.28,
+    "text": "It saves all that information."
+  },
+  {
+    "start": 490.28,
+    "end": 497.12,
+    "text": "So I don't, every time I start it up, I don't have to redo this, which is really nice."
+  },
+  {
+    "start": 497.12,
+    "end": 503.88,
+    "text": "Now if you guys have never used BYOB, it's a very, very neat tool because you can load"
+  },
+  {
+    "start": 503.88,
+    "end": 510.16,
+    "text": "your own Python modules into it, meaning if you have some Python script that you love"
+  },
+  {
+    "start": 510.16,
+    "end": 514.96,
+    "text": "that does a lot of, you can see there, it's getting the request."
+  },
+  {
+    "start": 514.96,
+    "end": 520.72,
+    "text": "If you have a Python script that you love that does pretty much anything you want, like"
+  },
+  {
+    "start": 520.72,
+    "end": 527.72,
+    "text": "it starts searching for information, enumeration, that type of stuff, you can have that built"
+  },
+  {
+    "start": 527.72,
+    "end": 530.36,
+    "text": "in and it will run on the host machine."
+  },
+  {
+    "start": 530.36,
+    "end": 535.36,
+    "text": "So you can see it's going really slow here, which is kind of a pain in the butt, but it"
+  },
+  {
+    "start": 535.36,
+    "end": 536.62,
+    "text": "is what it is."
+  },
+  {
+    "start": 536.62,
+    "end": 539.48,
+    "text": "So you can see it's, we're hosting our own website."
+  },
+  {
+    "start": 539.48,
+    "end": 545.18,
+    "text": "So this is our website, not, this isn't on the web right now."
+  },
+  {
+    "start": 545.18,
+    "end": 547.42,
+    "text": "So you'd have to register."
+  },
+  {
+    "start": 547.42,
+    "end": 552.18,
+    "text": "Registering is just literally creating a username, password."
+  },
+  {
+    "start": 552.18,
+    "end": 556.02,
+    "text": "And then hopefully this can work long enough."
+  },
+  {
+    "start": 556.02,
+    "end": 558.58,
+    "text": "So now we'll log in."
+  },
+  {
+    "start": 558.58,
+    "end": 563.02,
+    "text": "Now the other nice thing is if you're on the same network or if you're publicly hosting"
+  },
+  {
+    "start": 563.02,
+    "end": 568.06,
+    "text": "this, I could log into this from the attack machine too, which is really handy for this"
+  },
+  {
+    "start": 568.06,
+    "end": 581.82,
+    "text": "because if, let's just say if we were able to get the other, get the machine we're attacking,"
+  },
+  {
+    "start": 581.82,
+    "end": 586.06,
+    "text": "if we were able to get it connected, we could just download the payload rather than trying"
+  },
+  {
+    "start": 586.06,
+    "end": 589.42,
+    "text": "to have them click on an email or anything like that."
+  },
+  {
+    "start": 589.42,
+    "end": 595.3,
+    "text": "So basically that's super useful, especially in testing purposes, because we all know that"
+  },
+  {
+    "start": 595.3,
+    "end": 597.42,
+    "text": "you can get a file onto a computer, right?"
+  },
+  {
+    "start": 597.42,
+    "end": 598.42,
+    "text": "We all know that."
+  },
+  {
+    "start": 598.42,
+    "end": 602.66,
+    "text": "Oh, it actually, you can see here, it actually has it right here online."
+  },
+  {
+    "start": 602.66,
+    "end": 608.82,
+    "text": "Now the reason it has this is because, and I'll show you guys, is because I did a persistence"
+  },
+  {
+    "start": 608.82,
+    "end": 611.42,
+    "text": "attack on it when testing."
+  },
+  {
+    "start": 611.42,
+    "end": 614.1,
+    "text": "So we'll go ahead and we'll remove this."
+  },
+  {
+    "start": 614.1,
+    "end": 615.1,
+    "text": "Okay."
+  },
+  {
+    "start": 615.1,
+    "end": 616.1,
+    "text": "Session removed."
+  },
+  {
+    "start": 616.1,
+    "end": 617.1,
+    "text": "Perfectly."
+  },
+  {
+    "start": 617.1,
+    "end": 620.7,
+    "text": "So now you see we have no clients here, no bots as you will."
+  },
+  {
+    "start": 620.7,
+    "end": 623.58,
+    "text": "You can see we can select module payloads."
+  },
+  {
+    "start": 623.58,
+    "end": 624.58,
+    "text": "So now let's go to payloads."
+  },
+  {
+    "start": 624.58,
+    "end": 627.34,
+    "text": "This is a big one."
+  },
+  {
+    "start": 627.34,
+    "end": 629.78,
+    "text": "Okay."
+  },
+  {
+    "start": 629.78,
+    "end": 631.74,
+    "text": "So here's payloads that I've generated."
+  },
+  {
+    "start": 631.74,
+    "end": 633.18,
+    "text": "Okay."
+  },
+  {
+    "start": 633.18,
+    "end": 635.26,
+    "text": "So we'll go ahead and generate one just to show you guys."
+  },
+  {
+    "start": 635.26,
+    "end": 638.24,
+    "text": "So format, first thing we're going to select."
+  },
+  {
+    "start": 638.24,
+    "end": 643.26,
+    "text": "We want a Python or we can do executable, either one."
+  },
+  {
+    "start": 643.26,
+    "end": 646.6,
+    "text": "Since we have a Python one already there, we'll do executable."
+  },
+  {
+    "start": 646.6,
+    "end": 648.14,
+    "text": "Now you do select operating systems."
+  },
+  {
+    "start": 648.62,
+    "end": 650.3,
+    "text": "a bunch of bots."
+  },
+  {
+    "start": 650.3,
+    "end": 653.94,
+    "text": "We'll do Linux and the architecture AMD."
+  },
+  {
+    "start": 653.94,
+    "end": 655.78,
+    "text": "It doesn't really matter."
+  },
+  {
+    "start": 655.78,
+    "end": 656.78,
+    "text": "All right."
+  },
+  {
+    "start": 656.78,
+    "end": 659.1,
+    "text": "It says this can take a few minutes."
+  },
+  {
+    "start": 659.1,
+    "end": 662.42,
+    "text": "Now this, this will take a little bit because it is generating a payload."
+  },
+  {
+    "start": 662.42,
+    "end": 666.54,
+    "text": "It's literally creating that payload with this in mind."
+  },
+  {
+    "start": 666.54,
+    "end": 667.54,
+    "text": "Okay."
+  },
+  {
+    "start": 667.54,
+    "end": 671.3,
+    "text": "Now if you guys do this command line, which I've done the command line version of it as"
+  },
+  {
+    "start": 671.3,
+    "end": 677.38,
+    "text": "well, it will take a little bit more understanding of what you're doing because you have to,"
+  },
+  {
+    "start": 677.82,
+    "end": 680.42,
+    "text": "specify the port you want it to run on the,"
+  },
+  {
+    "start": 682.02,
+    "end": 686.22,
+    "text": "I'm trying to think what else you had to specify some, the port, the IP stuff like that."
+  },
+  {
+    "start": 686.22,
+    "end": 688.26,
+    "text": "So it will take a little bit more."
+  },
+  {
+    "start": 688.26,
+    "end": 690.86,
+    "text": "Now let's go over to our machine."
+  },
+  {
+    "start": 690.86,
+    "end": 692.38,
+    "text": "We're trying to attack, right?"
+  },
+  {
+    "start": 697.3,
+    "end": 700.26,
+    "text": "All right. So here's our attack machine."
+  },
+  {
+    "start": 700.26,
+    "end": 701.58,
+    "text": "So now if we go here,"
+  },
+  {
+    "start": 701.58,
+    "end": 708.38,
+    "text": "the nice thing is we could, we could set up a simple server to get it over here."
+  },
+  {
+    "start": 708.38,
+    "end": 710.34,
+    "text": "We could send it an email."
+  },
+  {
+    "start": 710.34,
+    "end": 712.66,
+    "text": "We could do whatever we wanted to, to get it here."
+  },
+  {
+    "start": 712.66,
+    "end": 716.22,
+    "text": "Right. But you can see here, here's our IP address."
+  },
+  {
+    "start": 716.22,
+    "end": 722.78,
+    "text": "And look, we can log right in with our account."
+  },
+  {
+    "start": 722.78,
+    "end": 725.1,
+    "text": "So if we just do our account,"
+  },
+  {
+    "start": 725.1,
+    "end": 736.66,
+    "text": "and you see we're right in the control panel, we're right there."
+  },
+  {
+    "start": 736.66,
+    "end": 739.22,
+    "text": "Right. So even though we're on the attacker's machine,"
+  },
+  {
+    "start": 739.22,
+    "end": 742.82,
+    "text": "so if we have access to that attacker's machine, but we're trying to build a botnet,"
+  },
+  {
+    "start": 742.82,
+    "end": 743.9,
+    "text": "we can do this."
+  },
+  {
+    "start": 743.9,
+    "end": 748.98,
+    "text": "Now, if we just want to send this out in a mass spam email and see who,"
+  },
+  {
+    "start": 748.98,
+    "end": 750.9,
+    "text": "who clicks on it, we could do that."
+  },
+  {
+    "start": 750.9,
+    "end": 753.38,
+    "text": "There's a million ways you could, you could implement this."
+  },
+  {
+    "start": 753.58,
+    "end": 756.9,
+    "text": "So now you can see it's still generating that,"
+  },
+  {
+    "start": 756.9,
+    "end": 759.86,
+    "text": "that previous payload because otherwise this would be,"
+  },
+  {
+    "start": 759.86,
+    "end": 763.1,
+    "text": "this would have another payload here."
+  },
+  {
+    "start": 763.1,
+    "end": 764.42,
+    "text": "And there we go."
+  },
+  {
+    "start": 764.42,
+    "end": 765.94,
+    "text": "So you can see it's still loading."
+  },
+  {
+    "start": 765.94,
+    "end": 773.02,
+    "text": "That's fine. We'll go to the control panel because we want to see if this pops up."
+  },
+  {
+    "start": 773.02,
+    "end": 774.78,
+    "text": "All right. So the control panel, here we go."
+  },
+  {
+    "start": 774.78,
+    "end": 776.62,
+    "text": "That'll load while we're doing this."
+  },
+  {
+    "start": 776.62,
+    "end": 779.82,
+    "text": "So now here we're on the Ubuntu machine."
+  },
+  {
+    "start": 779.86,
+    "end": 786.02,
+    "text": "So we'll go to payloads and here's one for Linux that we're going to download."
+  },
+  {
+    "start": 786.02,
+    "end": 791.74,
+    "text": "Now, again, keep in mind that you can get this onto someone's machine a million different ways."
+  },
+  {
+    "start": 791.74,
+    "end": 795.74,
+    "text": "Don't think that you literally have to go onto their machine, open up a browser,"
+  },
+  {
+    "start": 795.74,
+    "end": 796.9,
+    "text": "that type of stuff."
+  },
+  {
+    "start": 796.9,
+    "end": 802.74,
+    "text": "Now, the other thing to keep in mind is that these are undetectable payloads typically."
+  },
+  {
+    "start": 802.78,
+    "end": 810.02,
+    "text": "Okay. So now this is a Linux machine or a Linux executable."
+  },
+  {
+    "start": 810.02,
+    "end": 823.06,
+    "text": "So if we go to our terminal and it's in downloads and you can see there's our executable."
+  },
+  {
+    "start": 823.06,
+    "end": 828.1,
+    "text": "Now, the one that I just downloaded isn't executable yet because I have to change the permissions on it."
+  },
+  {
+    "start": 828.1,
+    "end": 830.38,
+    "text": "But that's just the way this works."
+  },
+  {
+    "start": 830.42,
+    "end": 837.94,
+    "text": "So now if we do this, you'll see this is the same payload that I just downloaded."
+  },
+  {
+    "start": 837.94,
+    "end": 842.18,
+    "text": "If we run it. All right. You see that it's running."
+  },
+  {
+    "start": 842.18,
+    "end": 847.98,
+    "text": "So this would run in the background. We'd have it set up to run in the background, right?"
+  },
+  {
+    "start": 847.98,
+    "end": 853.46,
+    "text": "Now we go here, refresh the page."
+  },
+  {
+    "start": 853.46,
+    "end": 855.38,
+    "text": "And you see right there it popped up new connection."
+  },
+  {
+    "start": 861.38,
+    "end": 866.38,
+    "text": "Now there are a couple of caveats I'm going to tell you guys now while this is loading."
+  },
+  {
+    "start": 866.38,
+    "end": 871.38,
+    "text": "One thing you're going to have to do if you're using this to get it to work."
+  },
+  {
+    "start": 871.38,
+    "end": 875.38,
+    "text": "And if you're my Patreon member, I'm going to have it all in the guide."
+  },
+  {
+    "start": 875.38,
+    "end": 880.38,
+    "text": "But you will have to set up port forwarding on your personal router."
+  },
+  {
+    "start": 880.38,
+    "end": 885.38,
+    "text": "The only reason is because this is going to use your external IP, not your internals."
+  },
+  {
+    "start": 885.38,
+    "end": 888.38,
+    "text": "So it's not going to route correctly without it."
+  },
+  {
+    "start": 888.38,
+    "end": 892.38,
+    "text": "All right. And you can see, look, we have our host right here."
+  },
+  {
+    "start": 892.38,
+    "end": 896.38,
+    "text": "So let's go ahead. But you can see."
+  },
+  {
+    "start": 896.38,
+    "end": 900.38,
+    "text": "So the nice thing about this this build your own botnet is here."
+  },
+  {
+    "start": 900.38,
+    "end": 906.38,
+    "text": "I can go on here and I can do the persistence and you can see that the persistence works"
+  },
+  {
+    "start": 906.38,
+    "end": 909.38,
+    "text": "because as soon as we logged in, I already had a bot here."
+  },
+  {
+    "start": 909.38,
+    "end": 916.38,
+    "text": "And that was because I had I did the persistence module earlier when I was testing."
+  },
+  {
+    "start": 916.38,
+    "end": 919.38,
+    "text": "So that's pretty neat because I didn't know how it would work, to be honest with you,"
+  },
+  {
+    "start": 919.38,
+    "end": 922.38,
+    "text": "like if it actually work or what. And as soon as we logged in, we still had our bot."
+  },
+  {
+    "start": 922.38,
+    "end": 926.38,
+    "text": "So it does work. The other thing is we have minor."
+  },
+  {
+    "start": 926.38,
+    "end": 932.38,
+    "text": "That's the crypto miner. OK, we have key logger escalate privileges."
+  },
+  {
+    "start": 932.38,
+    "end": 940.38,
+    "text": "We don't need to ask that person because we're already root or we have pseudo access packet sniffer screenshots, webcams outlook."
+  },
+  {
+    "start": 940.38,
+    "end": 945.38,
+    "text": "So these are what comes by default. Now, the port scanners interesting because if I click port scanner,"
+  },
+  {
+    "start": 945.38,
+    "end": 949.38,
+    "text": "it will ask me for a target. Right. So it's going to ask me to."
+  },
+  {
+    "start": 949.38,
+    "end": 952.38,
+    "text": "So I click port scanner. It's going to say, what's the IP you want to target?"
+  },
+  {
+    "start": 952.38,
+    "end": 959.38,
+    "text": "So if I did, for instance, in maps, scan me dot org, which is a test site."
+  },
+  {
+    "start": 959.38,
+    "end": 961.38,
+    "text": "Right. I could do that and execute it."
+  },
+  {
+    "start": 961.38,
+    "end": 966.38,
+    "text": "And then this computer, my target machine would be the one running the scan, not me."
+  },
+  {
+    "start": 966.38,
+    "end": 970.38,
+    "text": "I don't have to worry about getting caught because the bot did it. Right."
+  },
+  {
+    "start": 971.38,
+    "end": 977.38,
+    "text": "Theoretically. Now, obviously, this can all be traced back if you don't know what you're doing now."
+  },
+  {
+    "start": 977.38,
+    "end": 981.38,
+    "text": "You can see the hashes per second, things like that. So I can try and get their passwords."
+  },
+  {
+    "start": 981.38,
+    "end": 990.38,
+    "text": "There are more modules in the non web GUI. I noticed that you can see that you can get you can upload your own."
+  },
+  {
+    "start": 990.38,
+    "end": 998.38,
+    "text": "The other really nice thing is it'll tell you exactly what to how to get started, how it works, ask questions, all that stuff."
+  },
+  {
+    "start": 998.38,
+    "end": 1007.38,
+    "text": "This is a really good web interface. Actually, the other really nice thing is you can go to shell here and this gives you an Internet terminal, which is really nice."
+  },
+  {
+    "start": 1007.38,
+    "end": 1013.38,
+    "text": "I didn't expect this. So I have a shell on my machine right now."
+  },
+  {
+    "start": 1013.38,
+    "end": 1017.38,
+    "text": "And you can see there's my payloads. I have a shell on my machine right now."
+  },
+  {
+    "start": 1017.38,
+    "end": 1025.38,
+    "text": "And that's simply from just having this Internet, this web browser open."
+  },
+  {
+    "start": 1025.38,
+    "end": 1031.38,
+    "text": "And now I have a web browser shell, which is not something I'd expect from a educational tool. Right."
+  },
+  {
+    "start": 1031.38,
+    "end": 1039.38,
+    "text": "I wouldn't expect this unless this tool is going to be sold and it's still free. So I'm actually really impressed with the tool."
+  },
+  {
+    "start": 1039.38,
+    "end": 1044.38,
+    "text": "I think it's awesome. You can see here that there is some more things you can do here."
+  },
+  {
+    "start": 1044.38,
+    "end": 1051.38,
+    "text": "You can actually will let it load, but you can actually upload different files you could."
+  },
+  {
+    "start": 1051.38,
+    "end": 1055.38,
+    "text": "So the other really nice thing is you can write your own payloads here."
+  },
+  {
+    "start": 1055.38,
+    "end": 1062.38,
+    "text": "That is really nice because you can use them later. So if I to select a target, you just like this."
+  },
+  {
+    "start": 1062.38,
+    "end": 1070.38,
+    "text": "And you can see here's obviously the default ones, but you can upload whatever you want, any payloads you make, any payloads you download, anything."
+  },
+  {
+    "start": 1070.38,
+    "end": 1075.38,
+    "text": "So, for instance, this is just an example. I haven't tested this. I don't know that this stuff works."
+  },
+  {
+    "start": 1075.38,
+    "end": 1084.38,
+    "text": "But for instance, like Mimi cats and Lin Peas and all that stuff, right, you could theoretically, if you did it correctly, you could upload those into here."
+  },
+  {
+    "start": 1084.38,
+    "end": 1088.38,
+    "text": "And then straight from here, you could just go to all the bots and run those."
+  },
+  {
+    "start": 1088.38,
+    "end": 1094.38,
+    "text": "And you wouldn't have to go into a shell, get on there, blah, blah, blah. You could just do all that from here."
+  },
+  {
+    "start": 1094.38,
+    "end": 1099.38,
+    "text": "You could control everything. Now, imagine if you had ten thousand bots here."
+  },
+  {
+    "start": 1099.38,
+    "end": 1108.38,
+    "text": "And you said. Port scanner, right? Now you're saying, well, why do you need ten thousand bots to scan one one address, right?"
+  },
+  {
+    "start": 1108.38,
+    "end": 1113.38,
+    "text": "You would put a range of addresses there. Let's say ten thousand addresses."
+  },
+  {
+    "start": 1113.38,
+    "end": 1118.38,
+    "text": "Well, you have ten thousand bots. You select all the bots. Now you're doing ten thousand addresses at once."
+  },
+  {
+    "start": 1118.38,
+    "end": 1126.38,
+    "text": "It's going to take. What however long an in-map scan takes, right, versus if you were to scan ten thousand in-map scans."
+  },
+  {
+    "start": 1126.38,
+    "end": 1129.38,
+    "text": "So that's kind of some of the uses, right?"
+  },
+  {
+    "start": 1129.38,
+    "end": 1133.38,
+    "text": "Besides the fact that you can use them for DDoS attacks and things like that."
+  },
+  {
+    "start": 1133.38,
+    "end": 1140.38,
+    "text": "Now, this is how hackers build botnets. This is called a command and control server."
+  },
+  {
+    "start": 1140.38,
+    "end": 1148.38,
+    "text": "Now, I know that this might not be as interesting to you because of the fact that this."
+  },
+  {
+    "start": 1148.38,
+    "end": 1151.38,
+    "text": "What are you going to do? Are you going to go get start building bots?"
+  },
+  {
+    "start": 1151.38,
+    "end": 1155.38,
+    "text": "Probably not the reason because it's illegal, right? You're taking control of a machine."
+  },
+  {
+    "start": 1155.38,
+    "end": 1164.38,
+    "text": "But it's important to know how it's done because when you're especially if you're a cyber analyst or sock analyst, something like that,"
+  },
+  {
+    "start": 1164.38,
+    "end": 1169.38,
+    "text": "what you're looking for in a botnet scenario is a callback, right?"
+  },
+  {
+    "start": 1169.38,
+    "end": 1179.38,
+    "text": "So you're looking for these bots here to reach back and gather information or to send information to you."
+  },
+  {
+    "start": 1179.38,
+    "end": 1185.38,
+    "text": "Excuse me, to one IP address, which would be this host, right?"
+  },
+  {
+    "start": 1185.38,
+    "end": 1195.38,
+    "text": "So what you're looking for is you're looking for a pattern of callbacks, meaning, OK, so this one server command and control server,"
+  },
+  {
+    "start": 1195.38,
+    "end": 1199.38,
+    "text": "all these IPs are reaching back to it. So that tells me, whoops, that tells me right there."
+  },
+  {
+    "start": 1199.38,
+    "end": 1205.38,
+    "text": "This is probably a command and control server because that IP is not ours, right?"
+  },
+  {
+    "start": 1205.38,
+    "end": 1210.38,
+    "text": "So that's when you know you have a problem because you have all these infected machines."
+  },
+  {
+    "start": 1210.38,
+    "end": 1215.38,
+    "text": "Now, could you theoretically just block this IP? You could."
+  },
+  {
+    "start": 1215.38,
+    "end": 1219.38,
+    "text": "The problem is all of those machines still have the software on them."
+  },
+  {
+    "start": 1219.38,
+    "end": 1226.38,
+    "text": "Now, there are ways built in not on this one because this is for education, but on some botnets,"
+  },
+  {
+    "start": 1226.38,
+    "end": 1232.38,
+    "text": "there's ways back in where if you block the IP, it'll route to a backup IP, a backup domain, so on and so forth."
+  },
+  {
+    "start": 1232.38,
+    "end": 1235.38,
+    "text": "And so there are ways that they could try and circumvent."
+  },
+  {
+    "start": 1235.38,
+    "end": 1239.38,
+    "text": "And it's this back and forth that hackers have with white hats, black hats, right?"
+  },
+  {
+    "start": 1239.38,
+    "end": 1246.38,
+    "text": "So keep this in mind that this is a really cool tool, especially if you have an at home lab set up"
+  },
+  {
+    "start": 1246.38,
+    "end": 1250.38,
+    "text": "where you might have like five or six VMs, a couple of machines, whatever."
+  },
+  {
+    "start": 1250.38,
+    "end": 1257.38,
+    "text": "You could have all those be bots and you could start sending them commands and watch them do things without you ever doing anything."
+  },
+  {
+    "start": 1257.38,
+    "end": 1261.38,
+    "text": "So we're sitting here at this Web GUI and setting it up."
+  },
+  {
+    "start": 1261.38,
+    "end": 1266.38,
+    "text": "So I will tell you, I had a little bit of issue installing this initially."
+  },
+  {
+    "start": 1266.38,
+    "end": 1272.38,
+    "text": "And the only reason is because it was erroring out. If that happens, just reinstall."
+  },
+  {
+    "start": 1272.38,
+    "end": 1279.38,
+    "text": "That's what I did. And it worked. I was trying to use this same version that aired out and it was never working."
+  },
+  {
+    "start": 1279.38,
+    "end": 1284.38,
+    "text": "So I will say make sure that you reinstall works great when you reinstall."
+  },
+  {
+    "start": 1284.38,
+    "end": 1291.38,
+    "text": "Make sure that you after you reinstall, go ahead and make sure that there's no errors."
+  },
+  {
+    "start": 1291.38,
+    "end": 1298.38,
+    "text": "Now, there might be some errors if, like, for instance, you already have Docker and it's trying to install it or anything like that."
+  },
+  {
+    "start": 1298.38,
+    "end": 1302.38,
+    "text": "If you have any issues with installing, I'll show you here."
+  },
+  {
+    "start": 1302.38,
+    "end": 1308.38,
+    "text": "So we're going to go ahead and close this down because I want to show you."
+  },
+  {
+    "start": 1308.38,
+    "end": 1314.38,
+    "text": "All right. So if you have issues with anything installing, airing out,"
+  },
+  {
+    "start": 1314.38,
+    "end": 1318.38,
+    "text": "cat the requirements and just manually install those."
+  },
+  {
+    "start": 1318.38,
+    "end": 1326.38,
+    "text": "OK, if you manually install them, then you can see the errors one by one versus if you're watching an automated process go."
+  },
+  {
+    "start": 1326.38,
+    "end": 1329.38,
+    "text": "Now, this tool, I will tell you, is very powerful."
+  },
+  {
+    "start": 1329.38,
+    "end": 1334.38,
+    "text": "You can do a lot of illegal stuff and I do not do not condone it."
+  },
+  {
+    "start": 1334.38,
+    "end": 1341.38,
+    "text": "You could get in a lot of trouble for this, especially because you're starting to take over a lot of machines and that's that's very dangerous."
+  },
+  {
+    "start": 1341.38,
+    "end": 1344.38,
+    "text": "So keep that in mind when you guys are doing this."
+  },
+  {
+    "start": 1344.38,
+    "end": 1351.38,
+    "text": "But it is a lot of fun. It is kind of crazy that it's this simple to build your own command and control server nowadays,"
+  },
+  {
+    "start": 1351.38,
+    "end": 1356.38,
+    "text": "especially when that that's a very sophisticated attack eventually, depending on what you do."
+  },
+  {
+    "start": 1356.38,
+    "end": 1360.38,
+    "text": "But keep this stuff in mind that this is how hackers do this."
+  },
+  {
+    "start": 1360.38,
+    "end": 1371.38,
+    "text": "And it is something that is very prevalent and very scary and very real because this is how attackers also don't get caught because there's so many different things they can do."
+  },
+  {
+    "start": 1371.38,
+    "end": 1381.38,
+    "text": "But another big one they'll do is like, let's say I send five hundred computers to send packets to this one computer."
+  },
+  {
+    "start": 1381.38,
+    "end": 1388.38,
+    "text": "Right. Well, if I have five hundred computers, send something to them all at once."
+  },
+  {
+    "start": 1388.38,
+    "end": 1391.38,
+    "text": "You don't know which one is the malicious packet. Right."
+  },
+  {
+    "start": 1391.38,
+    "end": 1400.38,
+    "text": "So whether I send payloads or just random text, you don't know you'd have to go through and you can multiply this by five thousand five hundred thousand whatever."
+  },
+  {
+    "start": 1400.38,
+    "end": 1405.38,
+    "text": "You have to go through every single log, which has hundreds of requests."
+  },
+  {
+    "start": 1406.38,
+    "end": 1418.38,
+    "text": "For each machine, you'd have to go through each individual log and look at which one sent that malicious code unless you have some sort of endpoint detection system or something like that that's doing this automatically for you."
+  },
+  {
+    "start": 1418.38,
+    "end": 1428.38,
+    "text": "But keep this stuff in mind that this can get very sophisticated and very dangerous, especially if you're setting encoded payloads and stuff like that, because now it's just more logs you have to go through."
+  },
+  {
+    "start": 1428.38,
+    "end": 1432.38,
+    "text": "And it can get pretty convoluted and pretty complex."
+  },
+  {
+    "start": 1432.38,
+    "end": 1434.38,
+    "text": "So hopefully you guys like this video."
+  },
+  {
+    "start": 1434.38,
+    "end": 1441.38,
+    "text": "This this video was a little bit harder to make only because I had so many issues with setting it up."
+  },
+  {
+    "start": 1441.38,
+    "end": 1444.38,
+    "text": "And that was simply because of the errors."
+  },
+  {
+    "start": 1444.38,
+    "end": 1448.38,
+    "text": "And I was trying to make the video with the Web GUI and the regular."
+  },
+  {
+    "start": 1448.38,
+    "end": 1453.38,
+    "text": "And I realized, like, that's going to be too much because I wanted to show you guys the terminal line because there's a few more options."
+  },
+  {
+    "start": 1453.38,
+    "end": 1456.38,
+    "text": "But it was just too much to do."
+  },
+  {
+    "start": 1456.38,
+    "end": 1460.38,
+    "text": "And then I had to get a clean install and a bunch of other stuff."
+  },
+  {
+    "start": 1460.38,
+    "end": 1463.38,
+    "text": "So this video took longer than it should have to make."
+  },
+  {
+    "start": 1463.38,
+    "end": 1465.38,
+    "text": "And hopefully you guys enjoyed it."
+  },
+  {
+    "start": 1465.38,
+    "end": 1469.38,
+    "text": "Hopefully you guys are liking the videos and hopefully you guys can keep supporting me."
+  },
+  {
+    "start": 1469.38,
+    "end": 1470.38,
+    "text": "We're almost to 500 subs."
+  },
+  {
+    "start": 1470.38,
+    "end": 1474.38,
+    "text": "And again, guys, at 500 subs, we're going to do the keylogger giveaway."
+  },
+  {
+    "start": 1474.38,
+    "end": 1476.38,
+    "text": "And I really appreciate it."
+  },
+  {
+    "start": 1476.38,
+    "end": 1478.38,
+    "text": "I might do something special for 500."
+  },
+  {
+    "start": 1478.38,
+    "end": 1483.38,
+    "text": "I might do like a lock picking tutorial or something like that for just something off beat, something different."
+  },
+  {
+    "start": 1483.38,
+    "end": 1486.38,
+    "text": "So hopefully you guys like it and hopefully you guys keep supporting."
+  },
+  {
+    "start": 1486.38,
+    "end": 1487.38,
+    "text": "Thanks, guys."
+  }
+]

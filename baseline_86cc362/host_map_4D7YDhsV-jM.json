@@ -1,0 +1,34 @@
+[
+  {
+    "host": "pip",
+    "start": 0.0,
+    "end": 85.2333,
+    "bbox": [
+      0.7443,
+      0.7435,
+      0.2552,
+      0.2556
+    ],
+    "mask": "/home/boss/videogen/wk_b_4D7YDhsV-jM/masks/seg_0000.png",
+    "shape": "rect90"
+  },
+  {
+    "host": "off",
+    "start": 85.2333,
+    "end": 95.0333,
+    "bbox": null
+  },
+  {
+    "host": "pip",
+    "start": 95.0333,
+    "end": 860.83,
+    "bbox": [
+      0.7443,
+      0.7435,
+      0.2552,
+      0.2556
+    ],
+    "mask": "/home/boss/videogen/wk_b_4D7YDhsV-jM/masks/seg_0000.png",
+    "shape": "rect90"
+  }
+]

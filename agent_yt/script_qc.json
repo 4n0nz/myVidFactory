@@ -1,0 +1,256 @@
+{
+  "meta": {"fps": 30, "width": 1920, "height": 1080},
+  "scenes": [
+    {
+      "id": "intro_title",
+      "type": "title",
+      "host": "off",
+      "narration": "100,000 machines qui exécutent tes commandes. T'as même pas besoin de toucher ton clavier.",
+      "props": {
+        "title": "BOTNETS",
+        "subtitle": "Comment les hackers prennent le contrôle — et comment tu le détectes"
+      }
+    },
+    {
+      "id": "accroche_stat",
+      "type": "stat",
+      "host": "pip",
+      "narration": "Un seul ordi qui tente un DDoS ? Rien. Mais 100,000 machines qui envoient des packets en même temps ? Tu mets n'importe quel serveur à genoux. C'est ça un botnet.",
+      "props": {
+        "items": [
+          {"value": "1", "label": "machine = inutile"},
+          {"value": "100K", "label": "machines = DDoS réel"},
+          {"value": "0", "label": "traces sur ton IP"}
+        ]
+      }
+    },
+    {
+      "id": "contexte_definition",
+      "type": "bullets",
+      "host": "pip",
+      "narration": "Un botnet c'est simple. T'as des machines infectées — les bots — qui reachent back à un C2, un command and control server. C'est lui le cerveau. Toi tu donnes les ordres depuis là, depuis n'importe où dans le monde.",
+      "props": {
+        "heading": "C'est quoi un botnet",
+        "bullets": [
+          "Bot = machine infectée qui reçoit des ordres à distance",
+          "C2 = command and control server, ton quartier général",
+          "Tout run en background — la victime voit rien",
+          "Le botnet peut se spread et infecter de nouvelles machines"
+        ]
+      }
+    },
+    {
+      "id": "enjeu_usages",
+      "type": "bullets",
+      "host": "pip",
+      "narration": "Pis les usages, c'est pas juste du DDoS. Les hackers utilisent leurs bots pour scanner des réseaux, miner de la crypto, logger des keystrokes, exfiltrer du data — tout ça depuis des IPs qui sont pas les leurs. Toi t'es invisible.",
+      "props": {
+        "heading": "Ce que les hackers font avec leurs bots",
+        "bullets": [
+          "DDoS — saturer une cible avec 100K sources différentes",
+          "Port scan — l'IP du bot prend le risque, pas la tienne",
+          "Crypto mining — tu voles les ressources CPU des victimes",
+          "Keylogging + screenshots — tu exfiltres du data sensible",
+          "Persistence — le bot survit aux reboots, il revient toujours"
+        ]
+      }
+    },
+    {
+      "id": "architecture_c2",
+      "type": "architecture",
+      "host": "pip",
+      "narration": "Voilà comment ça s'organise. Ton C2 server est au centre. Tous les bots reachent back à lui pour recevoir des instructions. Toi tu contrôles tout depuis une web GUI — même depuis la machine de la cible si t'as accès au network.",
+      "props": {
+        "nodes": [
+          {"id": "attacker", "label": "Attaquant (toi)"},
+          {"id": "c2", "label": "C2 Server (BYOB)"},
+          {"id": "bot1", "label": "Bot 1 — Ubuntu VM"},
+          {"id": "bot2", "label": "Bot 2 — Windows"},
+          {"id": "bot3", "label": "Bot 3 — Japon"},
+          {"id": "target", "label": "Cible scannée"}
+        ],
+        "side": "Le C2 = point central. Tous les bots callback vers lui en permanence."
+      }
+    },
+    {
+      "id": "chapter_1",
+      "type": "chapter",
+      "host": "pip",
+      "narration": "Premier point — setup ton C2 avec BYOB.",
+      "props": {
+        "num": "01",
+        "title": "Setup le C2 — Build Your Own Botnet"
+      }
+    },
+    {
+      "id": "setup_install",
+      "type": "terminal",
+      "host": "pip",
+      "narration": "BYOB — Build Your Own Botnet — c'est un projet Python open source sur GitHub. T'installes Git, tu clones le repo, pis tu lances le startup script. Ça installe Docker et toutes les dépendances. Donne-lui du temps, c'est pas instantané.",
+      "props": {
+        "commands": [
+          "sudo apt install git",
+          "git clone https://github.com/malwaredllc/byob.git",
+          "cd byob/web-gui",
+          "bash startup.sh"
+        ]
+      }
+    },
+    {
+      "id": "setup_filetree",
+      "type": "filetree",
+      "host": "pip",
+      "narration": "Une fois cloné, voilà ta structure. Le dossier web-gui c'est là que tout se passe. Le run.py démarre ton interface. Les requirements.txt te montrent tout ce qui s'installe — si le startup.sh error out, installe-les manuellement un par un.",
+      "props": {
+        "files": [
+          "byob/",
+          "byob/byob/                  ← CLI version",
+          "byob/web-gui/",
+          "byob/web-gui/run.py         ← démarre le C2",
+          "byob/web-gui/startup.sh     ← install des dépendances",
+          "byob/web-gui/requirements.txt"
+        ]
+      }
+    },
+    {
+      "id": "setup_launch",
+      "type": "terminal",
+      "host": "pip",
+      "narration": "Tu lances le C2 avec une seule commande. Il run sur ton localhost port 5000. Depuis n'importe quelle machine sur ton network, tu te connectes à la web GUI avec l'IP du serveur. Tu crées un compte — juste un username et un password.",
+      "props": {
+        "commands": [
+          "cd byob/web-gui",
+          "sudo python3 run.py",
+          "# → Interface web : https://127.0.0.1:5000",
+          "# → Depuis le réseau : https://[IP-SERVEUR]:5000"
+        ]
+      }
+    },
+    {
+      "id": "chapter_2",
+      "type": "chapter",
+      "host": "pip",
+      "narration": "Deuxième point — générer ton payload.",
+      "props": {
+        "num": "02",
+        "title": "Générer le Payload"
+      }
+    },
+    {
+      "id": "payload_generation",
+      "type": "bullets",
+      "host": "pip",
+      "narration": "Dans la web GUI tu vas dans Payloads. Tu choisis le format — Python ou executable — ton OS cible, l'architecture. BYOB génère un binaire customisé qui call back à l'IP de ton C2 automatiquement. Ça prend quelques minutes. Pis tu peux embed tes propres modules Python dedans.",
+      "props": {
+        "heading": "Générer un payload dans BYOB",
+        "bullets": [
+          "Format : Python (.py) ou Executable (ELF Linux / EXE Windows)",
+          "OS cible : Linux ou Windows — Architecture : AMD64",
+          "Le payload call back automatiquement à l'IP de ton C2",
+          "Tu peux embed des modules Python customs dans le payload",
+          "Payload typiquement non détecté par les antivirus de base"
+        ]
+      }
+    },
+    {
+      "id": "chapter_3",
+      "type": "chapter",
+      "host": "pip",
+      "narration": "Troisième point — infecter la machine cible.",
+      "props": {
+        "num": "03",
+        "title": "Infecter la Cible"
+      }
+    },
+    {
+      "id": "infection_deploy",
+      "type": "terminal",
+      "host": "pip",
+      "narration": "Sur la machine cible, tu télécharges le payload depuis la web GUI de ton C2. Tu changes les permissions, tu l'exécutes en background. Dans ton control panel, la nouvelle connexion pop instantanément. Tu peux aussi envoyer le payload par email, simple server HTTP, whatever — y'a mille façons de le livrer.",
+      "props": {
+        "commands": [
+          "# Sur la machine cible",
+          "chmod +x payload_linux_amd64",
+          "./payload_linux_amd64 &",
+          "# → 'New connection' pop dans le C2 control panel"
+        ]
+      }
+    },
+    {
+      "id": "chapter_4",
+      "type": "chapter",
+      "host": "pip",
+      "narration": "Quatrième point — contrôler tes bots.",
+      "props": {
+        "num": "04",
+        "title": "Contrôler tes Bots"
+      }
+    },
+    {
+      "id": "modules_disponibles",
+      "type": "bullets",
+      "host": "pip",
+      "narration": "Une fois le bot connecté, t'as accès aux modules built-in. Persistence pour survivre aux reboots. Port scanner — mais c'est l'IP du bot qui scan, pas la tienne. Miner, keylogger, screenshots, webcam. Pis le plus impressionnant : un shell web direct sur la machine — t'as un terminal complet dans ton browser.",
+      "props": {
+        "heading": "Modules BYOB disponibles",
+        "bullets": [
+          "Persistence — bot survit aux reboots, il revient",
+          "Port Scanner — scan depuis l'IP du bot, pas la tienne",
+          "Keylogger — capture toutes les keystrokes",
+          "Miner — vol de CPU pour crypto mining",
+          "Screenshots + Webcam — surveillance complète",
+          "Shell — terminal web direct dans ton browser"
+        ]
+      }
+    },
+    {
+      "id": "scale_stat",
+      "type": "stat",
+      "host": "pip",
+      "narration": "Imagine 10,000 bots. Tu sélectionnes tout. Tu lances un port scan sur 10,000 addresses différentes. Chaque bot scan une adresse. Le temps total égale le temps d'un seul scan. C'est ça la vraie puissance du scaling.",
+      "props": {
+        "items": [
+          {"value": "10K", "label": "bots actifs"},
+          {"value": "10K", "label": "adresses scannées en parallèle"},
+          {"value": "1×", "label": "temps = 1 scan normal"}
+        ]
+      }
+    },
+    {
+      "id": "chapter_5",
+      "type": "chapter",
+      "host": "pip",
+      "narration": "Cinquième point — détecter un botnet. La vue du défenseur.",
+      "props": {
+        "num": "05",
+        "title": "Détecter un Botnet — Vue Défenseur"
+      }
+    },
+    {
+      "id": "detection_callbacks",
+      "type": "bullets",
+      "host": "pip",
+      "narration": "Si t'es SOC analyst, ce que tu cherches c'est des callbacks. Un pattern où plusieurs machines internes reachent out vers la même IP externe — c'est ton red flag. Bloquer l'IP du C2 c'est pas suffisant : les bots ont encore le malware. Certains botnets ont des backup IPs et domains intégrés. C'est un game de cat and mouse entre hackers et défenseurs.",
+      "props": {
+        "heading": "Comment détecter un C2 dans tes logs",
+        "bullets": [
+          "Pattern de callbacks — plusieurs IPs internes → même IP externe",
+          "Connexions périodiques régulières = beacon, heartbeat du bot",
+          "Trafic chiffré vers une IP inconnue = suspect",
+          "Bloquer le C2 ne suffit pas — les bots ont encore le malware",
+          "EDR (Endpoint Detection) pour automatiser l'analyse des logs"
+        ]
+      }
+    },
+    {
+      "id": "cta_transformation",
+      "type": "title",
+      "host": "pip",
+      "narration": "Dans ton home lab, setup BYOB. Infecte tes VMs. Regarde les callbacks dans tes logs. C'est comme ça que tu comprends vraiment comment les hackers évitent de se faire catch — et comment toi tu les attrapes. Reste jusqu'à fin.",
+      "props": {
+        "title": "PRATIQUE ÇA",
+        "subtitle": "Home lab → C2 → bots → callbacks → tu comprends tout"
+      }
+    }
+  ]
+}
