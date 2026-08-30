@@ -1,0 +1,8 @@
+wk_masortie t=202 -> 1 facecam(s)
+wk_masortie t=367 -> 1 facecam(s)
+wk_masortie t=1065 -> 1 facecam(s)
+wk_lastvideo t=220 -> 1 facecam(s)
+wk_lastvideo t=700 -> 1 facecam(s)
+wk_lastvideo t=1100 -> 1 facecam(s)
+VAL_DONE -> /home/boss/yolo/val_real
+VALWAIT_DONE
